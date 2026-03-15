@@ -46,6 +46,31 @@ export function ClientTopUp() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const handlePaste = useCallback((e: ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (!file) return;
+        if (file.size > 5 * 1024 * 1024) {
+          toast.error("File size must be under 5MB");
+          return;
+        }
+        setProofFile(file);
+        setProofPreview(URL.createObjectURL(file));
+        toast.success("Screenshot pasted!");
+        return;
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    document.addEventListener("paste", handlePaste);
+    return () => document.removeEventListener("paste", handlePaste);
+  }, [handlePaste]);
+
   const { data: usdRate } = useQuery({
     queryKey: ["usd-rate", user?.id],
     queryFn: async () => {
