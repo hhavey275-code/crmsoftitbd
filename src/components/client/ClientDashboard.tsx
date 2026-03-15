@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { MetricCard } from "@/components/MetricCard";
-import { Wallet, MonitorSmartphone, TrendingUp, CalendarIcon, ShoppingCart, DollarSign } from "lucide-react";
+import { Wallet, MonitorSmartphone, TrendingUp, CalendarIcon, ShoppingCart, DollarSign, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,9 @@ import { format, startOfMonth, endOfMonth } from "date-fns";
 
 export function ClientDashboard() {
   const { user, profile } = useAuth();
+  const queryClient = useQueryClient();
   const isInactive = (profile as any)?.status === "inactive";
+  const [updatingMeta, setUpdatingMeta] = useState(false);
 
   const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfMonth(new Date()));
   const [dateTo, setDateTo] = useState<Date | undefined>(endOfMonth(new Date()));
@@ -136,6 +139,33 @@ export function ClientDashboard() {
       )}
 
       {/* Today's Performance - Aggregated across all ad accounts */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-medium text-muted-foreground">Today's Performance</h2>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={updatingMeta || !adAccounts || adAccounts.length === 0}
+          onClick={async () => {
+            if (!adAccounts || adAccounts.length === 0) return;
+            setUpdatingMeta(true);
+            try {
+              const ids = adAccounts.map((a: any) => a.id);
+              await supabase.functions.invoke("get-account-insights", {
+                body: { ad_account_ids: ids, source: "meta" },
+              });
+              await queryClient.invalidateQueries({ queryKey: ["client-insights"] });
+              toast.success("Data updated from Meta successfully!");
+            } catch {
+              toast.error("Failed to update from Meta");
+            } finally {
+              setUpdatingMeta(false);
+            }
+          }}
+        >
+          <RefreshCw className={cn("h-3.5 w-3.5 mr-1.5", updatingMeta && "animate-spin")} />
+          {updatingMeta ? "Updating..." : "Update from Meta"}
+        </Button>
+      </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           title="Today's Spend"
