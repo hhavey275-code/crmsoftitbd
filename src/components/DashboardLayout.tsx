@@ -45,6 +45,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           </main>
         </div>
       </div>
+      {!isAdmin && <ChatWidget />}
     </SidebarProvider>
   );
 }

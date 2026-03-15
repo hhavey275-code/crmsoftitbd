@@ -40,6 +40,7 @@ const adminNavItems = [
   { title: "Top-Up Request", url: "/top-up", icon: ArrowUpCircle, key: "top-up" },
   { title: "Transactions", url: "/transactions", icon: History, key: "transactions" },
   { title: "Banks", url: "/banks", icon: Landmark, key: "banks" },
+  { title: "Chat Support", url: "/chat", icon: MessageCircle, key: "chat" },
   { title: "Settings", url: "/settings", icon: Settings, key: "settings" },
 ];
 
