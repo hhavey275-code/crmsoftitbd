@@ -71,20 +71,26 @@ export function AdminBusinessManagers() {
 
   const addBmMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("business_managers").insert({
+      const { data, error } = await supabase.from("business_managers").insert({
         bm_id: bmId,
         name: bmName,
         access_token: accessToken,
-      });
+      }).select().single();
       if (error) throw error;
+      return data;
     },
-    onSuccess: () => {
-      toast.success("Business Manager connected");
+    onSuccess: async (data) => {
+      toast.success("Business Manager connected! Syncing ad accounts...");
       queryClient.invalidateQueries({ queryKey: ["admin-business-managers"] });
       setOpen(false);
       setBmId("");
       setBmName("");
       setAccessToken("");
+      // Auto-sync ad accounts after connecting
+      if (data?.id) {
+        setExpandedBm(data.id);
+        syncMutation.mutate(data.id);
+      }
     },
     onError: (err: any) => toast.error(err.message),
   });
