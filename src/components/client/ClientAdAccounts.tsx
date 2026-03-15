@@ -428,20 +428,6 @@ export function ClientAdAccounts() {
                       <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} />
                     </TableCell>
                     <TableCell className="hidden sm:table-cell"><StatusBadge status={a.status} /></TableCell>
-                    <TableCell>
-                      <div className="text-sm whitespace-nowrap">
-                        {ins?.cards && ins.cards.length > 0 ? (
-                          ins.cards.map((card: any, i: number) => (
-                            <div key={i} className="flex items-center gap-1.5">
-                              <CardBrandIcon displayString={card.display_string} size="xs" />
-                              <span>{card.display_string}</span>
-                            </div>
-                          ))
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </div>
-                    </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <Button
                         size="icon"
