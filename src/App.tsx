@@ -15,6 +15,8 @@ import TransactionsPage from "./pages/TransactionsPage";
 import SettingsPage from "./pages/SettingsPage";
 import BusinessManagersPage from "./pages/BusinessManagersPage";
 import BanksPage from "./pages/BanksPage";
+import ClientsPage from "./pages/ClientsPage";
+import ClientDetailPage from "./pages/ClientDetailPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +40,8 @@ const App = () => (
             <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
             <Route path="/business-managers" element={<ProtectedRoute><BusinessManagersPage /></ProtectedRoute>} />
             <Route path="/banks" element={<ProtectedRoute><BanksPage /></ProtectedRoute>} />
+            <Route path="/clients" element={<ProtectedRoute><ClientsPage /></ProtectedRoute>} />
+            <Route path="/clients/:userId" element={<ProtectedRoute><ClientDetailPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

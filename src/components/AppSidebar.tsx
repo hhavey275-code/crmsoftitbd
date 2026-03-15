@@ -8,6 +8,7 @@ import {
   Zap,
   Building2,
   Landmark,
+  Users,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -28,6 +29,7 @@ import { Button } from "@/components/ui/button";
 
 const adminNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Clients", url: "/clients", icon: Users },
   { title: "Ad Accounts", url: "/ad-accounts", icon: MonitorSmartphone },
   { title: "Business Managers", url: "/business-managers", icon: Building2 },
   { title: "Top-Up Request", url: "/top-up", icon: ArrowUpCircle },

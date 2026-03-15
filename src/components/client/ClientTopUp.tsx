@@ -11,9 +11,11 @@ import { toast } from "sonner";
 import { ArrowUpCircle, Banknote, DollarSign } from "lucide-react";
 
 export function ClientTopUp() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const queryClient = useQueryClient();
   const [bdtAmount, setBdtAmount] = useState("");
+
+  const isInactive = (profile as any)?.status === "inactive";
   const [selectedBank, setSelectedBank] = useState("");
   const [paymentRef, setPaymentRef] = useState("");
 
@@ -69,6 +71,14 @@ export function ClientTopUp() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Top-Up Wallet</h1>
+
+      {isInactive && (
+        <Card className="border-destructive bg-destructive/10">
+          <CardContent className="p-4 flex items-center gap-3">
+            <span className="text-destructive font-semibold">⚠️ Your account was freezed for violating our policy. You cannot submit top-up requests.</span>
+          </CardContent>
+        </Card>
+      )}
 
       {/* USD Rate Info */}
       <Card className="max-w-lg border-cyan-200 bg-cyan-50/50 dark:bg-cyan-950/20 dark:border-cyan-800">
@@ -156,9 +166,9 @@ export function ClientTopUp() {
           <Button
             className="w-full"
             onClick={() => submitMutation.mutate()}
-            disabled={!bdtAmount || parseFloat(bdtAmount) <= 0 || !selectedBank || submitMutation.isPending}
+            disabled={isInactive || !bdtAmount || parseFloat(bdtAmount) <= 0 || !selectedBank || submitMutation.isPending}
           >
-            {submitMutation.isPending ? "Submitting..." : "Submit Request"}
+            {submitMutation.isPending ? "Submitting..." : isInactive ? "Account Frozen" : "Submit Request"}
           </Button>
         </CardContent>
       </Card>
