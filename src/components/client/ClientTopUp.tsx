@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
 import { toast } from "sonner";
-import { ArrowUpCircle, Banknote, DollarSign, MessageSquare } from "lucide-react";
+import { ArrowUpCircle, Banknote, DollarSign, MessageSquare, ImageIcon, X } from "lucide-react";
 import { format } from "date-fns";
 
 export function ClientTopUp() {
