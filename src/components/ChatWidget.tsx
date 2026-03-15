@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import { MessageCircle, Send, X, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -31,7 +30,7 @@ export function ChatWidget() {
   useEffect(() => {
     if (!user) return;
     const load = async () => {
-      const { data } = await supabase
+      const { data } = await (supabase as any)
         .from("chat_conversations")
         .select("id")
         .eq("client_id", user.id)
@@ -47,12 +46,12 @@ export function ChatWidget() {
   useEffect(() => {
     if (!conversationId) return;
     const loadMessages = async () => {
-      const { data } = await supabase
+      const { data } = await (supabase as any)
         .from("chat_messages")
         .select("*")
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: true });
-      if (data) setMessages(data);
+      if (data) setMessages(data as ChatMessage[]);
     };
     loadMessages();
   }, [conversationId]);
@@ -69,7 +68,7 @@ export function ChatWidget() {
     if (!open || !conversationId || !user) return;
     const unread = messages.filter(m => m.sender_id !== user.id && !m.is_read);
     if (unread.length > 0) {
-      supabase
+      (supabase as any)
         .from("chat_messages")
         .update({ is_read: true })
         .eq("conversation_id", conversationId)
@@ -106,6 +105,29 @@ export function ChatWidget() {
     return () => { supabase.removeChannel(channel); };
   }, [conversationId]);
 
+  // Also listen for new conversations created by admin for this client
+  useEffect(() => {
+    if (!user || conversationId) return;
+    const channel = supabase
+      .channel("chat-conv-watch")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "chat_conversations",
+        },
+        (payload) => {
+          const conv = payload.new as any;
+          if (conv.client_id === user.id) {
+            setConversationId(conv.id);
+          }
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user, conversationId]);
+
   // Auto-scroll
   useEffect(() => {
     if (scrollRef.current) {
@@ -119,7 +141,7 @@ export function ChatWidget() {
 
     let convId = conversationId;
     if (!convId) {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("chat_conversations")
         .insert({ client_id: user.id })
         .select("id")
@@ -129,15 +151,14 @@ export function ChatWidget() {
       setConversationId(convId);
     }
 
-    const { error } = await supabase.from("chat_messages").insert({
+    const { error } = await (supabase as any).from("chat_messages").insert({
       conversation_id: convId,
       sender_id: user.id,
       message: message.trim(),
     });
 
     if (!error) {
-      // Update last_message_at
-      await supabase
+      await (supabase as any)
         .from("chat_conversations")
         .update({ last_message_at: new Date().toISOString() })
         .eq("id", convId);

@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
-import { MessageCircle, Send, CheckCircle, Circle } from "lucide-react";
+import { MessageCircle, Send, CheckCircle, Circle, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,12 @@ interface ChatMessage {
   created_at: string;
 }
 
+interface ClientProfile {
+  user_id: string;
+  full_name: string | null;
+  email: string | null;
+}
+
 export function AdminChat() {
   const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -37,30 +44,31 @@ export function AdminChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
+  const [newChatOpen, setNewChatOpen] = useState(false);
+  const [clients, setClients] = useState<ClientProfile[]>([]);
+  const [clientSearch, setClientSearch] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Load conversations with client info
   const loadConversations = async () => {
-    const { data: convos } = await supabase
+    const { data: convos } = await (supabase as any)
       .from("chat_conversations")
       .select("*")
       .order("last_message_at", { ascending: false });
 
     if (!convos) return;
 
-    // Get client profiles
-    const clientIds = convos.map(c => c.client_id);
+    const clientIds = (convos as any[]).map((c: any) => c.client_id);
     const { data: profiles } = await supabase
       .from("profiles")
       .select("user_id, full_name, email")
       .in("user_id", clientIds);
 
-    // Get last messages and unread counts
     const enriched = await Promise.all(
-      convos.map(async (conv) => {
+      (convos as any[]).map(async (conv: any) => {
         const profile = profiles?.find(p => p.user_id === conv.client_id);
 
-        const { data: lastMsg } = await supabase
+        const { data: lastMsg } = await (supabase as any)
           .from("chat_messages")
           .select("message")
           .eq("conversation_id", conv.id)
@@ -68,7 +76,7 @@ export function AdminChat() {
           .limit(1)
           .maybeSingle();
 
-        const { count } = await supabase
+        const { count } = await (supabase as any)
           .from("chat_messages")
           .select("*", { count: "exact", head: true })
           .eq("conversation_id", conv.id)
@@ -94,15 +102,14 @@ export function AdminChat() {
   useEffect(() => {
     if (!selectedId) return;
     const load = async () => {
-      const { data } = await supabase
+      const { data } = await (supabase as any)
         .from("chat_messages")
         .select("*")
         .eq("conversation_id", selectedId)
         .order("created_at", { ascending: true });
-      if (data) setMessages(data);
+      if (data) setMessages(data as ChatMessage[]);
 
-      // Mark as read
-      await supabase
+      await (supabase as any)
         .from("chat_messages")
         .update({ is_read: true })
         .eq("conversation_id", selectedId)
@@ -128,9 +135,8 @@ export function AdminChat() {
               if (prev.find(m => m.id === newMsg.id)) return prev;
               return [...prev, newMsg];
             });
-            // Mark as read immediately
             if (newMsg.sender_id !== user?.id) {
-              supabase.from("chat_messages").update({ is_read: true }).eq("id", newMsg.id).then();
+              (supabase as any).from("chat_messages").update({ is_read: true }).eq("id", newMsg.id).then();
             }
           }
           loadConversations();
@@ -155,12 +161,12 @@ export function AdminChat() {
   const handleSend = async () => {
     if (!reply.trim() || !selectedId || !user || sending) return;
     setSending(true);
-    await supabase.from("chat_messages").insert({
+    await (supabase as any).from("chat_messages").insert({
       conversation_id: selectedId,
       sender_id: user.id,
       message: reply.trim(),
     });
-    await supabase
+    await (supabase as any)
       .from("chat_conversations")
       .update({ last_message_at: new Date().toISOString() })
       .eq("id", selectedId);
@@ -169,11 +175,54 @@ export function AdminChat() {
   };
 
   const handleResolve = async (convId: string, resolved: boolean) => {
-    await supabase
+    await (supabase as any)
       .from("chat_conversations")
       .update({ is_resolved: !resolved })
       .eq("id", convId);
     loadConversations();
+  };
+
+  // Load client list for new chat
+  const loadClients = async () => {
+    // Get all client user_ids (users with 'client' role)
+    const { data: roleData } = await supabase
+      .from("user_roles")
+      .select("user_id")
+      .eq("role", "client");
+
+    if (!roleData) return;
+    const clientUserIds = roleData.map(r => r.user_id);
+
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("user_id, full_name, email")
+      .in("user_id", clientUserIds)
+      .eq("status", "active");
+
+    setClients((profiles as ClientProfile[]) || []);
+  };
+
+  const handleStartChat = async (clientId: string) => {
+    // Check if conversation already exists
+    const existing = conversations.find(c => c.client_id === clientId);
+    if (existing) {
+      setSelectedId(existing.id);
+      setNewChatOpen(false);
+      return;
+    }
+
+    // Create new conversation (admin creates on behalf of client)
+    const { data, error } = await (supabase as any)
+      .from("chat_conversations")
+      .insert({ client_id: clientId })
+      .select("id")
+      .single();
+
+    if (!error && data) {
+      setSelectedId(data.id);
+      await loadConversations();
+    }
+    setNewChatOpen(false);
   };
 
   const formatTime = (dateStr: string) => {
@@ -187,15 +236,71 @@ export function AdminChat() {
 
   const selected = conversations.find(c => c.id === selectedId);
 
+  const filteredClients = clients.filter(c =>
+    (c.full_name || "").toLowerCase().includes(clientSearch.toLowerCase()) ||
+    (c.email || "").toLowerCase().includes(clientSearch.toLowerCase())
+  );
+
   return (
     <div className="flex h-[calc(100vh-8rem)] gap-4">
       {/* Conversations list */}
       <Card className="w-[340px] flex flex-col shrink-0">
         <div className="p-4 border-b">
-          <h2 className="font-semibold text-lg flex items-center gap-2">
-            <MessageCircle className="h-5 w-5" />
-            Chat Inbox
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-lg flex items-center gap-2">
+              <MessageCircle className="h-5 w-5" />
+              Chat Inbox
+            </h2>
+            <Dialog open={newChatOpen} onOpenChange={(open) => {
+              setNewChatOpen(open);
+              if (open) loadClients();
+            }}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline" className="h-8">
+                  <Plus className="h-4 w-4 mr-1" /> New
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Start Chat with Client</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search clients..."
+                      value={clientSearch}
+                      onChange={(e) => setClientSearch(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  <ScrollArea className="max-h-[300px]">
+                    {filteredClients.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-4">No clients found</p>
+                    )}
+                    {filteredClients.map((client) => {
+                      const hasConvo = conversations.some(c => c.client_id === client.user_id);
+                      return (
+                        <button
+                          key={client.user_id}
+                          onClick={() => handleStartChat(client.user_id)}
+                          className="w-full text-left p-3 hover:bg-accent/50 rounded-md transition-colors flex items-center justify-between"
+                        >
+                          <div>
+                            <p className="text-sm font-medium">{client.full_name || "Unnamed"}</p>
+                            <p className="text-xs text-muted-foreground">{client.email}</p>
+                          </div>
+                          {hasConvo && (
+                            <Badge variant="secondary" className="text-[10px]">Existing</Badge>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </ScrollArea>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
           <p className="text-xs text-muted-foreground mt-1">
             {conversations.length} conversation{conversations.length !== 1 ? "s" : ""}
           </p>
@@ -272,6 +377,11 @@ export function AdminChat() {
 
             {/* Messages */}
             <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+              {messages.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm">
+                  <p>No messages yet. Send the first message!</p>
+                </div>
+              )}
               {messages.map((msg) => {
                 const isAdmin = msg.sender_id !== selected?.client_id;
                 return (
