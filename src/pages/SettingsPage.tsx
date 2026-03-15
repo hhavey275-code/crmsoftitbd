@@ -18,7 +18,11 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const { logoUrl, refetch } = useSiteSettings();
+  const { logoUrl, siteName: currentSiteName, refetch } = useSiteSettings();
+
+  // Site Name state
+  const [siteNameInput, setSiteNameInput] = useState("");
+  const [savingSiteName, setSavingSiteName] = useState(false);
 
   // USD Rate state
   const { data: currentRate, refetch: refetchRate } = useQuery({
@@ -35,6 +39,10 @@ export default function SettingsPage() {
   // Sync rate input when data loads
   if (currentRate && !usdRate && !savingRate) {
     setUsdRate(currentRate);
+  }
+  // Sync site name input when data loads
+  if (currentSiteName && !siteNameInput && !savingSiteName) {
+    setSiteNameInput(currentSiteName);
   }
 
   const handleSave = async () => {
