@@ -16,35 +16,44 @@ export type Database = {
     Tables: {
       ad_account_insights: {
         Row: {
+          active_campaigns: number | null
           ad_account_id: string
           balance: number | null
           cards: Json | null
           id: string
+          today_messages: number | null
           today_orders: number | null
           today_spend: number | null
           updated_at: string | null
+          yesterday_messages: number | null
           yesterday_orders: number | null
           yesterday_spend: number | null
         }
         Insert: {
+          active_campaigns?: number | null
           ad_account_id: string
           balance?: number | null
           cards?: Json | null
           id?: string
+          today_messages?: number | null
           today_orders?: number | null
           today_spend?: number | null
           updated_at?: string | null
+          yesterday_messages?: number | null
           yesterday_orders?: number | null
           yesterday_spend?: number | null
         }
         Update: {
+          active_campaigns?: number | null
           ad_account_id?: string
           balance?: number | null
           cards?: Json | null
           id?: string
+          today_messages?: number | null
           today_orders?: number | null
           today_spend?: number | null
           updated_at?: string | null
+          yesterday_messages?: number | null
           yesterday_orders?: number | null
           yesterday_spend?: number | null
         }
