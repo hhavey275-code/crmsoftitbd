@@ -86,6 +86,8 @@ Deno.serve(async (req) => {
         insights[account.id] = {
           today_spend: 0,
           yesterday_spend: 0,
+          today_orders: 0,
+          yesterday_orders: 0,
           balance: 0,
           cards: [],
         };
