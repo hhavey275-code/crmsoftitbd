@@ -124,35 +124,31 @@ export function ClientDashboard() {
           title="Wallet Balance"
           value={`$${Number(wallet?.balance ?? 0).toLocaleString()}`}
           icon={Wallet}
-          iconBg="bg-green-100 dark:bg-green-900/50"
-          iconColor="text-green-600"
-          gradientClass="bg-gradient-to-br from-green-50 to-emerald-100/50 dark:from-green-950/40 dark:to-emerald-900/20 border-green-200 dark:border-green-800"
+          iconBg="bg-emerald-50 dark:bg-emerald-900/30"
+          iconColor="text-emerald-600"
         />
         <MetricCard
           title="Total Ad Accounts"
           value={adAccounts?.length ?? 0}
           icon={MonitorSmartphone}
-          iconBg="bg-blue-100 dark:bg-blue-900/50"
+          iconBg="bg-blue-50 dark:bg-blue-900/30"
           iconColor="text-blue-600"
-          gradientClass="bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/40 dark:to-blue-900/20 border-blue-200 dark:border-blue-800"
         />
         <MetricCard
           title="Total Top-Up"
           value={`$${Number(topUpTotal ?? 0).toLocaleString()}`}
           subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"}
           icon={TrendingUp}
-          iconBg="bg-orange-100 dark:bg-orange-900/50"
-          iconColor="text-orange-600"
-          gradientClass="bg-gradient-to-br from-orange-50 to-amber-100/50 dark:from-orange-950/40 dark:to-amber-900/20 border-orange-200 dark:border-orange-800"
+          iconBg="bg-amber-50 dark:bg-amber-900/30"
+          iconColor="text-amber-600"
         />
         <MetricCard
           title="Total Remaining Balance"
           value={`$${totalRemaining.toLocaleString()}`}
           subtitle="Across all ad accounts"
           icon={Wallet}
-          iconBg="bg-indigo-100 dark:bg-indigo-900/50"
-          iconColor="text-indigo-600"
-          gradientClass="bg-gradient-to-br from-indigo-50 to-violet-100/50 dark:from-indigo-950/40 dark:to-violet-900/20 border-indigo-200 dark:border-indigo-800"
+          iconBg="bg-violet-50 dark:bg-violet-900/30"
+          iconColor="text-violet-600"
         />
       </div>
 

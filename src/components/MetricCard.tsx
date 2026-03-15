@@ -13,17 +13,17 @@ interface MetricCardProps {
   className?: string;
 }
 
-export function MetricCard({ title, value, subtitle, icon: Icon, iconBg, iconColor, gradientClass, className }: MetricCardProps) {
+export function MetricCard({ title, value, subtitle, icon: Icon, iconBg, iconColor, className }: MetricCardProps) {
   return (
-    <Card className={cn("hover:shadow-md transition-shadow overflow-hidden", gradientClass, className)}>
+    <Card className={cn("bg-card border border-border/60 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.06)] hover:shadow-[0_2px_8px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.08)] transition-shadow duration-200", className)}>
       <CardContent className="p-6">
         <div className="flex items-start justify-between">
           <div className="space-y-1">
             <p className="text-sm font-medium text-muted-foreground">{title}</p>
-            <p className="text-2xl font-bold tracking-tight">{value}</p>
+            <p className="text-2xl font-bold tracking-tight text-foreground">{value}</p>
             {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
           </div>
-          <div className={cn("flex h-10 w-10 items-center justify-center rounded-lg", iconBg || "bg-primary/10")}>
+          <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl", iconBg || "bg-primary/10")}>
             <Icon className={cn("h-5 w-5", iconColor || "text-primary")} />
           </div>
         </div>

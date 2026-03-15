@@ -137,49 +137,43 @@ export function AdminDashboard() {
           title="Total Clients"
           value={profiles?.length ?? 0}
           icon={Users}
-          iconBg="bg-blue-100 dark:bg-blue-900/50"
+          iconBg="bg-blue-50 dark:bg-blue-900/30"
           iconColor="text-blue-600"
-          gradientClass="bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/40 dark:to-blue-900/20 border-blue-200 dark:border-blue-800"
         />
         <MetricCard
           title="Platform Balance"
           value={`$${totalBalance.toLocaleString()}`}
           icon={Wallet}
-          iconBg="bg-green-100 dark:bg-green-900/50"
-          iconColor="text-green-600"
-          gradientClass="bg-gradient-to-br from-green-50 to-emerald-100/50 dark:from-green-950/40 dark:to-emerald-900/20 border-green-200 dark:border-green-800"
+          iconBg="bg-emerald-50 dark:bg-emerald-900/30"
+          iconColor="text-emerald-600"
         />
         <MetricCard
           title="Pending Top-Ups"
           value={pendingRequests?.length ?? 0}
           icon={Clock}
-          iconBg="bg-orange-100 dark:bg-orange-900/50"
-          iconColor="text-orange-600"
-          gradientClass="bg-gradient-to-br from-orange-50 to-amber-100/50 dark:from-orange-950/40 dark:to-amber-900/20 border-orange-200 dark:border-orange-800"
+          iconBg="bg-amber-50 dark:bg-amber-900/30"
+          iconColor="text-amber-600"
         />
         <MetricCard
           title="Active Ad Accounts"
           value={activeAccounts.length}
           icon={Activity}
-          iconBg="bg-emerald-100 dark:bg-emerald-900/50"
-          iconColor="text-emerald-600"
-          gradientClass="bg-gradient-to-br from-emerald-50 to-teal-100/50 dark:from-emerald-950/40 dark:to-teal-900/20 border-emerald-200 dark:border-emerald-800"
+          iconBg="bg-teal-50 dark:bg-teal-900/30"
+          iconColor="text-teal-600"
         />
         <MetricCard
           title="Disabled Ad Accounts"
           value={disabledAccounts.length}
           icon={Ban}
-          iconBg="bg-red-100 dark:bg-red-900/50"
-          iconColor="text-red-600"
-          gradientClass="bg-gradient-to-br from-red-50 to-rose-100/50 dark:from-red-950/40 dark:to-rose-900/20 border-red-200 dark:border-red-800"
+          iconBg="bg-red-50 dark:bg-red-900/30"
+          iconColor="text-red-500"
         />
         <MetricCard
           title="Remaining Limit"
           value={`$${remainingLimit.toLocaleString()}`}
           icon={TrendingUp}
-          iconBg="bg-purple-100 dark:bg-purple-900/50"
-          iconColor="text-purple-600"
-          gradientClass="bg-gradient-to-br from-purple-50 to-violet-100/50 dark:from-purple-950/40 dark:to-violet-900/20 border-purple-200 dark:border-purple-800"
+          iconBg="bg-violet-50 dark:bg-violet-900/30"
+          iconColor="text-violet-600"
         />
       </div>
 
