@@ -57,7 +57,7 @@ export function AppSidebar() {
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="px-4 py-4">
+          <SidebarGroupLabel className="px-4 py-4 mt-4">
             {!collapsed && (
               <div className="flex items-center gap-3">
                 {logoUrl ? (
