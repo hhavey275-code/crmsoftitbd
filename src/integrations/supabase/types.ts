@@ -20,6 +20,7 @@ export type Database = {
           account_name: string
           amount_spent: number
           business_manager_id: string | null
+          business_name: string | null
           created_at: string
           id: string
           spend_cap: number
@@ -32,6 +33,7 @@ export type Database = {
           account_name: string
           amount_spent?: number
           business_manager_id?: string | null
+          business_name?: string | null
           created_at?: string
           id?: string
           spend_cap?: number
@@ -44,6 +46,7 @@ export type Database = {
           account_name?: string
           amount_spent?: number
           business_manager_id?: string | null
+          business_name?: string | null
           created_at?: string
           id?: string
           spend_cap?: number
@@ -247,6 +250,35 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      user_ad_accounts: {
+        Row: {
+          ad_account_id: string
+          assigned_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          ad_account_id: string
+          assigned_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          ad_account_id?: string
+          assigned_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_ad_accounts_ad_account_id_fkey"
+            columns: ["ad_account_id"]
+            isOneToOne: false
+            referencedRelation: "ad_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
