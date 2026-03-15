@@ -34,35 +34,36 @@ Deno.serve(async (req) => {
 
     const insights: Record<string, any> = {};
 
-    // Process accounts in parallel
     const promises = (accounts ?? []).map(async (account: any) => {
       const accessToken = account.business_managers?.access_token;
-      const actId = account.account_id; // e.g. act_123456
-
-      const currentBalance = Number(account.spend_cap) - Number(account.amount_spent);
+      const actId = account.account_id;
 
       if (!accessToken) {
         insights[account.id] = {
           today_spend: 0,
           yesterday_spend: 0,
-          current_balance: Math.max(currentBalance, 0),
+          balance: 0,
+          cards: [],
         };
         return;
       }
 
       try {
-        // Fetch today and yesterday spend in parallel
-        const [todayRes, yesterdayRes] = await Promise.all([
+        const [todayRes, yesterdayRes, accountRes] = await Promise.all([
           fetch(
             `https://graph.facebook.com/v24.0/${actId}/insights?fields=spend&date_preset=today&access_token=${accessToken}`
           ),
           fetch(
             `https://graph.facebook.com/v24.0/${actId}/insights?fields=spend&date_preset=yesterday&access_token=${accessToken}`
           ),
+          fetch(
+            `https://graph.facebook.com/v24.0/${actId}?fields=balance,funding_source_details&access_token=${accessToken}`
+          ),
         ]);
 
         const todayData = await todayRes.json();
         const yesterdayData = await yesterdayRes.json();
+        const accountData = await accountRes.json();
 
         const todaySpend = todayData?.data?.[0]?.spend
           ? parseFloat(todayData.data[0].spend)
@@ -71,16 +72,32 @@ Deno.serve(async (req) => {
           ? parseFloat(yesterdayData.data[0].spend)
           : 0;
 
+        const balance = accountData?.balance
+          ? parseFloat(accountData.balance) / 100
+          : 0;
+
+        const cards: any[] = [];
+        const fsd = accountData?.funding_source_details;
+        if (fsd) {
+          cards.push({
+            id: fsd.id,
+            display_string: fsd.display_string || `Card ending ${fsd.id?.slice(-4) || '****'}`,
+            type: fsd.type,
+          });
+        }
+
         insights[account.id] = {
           today_spend: todaySpend,
           yesterday_spend: yesterdaySpend,
-          current_balance: Math.max(currentBalance, 0),
+          balance,
+          cards,
         };
       } catch {
         insights[account.id] = {
           today_spend: 0,
           yesterday_spend: 0,
-          current_balance: Math.max(currentBalance, 0),
+          balance: 0,
+          cards: [],
         };
       }
     });
