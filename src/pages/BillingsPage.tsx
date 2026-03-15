@@ -126,6 +126,39 @@ export default function BillingsPage() {
             Update from Meta
           </Button>
         </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name or ID..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 h-9"
+            />
+          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[140px] h-9">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="disabled">Disabled</SelectItem>
+              <SelectItem value="unsettled">Unsettled</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={cardFilter} onValueChange={setCardFilter}>
+            <SelectTrigger className="w-[160px] h-9">
+              <SelectValue placeholder="Card" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Cards</SelectItem>
+              {uniqueCards.map((card) => (
+                <SelectItem key={card} value={card}>{card}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <Card>
           <CardContent className="pt-4 px-3">
             {sorted.length === 0 ? (

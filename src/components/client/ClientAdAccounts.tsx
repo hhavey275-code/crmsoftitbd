@@ -346,13 +346,15 @@ export function ClientAdAccounts() {
                     onClick={() => navigate(`/ad-accounts/${a.id}`)}
                     data-state={selectedIds.has(a.id) ? "selected" : undefined}
                   >
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        checked={selectedIds.has(a.id)}
-                        onCheckedChange={() => toggleSelect(a.id)}
-                        aria-label={`Select ${a.account_name}`}
-                      />
-                    </TableCell>
+                    {showSelect && (
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedIds.has(a.id)}
+                          onCheckedChange={() => toggleSelect(a.id)}
+                          aria-label={`Select ${a.account_name}`}
+                        />
+                      </TableCell>
+                    )}
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
