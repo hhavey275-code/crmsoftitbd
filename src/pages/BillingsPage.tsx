@@ -154,6 +154,7 @@ export default function BillingsPage() {
               <SelectItem value="all">All Status</SelectItem>
               <SelectItem value="active">Active</SelectItem>
               <SelectItem value="disabled">Disabled</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="unsettled">Unsettled</SelectItem>
             </SelectContent>
           </Select>
