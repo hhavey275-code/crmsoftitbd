@@ -188,34 +188,40 @@ export function ClientAdAccounts() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[220px]">
-                  <button className="flex items-center font-medium" onClick={() => toggleSort("account_name")}>
-                    Account <SortIcon field="account_name" />
+                <TableHead className="w-[200px]">
+                  <button className="flex items-center text-xs font-medium" onClick={() => toggleSort("account_name")}>
+                    Ad Account <SortIcon field="account_name" />
                   </button>
                 </TableHead>
-                <TableHead className="w-[80px] hidden sm:table-cell">Status</TableHead>
-                <TableHead className="w-[150px]">
-                  <button className="flex items-center font-medium" onClick={() => toggleSort("spend_cap")}>
-                    Spend Cap / Spent <SortIcon field="spend_cap" />
+                <TableHead className="w-[100px]">
+                  <button className="flex items-center text-xs font-medium" onClick={() => toggleSort("spend_cap")}>
+                    Budget <SortIcon field="spend_cap" />
                   </button>
                 </TableHead>
-                <TableHead className="w-[90px]">
-                  <button className="flex items-center font-medium" onClick={() => toggleSort("today_spend")}>
-                    Today <SortIcon field="today_spend" />
-                  </button>
+                <TableHead className="w-[90px] hidden sm:table-cell">
+                  <span className="text-xs font-medium">Status</span>
                 </TableHead>
                 <TableHead className="w-[90px]">
-                  <button className="flex items-center font-medium" onClick={() => toggleSort("yesterday_spend")}>
-                    Yesterday <SortIcon field="yesterday_spend" />
-                  </button>
-                </TableHead>
-                <TableHead className="w-[90px]">
-                  <button className="flex items-center font-medium" onClick={() => toggleSort("balance")}>
+                  <button className="flex items-center text-xs font-medium" onClick={() => toggleSort("balance")}>
                     Balance <SortIcon field="balance" />
                   </button>
                 </TableHead>
-                <TableHead className="w-[130px]">Cards</TableHead>
-                <TableHead className="w-[140px]">Actions</TableHead>
+                <TableHead className="w-[100px]">
+                  <button className="flex items-center text-xs font-medium" onClick={() => toggleSort("today_spend")}>
+                    Today <SortIcon field="today_spend" />
+                  </button>
+                </TableHead>
+                <TableHead className="w-[100px]">
+                  <button className="flex items-center text-xs font-medium" onClick={() => toggleSort("yesterday_spend")}>
+                    Yesterday <SortIcon field="yesterday_spend" />
+                  </button>
+                </TableHead>
+                <TableHead className="w-[110px]">
+                  <span className="text-xs font-medium">Card Name</span>
+                </TableHead>
+                <TableHead className="w-[100px]">
+                  <span className="text-xs font-medium">Actions</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
