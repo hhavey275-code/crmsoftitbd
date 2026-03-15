@@ -24,7 +24,7 @@ interface InsightsData {
 }
 
 export function ClientAdAccounts() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [topUpAccount, setTopUpAccount] = useState<any>(null);
@@ -32,6 +32,8 @@ export function ClientAdAccounts() {
   const [sortField, setSortField] = useState<string>("account_name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const isInactive = (profile as any)?.status === "inactive";
 
   const { data: accounts } = useQuery({
     queryKey: ["client-ad-accounts", user?.id],
@@ -119,13 +121,8 @@ export function ClientAdAccounts() {
     if (!accounts) return [];
     return [...accounts].sort((a, b) => {
       let valA: any, valB: any;
-      const insA = insights[a.id];
-      const insB = insights[b.id];
       switch (sortField) {
         case "account_name": valA = a.account_name?.toLowerCase(); valB = b.account_name?.toLowerCase(); break;
-        case "today_spend": valA = insA?.today_spend ?? 0; valB = insB?.today_spend ?? 0; break;
-        case "yesterday_spend": valA = insA?.yesterday_spend ?? 0; valB = insB?.yesterday_spend ?? 0; break;
-        case "balance": valA = insA?.balance ?? 0; valB = insB?.balance ?? 0; break;
         case "spend_cap": valA = Number(a.spend_cap); valB = Number(b.spend_cap); break;
         default: valA = a.account_name?.toLowerCase(); valB = b.account_name?.toLowerCase();
       }
@@ -133,7 +130,7 @@ export function ClientAdAccounts() {
       if (valA > valB) return sortDir === "asc" ? 1 : -1;
       return 0;
     });
-  }, [accounts, insights, sortField, sortDir]);
+  }, [accounts, sortField, sortDir]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
@@ -217,6 +214,15 @@ export function ClientAdAccounts() {
           </Button>
         </div>
       </div>
+
+      {isInactive && (
+        <Card className="border-destructive bg-destructive/10">
+          <CardContent className="p-4 flex items-center gap-3">
+            <span className="text-destructive font-semibold">⚠️ Your account has been frozen by admin. You cannot top up ad accounts.</span>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardContent className="pt-6">
           <Table>
@@ -241,21 +247,6 @@ export function ClientAdAccounts() {
                 </TableHead>
                 <TableHead className="w-[90px] hidden sm:table-cell">
                   <span className="text-xs font-medium">Status</span>
-                </TableHead>
-                <TableHead className="w-[90px]">
-                  <button className="flex items-center text-xs font-medium" onClick={() => toggleSort("balance")}>
-                    Balance <SortIcon field="balance" />
-                  </button>
-                </TableHead>
-                <TableHead className="w-[100px]">
-                  <button className="flex items-center text-xs font-medium" onClick={() => toggleSort("today_spend")}>
-                    Today <SortIcon field="today_spend" />
-                  </button>
-                </TableHead>
-                <TableHead className="w-[100px]">
-                  <button className="flex items-center text-xs font-medium" onClick={() => toggleSort("yesterday_spend")}>
-                    Yesterday <SortIcon field="yesterday_spend" />
-                  </button>
                 </TableHead>
                 <TableHead className="w-[110px]">
                   <span className="text-xs font-medium">Card Name</span>
@@ -305,15 +296,6 @@ export function ClientAdAccounts() {
                       <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} />
                     </TableCell>
                     <TableCell className="hidden sm:table-cell"><StatusBadge status={a.status} /></TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      <span className="text-sm">${ins?.balance?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</span>
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      <span className="text-sm">$ {ins?.today_spend?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</span>
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      <span className="text-sm">$ {ins?.yesterday_spend?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</span>
-                    </TableCell>
                     <TableCell>
                       <div className="text-sm whitespace-nowrap">
                         {ins?.cards && ins.cards.length > 0 ? (
@@ -342,6 +324,7 @@ export function ClientAdAccounts() {
                       <Button
                         size="sm"
                         variant="outline"
+                        disabled={isInactive}
                         onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
                       >
                         <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
@@ -352,7 +335,7 @@ export function ClientAdAccounts() {
                 );
               })}
               {(!accounts || accounts.length === 0) && (
-                <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground">No ad accounts assigned to you yet</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No ad accounts assigned to you yet</TableCell></TableRow>
               )}
             </TableBody>
           </Table>

@@ -5,11 +5,12 @@ import { MetricCard } from "@/components/MetricCard";
 import { Wallet, MonitorSmartphone, History, ArrowUpCircle, DollarSign } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { StatusBadge } from "@/components/StatusBadge";
 import { format } from "date-fns";
 
 export function ClientDashboard() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+
+  const isInactive = (profile as any)?.status === "inactive";
 
   const { data: wallet } = useQuery({
     queryKey: ["client-wallet", user?.id],
@@ -64,6 +65,14 @@ export function ClientDashboard() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Dashboard</h1>
+
+      {isInactive && (
+        <Card className="border-destructive bg-destructive/10">
+          <CardContent className="p-4 flex items-center gap-3">
+            <span className="text-destructive font-semibold">⚠️ Your account has been frozen by admin. You cannot perform any transactions or top-ups.</span>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <MetricCard
