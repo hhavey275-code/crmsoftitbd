@@ -553,6 +553,37 @@ export function AdminAdAccounts() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} Ad Account(s)?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove the selected ad accounts and all associated data (assignments, insights). This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                const ids = Array.from(selectedIds);
+                const { error } = await supabase.from("ad_accounts").delete().in("id", ids);
+                if (error) {
+                  toast.error(error.message);
+                } else {
+                  toast.success(`${ids.length} ad account(s) deleted`);
+                  setSelectedIds(new Set());
+                  queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
+                  queryClient.invalidateQueries({ queryKey: ["admin-insights-cache"] });
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
