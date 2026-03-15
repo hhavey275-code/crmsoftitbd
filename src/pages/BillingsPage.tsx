@@ -118,8 +118,6 @@ export default function BillingsPage() {
                         {sortDir === "asc" ? <ArrowUp className="h-3 w-3 ml-1" /> : <ArrowDown className="h-3 w-3 ml-1" />}
                       </button>
                     </TableHead>
-                      </button>
-                    </TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Payment</TableHead>
                     <TableHead className="w-[80px]"></TableHead>
