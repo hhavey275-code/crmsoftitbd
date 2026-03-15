@@ -33,6 +33,7 @@ const App = () => (
             <Route path="/top-up" element={<ProtectedRoute><TopUpPage /></ProtectedRoute>} />
             <Route path="/transactions" element={<ProtectedRoute><TransactionsPage /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+            <Route path="/business-managers" element={<ProtectedRoute><BusinessManagersPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
