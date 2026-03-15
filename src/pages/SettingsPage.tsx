@@ -67,6 +67,13 @@ export default function SettingsPage() {
   if (currentAnnouncement && !announcementInput && !savingAnnouncement) {
     setAnnouncementInput(currentAnnouncement);
   }
+  // Sync welcome inputs when data loads
+  if (currentWelcomeTitle && !welcomeTitleInput && !savingWelcome) {
+    setWelcomeTitleInput(currentWelcomeTitle);
+  }
+  if (currentWelcomeNote && !welcomeNoteInput && !savingWelcome) {
+    setWelcomeNoteInput(currentWelcomeNote);
+  }
 
   const handleSave = async () => {
     if (!user) return;
