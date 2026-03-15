@@ -1,4 +1,4 @@
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
@@ -7,16 +7,25 @@ import { ChatWidget } from "@/components/ChatWidget";
 import { useAuth } from "@/contexts/AuthContext";
 import { Zap } from "lucide-react";
 
+const TechBackground = lazy(() => import("@/components/TechBackground"));
+
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { logoUrl, headerAnnouncement } = useSiteSettings();
   const { isAdmin } = useAuth();
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full relative">
+        {/* Background with low opacity */}
+        <div className="fixed inset-0 opacity-[0.15] pointer-events-none z-0">
+          <Suspense fallback={null}>
+            <TechBackground />
+          </Suspense>
+        </div>
+
         <AppSidebar />
-        <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-14 flex items-center justify-between border-b bg-card px-4">
+        <div className="flex-1 flex flex-col min-w-0 relative z-10">
+          <header className="h-14 flex items-center justify-between border-b bg-card/80 backdrop-blur-sm px-4">
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <SidebarTrigger />
               {logoUrl ? (
