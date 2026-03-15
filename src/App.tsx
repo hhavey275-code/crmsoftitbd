@@ -17,6 +17,7 @@ import BusinessManagersPage from "./pages/BusinessManagersPage";
 import BanksPage from "./pages/BanksPage";
 import ClientsPage from "./pages/ClientsPage";
 import ClientDetailPage from "./pages/ClientDetailPage";
+import BillingsPage from "./pages/BillingsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
