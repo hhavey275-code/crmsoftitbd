@@ -13,7 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowUpCircle, ExternalLink, Wallet, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, CreditCard, RefreshCw, AppWindow, Search, ListChecks } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { ArrowUpCircle, ExternalLink, Wallet, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, CreditCard, RefreshCw, AppWindow, Search, ListChecks, Trash2 } from "lucide-react";
 import { CardBrandIcon } from "@/components/CardBrandIcon";
 
 interface InsightsData {
@@ -36,6 +37,7 @@ export function AdminAdAccounts() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [cardFilter, setCardFilter] = useState("all");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const { data: accounts } = useQuery({
     queryKey: ["admin-ad-accounts"],
@@ -255,15 +257,25 @@ export function AdminAdAccounts() {
             </span>
           )}
           {showSelect && selectedIds.size > 0 && (
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => refreshSelectedMutation.mutate()}
-              disabled={refreshSelectedMutation.isPending}
-            >
-              <RefreshCw className={`h-4 w-4 mr-1 ${refreshSelectedMutation.isPending ? 'animate-spin' : ''}`} />
-              {refreshSelectedMutation.isPending ? "Updating..." : `Update ${selectedIds.size} Selected`}
-            </Button>
+            <>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setShowDeleteConfirm(true)}
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Delete {selectedIds.size} Selected
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => refreshSelectedMutation.mutate()}
+                disabled={refreshSelectedMutation.isPending}
+              >
+                <RefreshCw className={`h-4 w-4 mr-1 ${refreshSelectedMutation.isPending ? 'animate-spin' : ''}`} />
+                {refreshSelectedMutation.isPending ? "Updating..." : `Update ${selectedIds.size} Selected`}
+              </Button>
+            </>
           )}
           <Button
             variant="outline"
@@ -369,10 +381,7 @@ export function AdminAdAccounts() {
                 <TableHead className="w-[90px]">
                   <span className="text-xs font-medium">Client</span>
                 </TableHead>
-                <TableHead className="w-[60px]">
-                  <span className="text-xs font-medium">Billing</span>
-                </TableHead>
-                <TableHead className="w-[80px]">
+                <TableHead className="w-[50px]">
                   <span className="text-xs font-medium">Actions</span>
                 </TableHead>
               </TableRow>
@@ -406,8 +415,17 @@ export function AdminAdAccounts() {
                           {a.business_managers?.name && (
                             <div className="text-xs text-muted-foreground">{a.business_managers.name}</div>
                           )}
-                          <div className="mt-0.5">
+                          <div className="mt-0.5 flex items-center gap-1.5">
                             <span className="text-xs text-muted-foreground font-mono">{a.account_id.replace(/^act_/, '')}</span>
+                            <a
+                              href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${a.account_id.replace(/^act_/, '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-muted-foreground hover:text-primary"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
                           </div>
                         </div>
                       </div>
@@ -443,30 +461,21 @@ export function AdminAdAccounts() {
                       <span className="text-sm">{getClientName(getAssignedUserId(a.id))}</span>
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
-                      <a
-                        href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${a.account_id.replace(/^act_/, '')}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:text-primary/80"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
-                    </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <Button
-                        size="sm"
-                        variant="outline"
+                        size="icon"
+                        variant="default"
+                        className="h-8 w-8"
                         onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
+                        title="Top Up"
                       >
-                        <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
-                        Top Up
+                        <ArrowUpCircle className="h-4 w-4" />
                       </Button>
                     </TableCell>
                   </TableRow>
                 );
               })}
               {(!accounts || accounts.length === 0) && (
-                <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground">No ad accounts</TableCell></TableRow>
+                <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground">No ad accounts</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -544,6 +553,37 @@ export function AdminAdAccounts() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} Ad Account(s)?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove the selected ad accounts and all associated data (assignments, insights). This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                const ids = Array.from(selectedIds);
+                const { error } = await supabase.from("ad_accounts").delete().in("id", ids);
+                if (error) {
+                  toast.error(error.message);
+                } else {
+                  toast.success(`${ids.length} ad account(s) deleted`);
+                  setSelectedIds(new Set());
+                  queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
+                  queryClient.invalidateQueries({ queryKey: ["admin-insights-cache"] });
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
