@@ -303,13 +303,15 @@ export function ClientAdAccounts() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[40px]" onClick={(e) => e.stopPropagation()}>
-                  <Checkbox
-                    checked={allSelected}
-                    onCheckedChange={toggleSelectAll}
-                    aria-label="Select all"
-                  />
-                </TableHead>
+                {showSelect && (
+                  <TableHead className="w-[40px]" onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={allSelected}
+                      onCheckedChange={toggleSelectAll}
+                      aria-label="Select all"
+                    />
+                  </TableHead>
+                )}
                 <TableHead className="w-[200px]">
                   <button className="flex items-center text-xs font-medium" onClick={() => toggleSort("account_name")}>
                     Ad Account <SortIcon field="account_name" />
