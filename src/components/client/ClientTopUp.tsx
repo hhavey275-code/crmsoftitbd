@@ -286,11 +286,11 @@ export function ClientTopUp() {
       </div>
 
       {/* My Requests History */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">My Requests</CardTitle>
+      <Card className="shadow-sm">
+        <CardHeader className="p-4 pb-2">
+          <CardTitle className="text-base">My Requests</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 pt-2">
           <Table>
             <TableHeader>
               <TableRow>
