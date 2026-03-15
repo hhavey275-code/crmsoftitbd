@@ -11,9 +11,11 @@ import { toast } from "sonner";
 import { ArrowUpCircle, Banknote, DollarSign } from "lucide-react";
 
 export function ClientTopUp() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const queryClient = useQueryClient();
   const [bdtAmount, setBdtAmount] = useState("");
+
+  const isInactive = (profile as any)?.status === "inactive";
   const [selectedBank, setSelectedBank] = useState("");
   const [paymentRef, setPaymentRef] = useState("");
 
