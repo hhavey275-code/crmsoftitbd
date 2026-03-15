@@ -384,192 +384,175 @@ export default function ClientDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Date Range Filter */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground">Period:</span>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className={cn("w-[140px] justify-start text-left font-normal", !dateFrom && "text-muted-foreground")}>
-                <CalendarIcon className="mr-1 h-3 w-3" />
-                {dateFrom ? format(dateFrom, "MMM d, yyyy") : "From"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className="p-3 pointer-events-auto" />
-            </PopoverContent>
-          </Popover>
-          <span className="text-muted-foreground">—</span>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className={cn("w-[140px] justify-start text-left font-normal", !dateTo && "text-muted-foreground")}>
-                <CalendarIcon className="mr-1 h-3 w-3" />
-                {dateTo ? format(dateTo, "MMM d, yyyy") : "To"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className="p-3 pointer-events-auto" />
-            </PopoverContent>
-          </Popover>
-        </div>
+        {/* Tabs: Overview & Transaction History */}
+        <Tabs defaultValue="overview" className="space-y-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm font-medium text-muted-foreground">Period:</span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className={cn("w-[140px] justify-start text-left font-normal", !dateFrom && "text-muted-foreground")}>
+                  <CalendarIcon className="mr-1 h-3 w-3" />
+                  {dateFrom ? format(dateFrom, "MMM d, yyyy") : "From"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
+            <span className="text-muted-foreground">—</span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className={cn("w-[140px] justify-start text-left font-normal", !dateTo && "text-muted-foreground")}>
+                  <CalendarIcon className="mr-1 h-3 w-3" />
+                  {dateTo ? format(dateTo, "MMM d, yyyy") : "To"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
 
-        {/* Metric Cards */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Wallet Balance with +/- */}
-          <div className="relative">
-            <MetricCard
-              title="Wallet Balance"
-              value={`$${walletBalance.toLocaleString()}`}
-              icon={Wallet}
-              iconBg="bg-green-100 dark:bg-green-900/50"
-              iconColor="text-green-600"
-              gradientClass="bg-gradient-to-br from-green-50 to-emerald-100/50 dark:from-green-950/40 dark:to-emerald-900/20 border-green-200 dark:border-green-800"
-            />
-            <div className="absolute top-2 right-2 flex gap-1">
-              <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600 hover:bg-green-100" onClick={() => { setWalletDialogType("credit"); setWalletAmount(""); setWalletNote(""); }}>
-                <Plus className="h-4 w-4" />
-              </Button>
-              <Button size="icon" variant="ghost" className="h-7 w-7 text-red-600 hover:bg-red-100" onClick={() => { setWalletDialogType("debit"); setWalletAmount(""); setWalletNote(""); }}>
-                <Minus className="h-4 w-4" />
-              </Button>
-            </div>
+            <TabsList className="ml-auto">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="transactions" className="flex items-center gap-1.5">
+                <Receipt className="h-3.5 w-3.5" />
+                Transactions
+              </TabsTrigger>
+            </TabsList>
           </div>
-          <MetricCard
-            title="Total Ad Accounts"
-            value={adAccounts?.length ?? 0}
-            icon={MonitorSmartphone}
-            iconBg="bg-blue-100 dark:bg-blue-900/50"
-            iconColor="text-blue-600"
-            gradientClass="bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/40 dark:to-blue-900/20 border-blue-200 dark:border-blue-800"
-          />
-          <MetricCard
-            title="Active Ad Accounts"
-            value={activeAccounts.length}
-            icon={CheckCircle}
-            iconBg="bg-emerald-100 dark:bg-emerald-900/50"
-            iconColor="text-emerald-600"
-            gradientClass="bg-gradient-to-br from-emerald-50 to-green-100/50 dark:from-emerald-950/40 dark:to-green-900/20 border-emerald-200 dark:border-emerald-800"
-          />
-          <MetricCard
-            title="Disabled Ad Accounts"
-            value={disabledAccounts.length}
-            icon={XCircle}
-            iconBg="bg-red-100 dark:bg-red-900/50"
-            iconColor="text-red-600"
-            gradientClass="bg-gradient-to-br from-red-50 to-rose-100/50 dark:from-red-950/40 dark:to-rose-900/20 border-red-200 dark:border-red-800"
-          />
-          <MetricCard
-            title="Total Top-Up"
-            value={`$${Number(topUpTotal ?? 0).toLocaleString()}`}
-            subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"}
-            icon={TrendingUp}
-            iconBg="bg-orange-100 dark:bg-orange-900/50"
-            iconColor="text-orange-600"
-            gradientClass="bg-gradient-to-br from-orange-50 to-amber-100/50 dark:from-orange-950/40 dark:to-amber-900/20 border-orange-200 dark:border-orange-800"
-          />
-          <MetricCard
-            title="Total Remaining Balance"
-            value={`$${totalRemaining.toLocaleString()}`}
-            subtitle="Across all ad accounts"
-            icon={Wallet}
-            iconBg="bg-indigo-100 dark:bg-indigo-900/50"
-            iconColor="text-indigo-600"
-            gradientClass="bg-gradient-to-br from-indigo-50 to-violet-100/50 dark:from-indigo-950/40 dark:to-violet-900/20 border-indigo-200 dark:border-indigo-800"
-          />
-          <MetricCard
-            title="Total Spending"
-            value={`$${(totalSpendingFiltered ?? totalSpending).toLocaleString()}`}
-            subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time (cumulative)"}
-            icon={TrendingDown}
-            iconBg="bg-purple-100 dark:bg-purple-900/50"
-            iconColor="text-purple-600"
-            gradientClass="bg-gradient-to-br from-purple-50 to-violet-100/50 dark:from-purple-950/40 dark:to-violet-900/20 border-purple-200 dark:border-purple-800"
-          />
-        </div>
 
-        {/* Ad Accounts */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Ad Accounts ({adAccounts?.length ?? 0})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {adAccounts?.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">No ad accounts assigned</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Account</TableHead>
-                    <TableHead>Budget</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Spent</TableHead>
-                    <TableHead>Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {adAccounts?.map((acc: any) => (
-                    <TableRow key={acc.id}>
-                      <TableCell>
-                        <p className="font-medium">{acc.account_name}</p>
-                        <p className="text-xs text-muted-foreground">{acc.account_id}</p>
-                      </TableCell>
-                      <TableCell>${Number(acc.spend_cap).toLocaleString()}</TableCell>
-                      <TableCell><StatusBadge status={acc.status} /></TableCell>
-                      <TableCell>
-                        <SpendProgressBar amountSpent={Number(acc.amount_spent)} spendCap={Number(acc.spend_cap)} />
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          size="sm"
-                          className="bg-primary text-primary-foreground hover:bg-primary/90"
-                          onClick={() => { setSelectedAccountId(acc.id); setTopUpDialogOpen(true); setTopUpAmount(""); }}
-                        >
-                          <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
-                          Top Up
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+          <TabsContent value="overview" className="space-y-6 mt-0">
+            {/* Metric Cards */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="relative">
+                <MetricCard
+                  title="Wallet Balance"
+                  value={`$${walletBalance.toLocaleString()}`}
+                  icon={Wallet}
+                  iconBg="bg-green-100 dark:bg-green-900/50"
+                  iconColor="text-green-600"
+                  gradientClass="bg-gradient-to-br from-green-50 to-emerald-100/50 dark:from-green-950/40 dark:to-emerald-900/20 border-green-200 dark:border-green-800"
+                />
+                <div className="absolute top-2 right-2 flex gap-1">
+                  <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600 hover:bg-green-100" onClick={() => { setWalletDialogType("credit"); setWalletAmount(""); setWalletNote(""); }}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                  <Button size="icon" variant="ghost" className="h-7 w-7 text-red-600 hover:bg-red-100" onClick={() => { setWalletDialogType("debit"); setWalletAmount(""); setWalletNote(""); }}>
+                    <Minus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <MetricCard title="Total Ad Accounts" value={adAccounts?.length ?? 0} icon={MonitorSmartphone} iconBg="bg-blue-100 dark:bg-blue-900/50" iconColor="text-blue-600" gradientClass="bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/40 dark:to-blue-900/20 border-blue-200 dark:border-blue-800" />
+              <MetricCard title="Active Ad Accounts" value={activeAccounts.length} icon={CheckCircle} iconBg="bg-emerald-100 dark:bg-emerald-900/50" iconColor="text-emerald-600" gradientClass="bg-gradient-to-br from-emerald-50 to-green-100/50 dark:from-emerald-950/40 dark:to-green-900/20 border-emerald-200 dark:border-emerald-800" />
+              <MetricCard title="Disabled Ad Accounts" value={disabledAccounts.length} icon={XCircle} iconBg="bg-red-100 dark:bg-red-900/50" iconColor="text-red-600" gradientClass="bg-gradient-to-br from-red-50 to-rose-100/50 dark:from-red-950/40 dark:to-rose-900/20 border-red-200 dark:border-red-800" />
+              <MetricCard title="Total Top-Up" value={`$${Number(topUpTotal ?? 0).toLocaleString()}`} subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"} icon={TrendingUp} iconBg="bg-orange-100 dark:bg-orange-900/50" iconColor="text-orange-600" gradientClass="bg-gradient-to-br from-orange-50 to-amber-100/50 dark:from-orange-950/40 dark:to-amber-900/20 border-orange-200 dark:border-orange-800" />
+              <MetricCard title="Total Remaining Balance" value={`$${totalRemaining.toLocaleString()}`} subtitle="Across all ad accounts" icon={Wallet} iconBg="bg-indigo-100 dark:bg-indigo-900/50" iconColor="text-indigo-600" gradientClass="bg-gradient-to-br from-indigo-50 to-violet-100/50 dark:from-indigo-950/40 dark:to-violet-900/20 border-indigo-200 dark:border-indigo-800" />
+              <MetricCard title="Total Spending" value={`$${(totalSpendingFiltered ?? totalSpending).toLocaleString()}`} subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time (cumulative)"} icon={TrendingDown} iconBg="bg-purple-100 dark:bg-purple-900/50" iconColor="text-purple-600" gradientClass="bg-gradient-to-br from-purple-50 to-violet-100/50 dark:from-purple-950/40 dark:to-violet-900/20 border-purple-200 dark:border-purple-800" />
+            </div>
 
-        {/* Transaction History */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Transaction History</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Balance After</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {transactions?.map((tx: any) => (
-                  <TableRow key={tx.id}>
-                    <TableCell className="text-muted-foreground whitespace-nowrap">{format(new Date(tx.created_at), "MMM d, yyyy HH:mm")}</TableCell>
-                    <TableCell className="capitalize font-medium">{tx.type.replace(/_/g, " ")}</TableCell>
-                    <TableCell className="text-sm">{tx.description || "—"}</TableCell>
-                    <TableCell className={cn("font-semibold", Number(tx.amount) >= 0 ? "text-green-600" : "text-red-600")}>
-                      {Number(tx.amount) >= 0 ? "+" : ""}${Math.abs(Number(tx.amount)).toLocaleString()}
-                    </TableCell>
-                    <TableCell className="font-medium">${Number(tx.balance_after ?? 0).toLocaleString()}</TableCell>
-                  </TableRow>
-                ))}
-                {(!transactions || transactions.length === 0) && (
-                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No transactions yet</TableCell></TableRow>
+            {/* Ad Accounts */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Ad Accounts ({adAccounts?.length ?? 0})</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {adAccounts?.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">No ad accounts assigned</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Account</TableHead>
+                        <TableHead>Budget</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Spent</TableHead>
+                        <TableHead>Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {adAccounts?.map((acc: any) => (
+                        <TableRow key={acc.id}>
+                          <TableCell>
+                            <p className="font-medium">{acc.account_name}</p>
+                            <p className="text-xs text-muted-foreground">{acc.account_id}</p>
+                          </TableCell>
+                          <TableCell>${Number(acc.spend_cap).toLocaleString()}</TableCell>
+                          <TableCell><StatusBadge status={acc.status} /></TableCell>
+                          <TableCell>
+                            <SpendProgressBar amountSpent={Number(acc.amount_spent)} spendCap={Number(acc.spend_cap)} />
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              size="sm"
+                              className="bg-primary text-primary-foreground hover:bg-primary/90"
+                              onClick={() => { setSelectedAccountId(acc.id); setTopUpDialogOpen(true); setTopUpAmount(""); }}
+                            >
+                              <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
+                              Top Up
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="transactions" className="mt-0">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Transaction History</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Ad Account</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Balance After</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {transactions?.map((tx: any) => {
+                      const linkedAccount = tx.reference_id && tx.type === "ad_topup"
+                        ? adAccounts?.find((a: any) => a.id === tx.reference_id)
+                        : null;
+                      return (
+                        <TableRow key={tx.id}>
+                          <TableCell className="text-muted-foreground whitespace-nowrap">{format(new Date(tx.created_at), "MMM d, yyyy HH:mm")}</TableCell>
+                          <TableCell className="capitalize font-medium">{tx.type.replace(/_/g, " ")}</TableCell>
+                          <TableCell className="text-sm">{tx.description || "—"}</TableCell>
+                          <TableCell className="text-sm">
+                            {linkedAccount ? (
+                              <div>
+                                <p className="font-medium">{linkedAccount.account_name}</p>
+                                <p className="text-[11px] text-muted-foreground font-mono">{linkedAccount.account_id}</p>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className={cn("font-semibold", Number(tx.amount) >= 0 ? "text-green-600" : "text-red-600")}>
+                            {Number(tx.amount) >= 0 ? "+" : ""}${Math.abs(Number(tx.amount)).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="font-medium">${Number(tx.balance_after ?? 0).toLocaleString()}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {(!transactions || transactions.length === 0) && (
+                      <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No transactions yet</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Wallet Adjust Dialog */}
