@@ -684,6 +684,62 @@ export default function ClientDetailPage() {
         </Tabs>
       </div>
 
+      {/* Assign Accounts Dialog */}
+      <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
+        <DialogContent className="max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Assign Ad Accounts</DialogTitle>
+            <DialogDescription>Select accounts to assign to this client.</DialogDescription>
+          </DialogHeader>
+          <div className="py-2 space-y-2 max-h-[50vh] overflow-y-auto">
+            {(() => {
+              const assignedIds = new Set(adAccounts?.map((a: any) => a.id) ?? []);
+              const unassigned = allAdAccounts?.filter((a: any) => !assignedIds.has(a.id)) ?? [];
+              if (unassigned.length === 0) return <p className="text-sm text-muted-foreground text-center py-4">No unassigned accounts available</p>;
+              return unassigned.map((acc: any) => (
+                <label key={acc.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-muted cursor-pointer">
+                  <Checkbox
+                    checked={assignSelectedIds.has(acc.id)}
+                    onCheckedChange={() => {
+                      setAssignSelectedIds(prev => {
+                        const next = new Set(prev);
+                        if (next.has(acc.id)) next.delete(acc.id);
+                        else next.add(acc.id);
+                        return next;
+                      });
+                    }}
+                  />
+                  <div>
+                    <p className="text-sm font-medium">{acc.account_name}</p>
+                    <p className="text-xs text-muted-foreground">{acc.account_id}</p>
+                  </div>
+                </label>
+              ));
+            })()}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAssignDialog(false)}>Cancel</Button>
+            <Button
+              disabled={assignSelectedIds.size === 0}
+              onClick={async () => {
+                const ids = Array.from(assignSelectedIds);
+                const { error } = await (supabase as any).from("user_ad_accounts").insert(
+                  ids.map(adAccountId => ({ user_id: userId, ad_account_id: adAccountId }))
+                );
+                if (error) { toast.error(error.message); return; }
+                toast.success(`${ids.length} account(s) assigned`);
+                setShowAssignDialog(false);
+                setAssignSelectedIds(new Set());
+                refetchAdAccounts();
+                queryClient.invalidateQueries({ queryKey: ["admin-user-ad-accounts"] });
+              }}
+            >
+              Assign {assignSelectedIds.size > 0 ? `${assignSelectedIds.size} ` : ""}Selected
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Wallet Adjust Dialog */}
       <Dialog open={!!walletDialogType} onOpenChange={(open) => !open && setWalletDialogType(null)}>
         <DialogContent>
