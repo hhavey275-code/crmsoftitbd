@@ -9,6 +9,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import WalletPage from "./pages/WalletPage";
 import AdAccountsPage from "./pages/AdAccountsPage";
+import AdAccountDetailPage from "./pages/AdAccountDetailPage";
 import TopUpPage from "./pages/TopUpPage";
 import TransactionsPage from "./pages/TransactionsPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -31,6 +32,7 @@ const App = () => (
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/wallet" element={<ProtectedRoute><WalletPage /></ProtectedRoute>} />
             <Route path="/ad-accounts" element={<ProtectedRoute><AdAccountsPage /></ProtectedRoute>} />
+            <Route path="/ad-accounts/:id" element={<ProtectedRoute><AdAccountDetailPage /></ProtectedRoute>} />
             <Route path="/top-up" element={<ProtectedRoute><TopUpPage /></ProtectedRoute>} />
             <Route path="/transactions" element={<ProtectedRoute><TransactionsPage /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
