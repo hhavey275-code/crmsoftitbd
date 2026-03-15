@@ -7,11 +7,7 @@ export function SpendProgressBar({ amountSpent, spendCap }: SpendProgressBarProp
   if (spendCap <= 0) {
     return (
       <div className="w-full">
-        <div className="flex justify-between text-[10px] mb-0.5">
-          <span>${amountSpent.toLocaleString()}</span>
-          <span className="text-muted-foreground">No cap</span>
-        </div>
-        <div className="h-1.5 w-full rounded-full bg-muted" />
+        <div className="text-sm font-medium text-muted-foreground">No cap</div>
       </div>
     );
   }
@@ -25,22 +21,18 @@ export function SpendProgressBar({ amountSpent, spendCap }: SpendProgressBarProp
       ? "bg-destructive"
       : ratio >= 0.5
         ? "bg-yellow-500"
-        : "bg-green-500";
+        : "bg-primary";
 
   return (
-    <div className="w-full min-w-[110px]">
-      <div className="flex justify-between text-[10px] mb-0.5">
-        <span>${amountSpent.toLocaleString()}</span>
-        <span className="text-muted-foreground">${spendCap.toLocaleString()}</span>
+    <div className="w-full min-w-[80px]">
+      <div className="text-sm font-medium whitespace-nowrap">
+        ${remaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} left
       </div>
-      <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+      <div className="h-1.5 w-full max-w-[80px] rounded-full bg-muted overflow-hidden mt-1">
         <div
           className={`h-full rounded-full transition-all ${barColor}`}
           style={{ width: `${percentage}%` }}
         />
-      </div>
-      <div className="text-[10px] mt-0.5 font-semibold text-muted-foreground">
-        Remaining: <span className={`${ratio >= 0.8 ? 'text-destructive' : ratio >= 0.5 ? 'text-yellow-600' : 'text-green-600'}`}>${remaining.toLocaleString()}</span>
       </div>
     </div>
   );
