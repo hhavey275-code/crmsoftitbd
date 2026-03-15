@@ -13,7 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowUpCircle, ExternalLink, Wallet, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, CreditCard, RefreshCw, AppWindow, Search, ListChecks } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { ArrowUpCircle, ExternalLink, Wallet, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, CreditCard, RefreshCw, AppWindow, Search, ListChecks, Trash2 } from "lucide-react";
 import { CardBrandIcon } from "@/components/CardBrandIcon";
 
 interface InsightsData {
