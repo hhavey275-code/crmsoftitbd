@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Zap } from "lucide-react";
 import { toast } from "sonner";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
@@ -16,6 +17,8 @@ export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [businessName, setBusinessName] = useState("");
+  const [monthlySpend, setMonthlySpend] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { logoUrl, welcomeTitle, welcomeNote } = useSiteSettings();
@@ -30,7 +33,7 @@ export default function Auth() {
         toast.success("Welcome back!");
         navigate("/dashboard");
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data: signUpData, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -38,6 +41,15 @@ export default function Auth() {
             emailRedirectTo: window.location.origin,
           },
         });
+        if (error) throw error;
+
+        // Update profile with business name and monthly spend
+        if (signUpData.user) {
+          await supabase.from("profiles").update({
+            company: businessName || null,
+            monthly_spend: monthlySpend || null,
+          } as any).eq("user_id", signUpData.user.id);
+        }
         if (error) throw error;
         toast.success("Account created! Please wait for admin approval after confirming your email.");
       }
@@ -85,7 +97,13 @@ export default function Auth() {
               {!isLogin && (
                 <div className="space-y-2">
                   <Label htmlFor="fullName">Full Name</Label>
-                  <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="John Doe" />
+                  <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="John Doe" required />
+                </div>
+              )}
+              {!isLogin && (
+                <div className="space-y-2">
+                  <Label htmlFor="businessName">Business Name</Label>
+                  <Input id="businessName" value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Your Company Ltd." required />
                 </div>
               )}
               <div className="space-y-2">
@@ -96,6 +114,23 @@ export default function Auth() {
                 <Label htmlFor="password">Password</Label>
                 <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required minLength={6} />
               </div>
+              {!isLogin && (
+                <div className="space-y-2">
+                  <Label htmlFor="monthlySpend">Monthly Approx. Spending (USD)</Label>
+                  <Select value={monthlySpend} onValueChange={setMonthlySpend}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select spending range" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="$0 - $500">$0 - $500</SelectItem>
+                      <SelectItem value="$500 - $2,000">$500 - $2,000</SelectItem>
+                      <SelectItem value="$2,000 - $5,000">$2,000 - $5,000</SelectItem>
+                      <SelectItem value="$5,000 - $10,000">$5,000 - $10,000</SelectItem>
+                      <SelectItem value="$10,000+">$10,000+</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </CardContent>
             <CardFooter className="flex flex-col gap-3">
               <Button type="submit" className="w-full" disabled={loading}>
