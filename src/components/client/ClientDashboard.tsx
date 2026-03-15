@@ -4,7 +4,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { MetricCard } from "@/components/MetricCard";
 import { Wallet, MonitorSmartphone, TrendingUp, CalendarIcon } from "lucide-react";
-import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -44,7 +43,6 @@ export function ClientDashboard() {
     enabled: !!user,
   });
 
-
   const { data: topUpTotal } = useQuery({
     queryKey: ["client-topup-total", user?.id, dateFrom?.toISOString(), dateTo?.toISOString()],
     queryFn: async () => {
@@ -81,8 +79,70 @@ export function ClientDashboard() {
 
   const totalRemaining = adAccounts?.reduce((sum: number, a: any) => sum + (Number(a.spend_cap) - Number(a.amount_spent)), 0) ?? 0;
 
-
   const greeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Welcome Banner */}
+      <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10">
+        <CardContent className="p-5">
+          <h1 className="text-xl font-bold text-foreground">
+            {greeting()}, {profile?.full_name || "there"}! 👋
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Welcome to your dashboard • {format(new Date(), "EEEE, MMMM d, yyyy")}
+          </p>
+        </CardContent>
+      </Card>
+
+      {isInactive && (
+        <Card className="border-destructive bg-destructive/10">
+          <CardContent className="p-4 flex items-center gap-3">
+            <span className="text-destructive font-semibold">⚠️ Your account has been frozen by admin. You cannot perform any transactions or top-ups.</span>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Quick Stats */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <MetricCard
+          title="Wallet Balance"
+          value={`$${Number(wallet?.balance ?? 0).toLocaleString()}`}
+          icon={Wallet}
+          iconBg="bg-violet-50 dark:bg-violet-900/30"
+          iconColor="text-violet-600"
+        />
+        <MetricCard
+          title="Total Ad Accounts"
+          value={adAccounts?.length ?? 0}
+          icon={MonitorSmartphone}
+          iconBg="bg-amber-50 dark:bg-amber-900/30"
+          iconColor="text-amber-600"
+        />
+        <MetricCard
+          title="Total Remaining Balance"
+          value={`$${totalRemaining.toLocaleString()}`}
+          subtitle="Across all ad accounts"
+          icon={Wallet}
+          iconBg="bg-rose-50 dark:bg-rose-900/30"
+          iconColor="text-rose-600"
+        />
+        <MetricCard
+          title="Total Top-Up"
+          value={`$${Number(topUpTotal ?? 0).toLocaleString()}`}
+          subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"}
+          icon={TrendingUp}
+          iconBg="bg-emerald-50 dark:bg-emerald-900/30"
+          iconColor="text-emerald-600"
+        />
+      </div>
+
+      {/* Date Range for Total Top-Up */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium text-muted-foreground">Top-Up Period:</span>
         <Popover>
@@ -108,25 +168,6 @@ export function ClientDashboard() {
             <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className="p-3 pointer-events-auto" />
           </PopoverContent>
         </Popover>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <MetricCard
-          title="Total Top-Up"
-          value={`$${Number(topUpTotal ?? 0).toLocaleString()}`}
-          subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"}
-          icon={TrendingUp}
-          iconBg="bg-amber-50 dark:bg-amber-900/30"
-          iconColor="text-amber-600"
-        />
-        <MetricCard
-          title="Total Remaining Balance"
-          value={`$${totalRemaining.toLocaleString()}`}
-          subtitle="Across all ad accounts"
-          icon={Wallet}
-          iconBg="bg-rose-50 dark:bg-rose-900/30"
-          iconColor="text-rose-600"
-        />
       </div>
 
       {/* Transaction History */}
