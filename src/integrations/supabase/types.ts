@@ -20,8 +20,10 @@ export type Database = {
           balance: number | null
           cards: Json | null
           id: string
+          today_orders: number | null
           today_spend: number | null
           updated_at: string | null
+          yesterday_orders: number | null
           yesterday_spend: number | null
         }
         Insert: {
@@ -29,8 +31,10 @@ export type Database = {
           balance?: number | null
           cards?: Json | null
           id?: string
+          today_orders?: number | null
           today_spend?: number | null
           updated_at?: string | null
+          yesterday_orders?: number | null
           yesterday_spend?: number | null
         }
         Update: {
@@ -38,8 +42,10 @@ export type Database = {
           balance?: number | null
           cards?: Json | null
           id?: string
+          today_orders?: number | null
           today_spend?: number | null
           updated_at?: string | null
+          yesterday_orders?: number | null
           yesterday_spend?: number | null
         }
         Relationships: [
