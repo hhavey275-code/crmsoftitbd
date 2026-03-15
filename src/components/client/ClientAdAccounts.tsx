@@ -34,6 +34,7 @@ export function ClientAdAccounts() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const isInactive = (profile as any)?.status === "inactive";
+  const dueLimit = Number((profile as any)?.due_limit ?? 0);
 
   const { data: accounts } = useQuery({
     queryKey: ["client-ad-accounts", user?.id],
@@ -153,8 +154,10 @@ export function ClientAdAccounts() {
   const allSelected = sortedAccounts.length > 0 && selectedIds.size === sortedAccounts.length;
 
   const walletBalance = Number(wallet?.balance ?? 0);
+  const effectiveBalance = walletBalance + dueLimit;
   const parsedAmount = parseFloat(topUpAmount) || 0;
-  const exceedsBalance = parsedAmount > walletBalance;
+  const exceedsBalance = parsedAmount > effectiveBalance;
+  const usingDueLimit = parsedAmount > walletBalance && parsedAmount <= effectiveBalance;
 
   const topUpMutation = useMutation({
     mutationFn: async () => {
@@ -172,6 +175,7 @@ export function ClientAdAccounts() {
       queryClient.invalidateQueries({ queryKey: ["client-ad-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["client-wallet"] });
       queryClient.invalidateQueries({ queryKey: ["client-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["client-dashboard-transactions"] });
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -360,6 +364,12 @@ export function ClientAdAccounts() {
                 ${walletBalance.toLocaleString()}
               </span>
             </div>
+            {dueLimit > 0 && (
+              <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+                <span className="text-amber-700 dark:text-amber-400">Due Limit</span>
+                <span className="font-semibold text-amber-700 dark:text-amber-400">${dueLimit.toLocaleString()}</span>
+              </div>
+            )}
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Current Spend Cap</span>
               <span className="font-medium">${Number(topUpAccount?.spend_cap ?? 0).toLocaleString()}</span>
@@ -370,13 +380,15 @@ export function ClientAdAccounts() {
                 type="number"
                 min="1"
                 step="0.01"
-                max={walletBalance}
                 value={topUpAmount}
                 onChange={(e) => setTopUpAmount(e.target.value)}
                 placeholder="500.00"
               />
               {exceedsBalance && parsedAmount > 0 && (
-                <p className="text-sm text-destructive">Amount exceeds your wallet balance</p>
+                <p className="text-sm text-destructive">Amount exceeds your wallet balance{dueLimit > 0 ? " + due limit" : ""}</p>
+              )}
+              {usingDueLimit && parsedAmount > 0 && (
+                <p className="text-sm text-amber-600">⚠️ Using ${(parsedAmount - walletBalance).toLocaleString()} from due limit</p>
               )}
             </div>
             {parsedAmount > 0 && !exceedsBalance && (

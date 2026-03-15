@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN due_limit numeric DEFAULT NULL;

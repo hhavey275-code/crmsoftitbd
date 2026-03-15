@@ -10,13 +10,18 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { SpendProgressBar } from "@/components/SpendProgressBar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   User, Building2, Phone, CalendarDays, Wallet, MonitorSmartphone,
-  CheckCircle, XCircle, TrendingUp, TrendingDown, DollarSign, CalendarIcon, Save
+  CheckCircle, XCircle, TrendingUp, TrendingDown, DollarSign, CalendarIcon, Save,
+  Plus, Minus, ArrowUpCircle, CreditCard, Shield
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 
@@ -28,6 +33,22 @@ export default function ClientDetailPage() {
   const [dateTo, setDateTo] = useState<Date | undefined>(endOfMonth(new Date()));
   const [editingRate, setEditingRate] = useState(false);
   const [rateInput, setRateInput] = useState("");
+  const [editingCompany, setEditingCompany] = useState(false);
+  const [companyInput, setCompanyInput] = useState("");
+  const [editingPhone, setEditingPhone] = useState(false);
+  const [phoneInput, setPhoneInput] = useState("");
+  const [editingDueLimit, setEditingDueLimit] = useState(false);
+  const [dueLimitInput, setDueLimitInput] = useState("");
+
+  // Wallet adjust dialog
+  const [walletDialogType, setWalletDialogType] = useState<"credit" | "debit" | null>(null);
+  const [walletAmount, setWalletAmount] = useState("");
+  const [walletNote, setWalletNote] = useState("");
+
+  // Top-up dialog
+  const [topUpDialogOpen, setTopUpDialogOpen] = useState(false);
+  const [selectedAccountId, setSelectedAccountId] = useState("");
+  const [topUpAmount, setTopUpAmount] = useState("");
 
   const { data: profile } = useQuery({
     queryKey: ["client-detail-profile", userId],
@@ -90,7 +111,6 @@ export default function ClientDetailPage() {
     enabled: !!userId,
   });
 
-  // Total spending from transactions table filtered by date range
   const { data: totalSpendingFiltered } = useQuery({
     queryKey: ["client-detail-spending", userId, dateFrom?.toISOString(), dateTo?.toISOString()],
     queryFn: async () => {
@@ -98,7 +118,7 @@ export default function ClientDetailPage() {
         .from("transactions")
         .select("amount")
         .eq("user_id", userId!)
-        .eq("type", "deduction");
+        .eq("type", "ad_topup");
       if (dateFrom) query = query.gte("created_at", dateFrom.toISOString());
       if (dateTo) {
         const end = new Date(dateTo);
@@ -111,19 +131,97 @@ export default function ClientDetailPage() {
     enabled: !!userId,
   });
 
-  const saveRateMutation = useMutation({
-    mutationFn: async () => {
-      const value = rateInput.trim() === "" ? null : parseFloat(rateInput);
-      const { error } = await supabase
-        .from("profiles")
-        .update({ usd_rate: value } as any)
-        .eq("user_id", userId!);
+  const { data: transactions } = useQuery({
+    queryKey: ["client-detail-transactions", userId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("user_id", userId!)
+        .order("created_at", { ascending: false });
+      return (data as any[]) ?? [];
+    },
+    enabled: !!userId,
+  });
+
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ["client-detail-profile", userId] });
+    queryClient.invalidateQueries({ queryKey: ["client-detail-wallet", userId] });
+    queryClient.invalidateQueries({ queryKey: ["client-detail-transactions", userId] });
+    queryClient.invalidateQueries({ queryKey: ["client-detail-ad-accounts", userId] });
+  };
+
+  // Save profile field mutation
+  const saveProfileMutation = useMutation({
+    mutationFn: async (fields: Record<string, any>) => {
+      const { error } = await supabase.from("profiles").update(fields as any).eq("user_id", userId!);
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("USD rate updated!");
+      toast.success("Profile updated!");
       queryClient.invalidateQueries({ queryKey: ["client-detail-profile", userId] });
-      setEditingRate(false);
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  // Wallet adjust mutation
+  const walletAdjustMutation = useMutation({
+    mutationFn: async () => {
+      const amt = parseFloat(walletAmount);
+      if (!amt || amt <= 0) throw new Error("Invalid amount");
+      const currentBalance = Number(wallet?.balance ?? 0);
+      const isCredit = walletDialogType === "credit";
+      const newBalance = isCredit ? currentBalance + amt : currentBalance - amt;
+      const txAmount = isCredit ? amt : -amt;
+
+      const { error: walletErr } = await supabase
+        .from("wallets")
+        .update({ balance: newBalance } as any)
+        .eq("user_id", userId!);
+      if (walletErr) throw walletErr;
+
+      const { error: txErr } = await supabase.from("transactions").insert({
+        user_id: userId!,
+        amount: txAmount,
+        balance_after: newBalance,
+        type: isCredit ? "admin_credit" : "admin_debit",
+        description: walletNote.trim() || (isCredit ? "Admin added balance" : "Admin deducted balance"),
+      });
+      if (txErr) throw txErr;
+    },
+    onSuccess: () => {
+      toast.success(walletDialogType === "credit" ? "Balance added!" : "Balance deducted!");
+      setWalletDialogType(null);
+      setWalletAmount("");
+      setWalletNote("");
+      invalidateAll();
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  // Top-up mutation (admin)
+  const topUpMutation = useMutation({
+    mutationFn: async () => {
+      const amt = parseFloat(topUpAmount);
+      if (!amt || amt <= 0) throw new Error("Invalid amount");
+      const { data, error } = await supabase.functions.invoke("update-spend-cap", {
+        body: {
+          ad_account_id: selectedAccountId,
+          amount: amt,
+          deduct_wallet: true,
+          target_user_id: userId,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data) => {
+      toast.success(`Spend cap updated: $${Number(data.old_spend_cap).toLocaleString()} → $${Number(data.new_spend_cap).toLocaleString()}`);
+      setTopUpDialogOpen(false);
+      setSelectedAccountId("");
+      setTopUpAmount("");
+      invalidateAll();
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -133,12 +231,24 @@ export default function ClientDetailPage() {
   const totalRemaining = adAccounts?.reduce((sum: number, a: any) => sum + (Number(a.spend_cap) - Number(a.amount_spent)), 0) ?? 0;
   const totalSpending = adAccounts?.reduce((sum: number, a: any) => sum + Number(a.amount_spent), 0) ?? 0;
   const isActive = (profile?.status ?? "active") === "active";
-  const clientRate = (profile as any)?.usd_rate;
+  const clientRate = profile?.usd_rate;
+  const dueLimit = (profile as any)?.due_limit;
+  const walletBalance = Number(wallet?.balance ?? 0);
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Client Details</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Client Details</h1>
+          <Button
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+            onClick={() => { setTopUpDialogOpen(true); setSelectedAccountId(""); setTopUpAmount(""); }}
+            disabled={!adAccounts || adAccounts.length === 0}
+          >
+            <ArrowUpCircle className="h-4 w-4 mr-2" />
+            Top Up
+          </Button>
+        </div>
 
         {/* Client Info Card */}
         <Card className={!isActive ? "border-destructive/50 bg-destructive/5" : ""}>
@@ -152,7 +262,8 @@ export default function ClientDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+              {/* Full Name */}
               <div className="flex items-center gap-3 rounded-lg border p-4">
                 <User className="h-5 w-5 text-muted-foreground" />
                 <div>
@@ -160,20 +271,54 @@ export default function ClientDetailPage() {
                   <p className="font-medium">{profile?.full_name || "—"}</p>
                 </div>
               </div>
+
+              {/* Business Name - editable */}
               <div className="flex items-center gap-3 rounded-lg border p-4">
                 <Building2 className="h-5 w-5 text-muted-foreground" />
-                <div>
+                <div className="flex-1 min-w-0">
                   <p className="text-xs text-muted-foreground">Business Name</p>
-                  <p className="font-medium">{profile?.company || "—"}</p>
+                  {editingCompany ? (
+                    <div className="flex items-center gap-1 mt-1">
+                      <Input className="w-24 h-7 text-sm" value={companyInput} onChange={(e) => setCompanyInput(e.target.value)} />
+                      <Button size="icon" className="h-7 w-7" onClick={() => { saveProfileMutation.mutate({ company: companyInput }); setEditingCompany(false); }}>
+                        <Save className="h-3 w-3" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingCompany(false)}>
+                        <XCircle className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="font-medium cursor-pointer hover:underline" onClick={() => { setCompanyInput(profile?.company ?? ""); setEditingCompany(true); }}>
+                      {profile?.company || "—"}
+                    </p>
+                  )}
                 </div>
               </div>
+
+              {/* Phone - editable */}
               <div className="flex items-center gap-3 rounded-lg border p-4">
                 <Phone className="h-5 w-5 text-muted-foreground" />
-                <div>
+                <div className="flex-1 min-w-0">
                   <p className="text-xs text-muted-foreground">Phone Number</p>
-                  <p className="font-medium">{(profile as any)?.phone || "—"}</p>
+                  {editingPhone ? (
+                    <div className="flex items-center gap-1 mt-1">
+                      <Input className="w-28 h-7 text-sm" value={phoneInput} onChange={(e) => setPhoneInput(e.target.value)} />
+                      <Button size="icon" className="h-7 w-7" onClick={() => { saveProfileMutation.mutate({ phone: phoneInput }); setEditingPhone(false); }}>
+                        <Save className="h-3 w-3" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingPhone(false)}>
+                        <XCircle className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="font-medium cursor-pointer hover:underline" onClick={() => { setPhoneInput(profile?.phone ?? ""); setEditingPhone(true); }}>
+                      {profile?.phone || "—"}
+                    </p>
+                  )}
                 </div>
               </div>
+
+              {/* Onboarding Date */}
               <div className="flex items-center gap-3 rounded-lg border p-4">
                 <CalendarDays className="h-5 w-5 text-muted-foreground" />
                 <div>
@@ -183,22 +328,16 @@ export default function ClientDetailPage() {
                   </p>
                 </div>
               </div>
-              {/* USD Rate - inline editable */}
+
+              {/* USD Rate - editable */}
               <div className="flex items-center gap-3 rounded-lg border border-cyan-200 bg-cyan-50/50 dark:bg-cyan-950/20 dark:border-cyan-800 p-4">
                 <DollarSign className="h-5 w-5 text-cyan-600" />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-muted-foreground">USD Rate</p>
                   {editingRate ? (
                     <div className="flex items-center gap-1 mt-1">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        className="w-20 h-7 text-sm"
-                        value={rateInput}
-                        onChange={(e) => setRateInput(e.target.value)}
-                        placeholder="e.g. 125"
-                      />
-                      <Button size="icon" className="h-7 w-7" onClick={() => saveRateMutation.mutate()} disabled={saveRateMutation.isPending}>
+                      <Input type="number" step="0.01" className="w-20 h-7 text-sm" value={rateInput} onChange={(e) => setRateInput(e.target.value)} placeholder="e.g. 125" />
+                      <Button size="icon" className="h-7 w-7" onClick={() => { saveProfileMutation.mutate({ usd_rate: rateInput.trim() === "" ? null : parseFloat(rateInput) }); setEditingRate(false); }}>
                         <Save className="h-3 w-3" />
                       </Button>
                       <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingRate(false)}>
@@ -206,11 +345,31 @@ export default function ClientDetailPage() {
                       </Button>
                     </div>
                   ) : (
-                    <p
-                      className="font-medium text-cyan-700 dark:text-cyan-400 cursor-pointer hover:underline"
-                      onClick={() => { setRateInput(clientRate?.toString() ?? ""); setEditingRate(true); }}
-                    >
+                    <p className="font-medium text-cyan-700 dark:text-cyan-400 cursor-pointer hover:underline" onClick={() => { setRateInput(clientRate?.toString() ?? ""); setEditingRate(true); }}>
                       {clientRate ? `৳${clientRate}` : `Global (৳${globalRate})`}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Due Limit - editable */}
+              <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800 p-4">
+                <Shield className="h-5 w-5 text-amber-600" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-muted-foreground">Due Limit</p>
+                  {editingDueLimit ? (
+                    <div className="flex items-center gap-1 mt-1">
+                      <Input type="number" step="1" className="w-20 h-7 text-sm" value={dueLimitInput} onChange={(e) => setDueLimitInput(e.target.value)} placeholder="e.g. 500" />
+                      <Button size="icon" className="h-7 w-7" onClick={() => { saveProfileMutation.mutate({ due_limit: dueLimitInput.trim() === "" ? null : parseFloat(dueLimitInput) } as any); setEditingDueLimit(false); }}>
+                        <Save className="h-3 w-3" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingDueLimit(false)}>
+                        <XCircle className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="font-medium text-amber-700 dark:text-amber-400 cursor-pointer hover:underline" onClick={() => { setDueLimitInput(dueLimit?.toString() ?? ""); setEditingDueLimit(true); }}>
+                      {dueLimit ? `$${Number(dueLimit).toLocaleString()}` : "No due limit"}
                     </p>
                   )}
                 </div>
@@ -255,14 +414,25 @@ export default function ClientDetailPage() {
 
         {/* Metric Cards */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <MetricCard
-            title="Wallet Balance"
-            value={`$${Number(wallet?.balance ?? 0).toLocaleString()}`}
-            icon={Wallet}
-            iconBg="bg-green-100 dark:bg-green-900/50"
-            iconColor="text-green-600"
-            gradientClass="bg-gradient-to-br from-green-50 to-emerald-100/50 dark:from-green-950/40 dark:to-emerald-900/20 border-green-200 dark:border-green-800"
-          />
+          {/* Wallet Balance with +/- */}
+          <div className="relative">
+            <MetricCard
+              title="Wallet Balance"
+              value={`$${walletBalance.toLocaleString()}`}
+              icon={Wallet}
+              iconBg="bg-green-100 dark:bg-green-900/50"
+              iconColor="text-green-600"
+              gradientClass="bg-gradient-to-br from-green-50 to-emerald-100/50 dark:from-green-950/40 dark:to-emerald-900/20 border-green-200 dark:border-green-800"
+            />
+            <div className="absolute top-2 right-2 flex gap-1">
+              <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600 hover:bg-green-100" onClick={() => { setWalletDialogType("credit"); setWalletAmount(""); setWalletNote(""); }}>
+                <Plus className="h-4 w-4" />
+              </Button>
+              <Button size="icon" variant="ghost" className="h-7 w-7 text-red-600 hover:bg-red-100" onClick={() => { setWalletDialogType("debit"); setWalletAmount(""); setWalletNote(""); }}>
+                <Minus className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
           <MetricCard
             title="Total Ad Accounts"
             value={adAccounts?.length ?? 0}
@@ -307,7 +477,7 @@ export default function ClientDetailPage() {
           />
           <MetricCard
             title="Total Spending"
-            value={`$${totalSpending.toLocaleString()}`}
+            value={`$${(totalSpendingFiltered ?? totalSpending).toLocaleString()}`}
             subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time (cumulative)"}
             icon={TrendingDown}
             iconBg="bg-purple-100 dark:bg-purple-900/50"
@@ -353,7 +523,138 @@ export default function ClientDetailPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Transaction History */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Transaction History</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Balance After</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {transactions?.map((tx: any) => (
+                  <TableRow key={tx.id}>
+                    <TableCell className="text-muted-foreground whitespace-nowrap">{format(new Date(tx.created_at), "MMM d, yyyy HH:mm")}</TableCell>
+                    <TableCell className="capitalize font-medium">{tx.type.replace(/_/g, " ")}</TableCell>
+                    <TableCell className="text-sm">{tx.description || "—"}</TableCell>
+                    <TableCell className={cn("font-semibold", Number(tx.amount) >= 0 ? "text-green-600" : "text-red-600")}>
+                      {Number(tx.amount) >= 0 ? "+" : ""}${Math.abs(Number(tx.amount)).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="font-medium">${Number(tx.balance_after ?? 0).toLocaleString()}</TableCell>
+                  </TableRow>
+                ))}
+                {(!transactions || transactions.length === 0) && (
+                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No transactions yet</TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Wallet Adjust Dialog */}
+      <Dialog open={!!walletDialogType} onOpenChange={(open) => !open && setWalletDialogType(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{walletDialogType === "credit" ? "Add Balance" : "Deduct Balance"}</DialogTitle>
+            <DialogDescription>
+              Current balance: <span className="font-semibold">${walletBalance.toLocaleString()}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Amount (USD)</Label>
+              <Input type="number" min="0.01" step="0.01" value={walletAmount} onChange={(e) => setWalletAmount(e.target.value)} placeholder="100.00" />
+            </div>
+            <div className="space-y-2">
+              <Label>Note (optional)</Label>
+              <Textarea value={walletNote} onChange={(e) => setWalletNote(e.target.value)} placeholder="Reason for adjustment..." rows={2} />
+            </div>
+            {walletDialogType === "credit" && parseFloat(walletAmount) > 0 && (
+              <p className="text-sm text-muted-foreground">New balance: <span className="font-semibold text-green-600">${(walletBalance + parseFloat(walletAmount)).toLocaleString()}</span></p>
+            )}
+            {walletDialogType === "debit" && parseFloat(walletAmount) > 0 && (
+              <p className="text-sm text-muted-foreground">New balance: <span className={cn("font-semibold", (walletBalance - parseFloat(walletAmount)) < 0 ? "text-red-600" : "text-green-600")}>${(walletBalance - parseFloat(walletAmount)).toLocaleString()}</span></p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWalletDialogType(null)}>Cancel</Button>
+            <Button onClick={() => walletAdjustMutation.mutate()} disabled={!walletAmount || parseFloat(walletAmount) <= 0 || walletAdjustMutation.isPending}>
+              {walletAdjustMutation.isPending ? "Processing..." : walletDialogType === "credit" ? "Add Balance" : "Deduct Balance"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Top Up Dialog */}
+      <Dialog open={topUpDialogOpen} onOpenChange={(open) => !open && setTopUpDialogOpen(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Top Up Ad Account</DialogTitle>
+            <DialogDescription>Select an ad account and enter amount. Wallet balance will be deducted.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-muted">
+              <span className="flex items-center gap-2"><Wallet className="h-4 w-4" /> Client Wallet</span>
+              <span className={cn("font-semibold", walletBalance < 0 ? "text-red-600" : "")}>${walletBalance.toLocaleString()}</span>
+            </div>
+            <div className="space-y-2">
+              <Label>Ad Account</Label>
+              <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+                <SelectTrigger><SelectValue placeholder="Select ad account" /></SelectTrigger>
+                <SelectContent>
+                  {adAccounts?.map((acc: any) => (
+                    <SelectItem key={acc.id} value={acc.id}>
+                      {acc.account_name} ({acc.account_id})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Amount (USD)</Label>
+              <Input type="number" min="1" step="0.01" value={topUpAmount} onChange={(e) => setTopUpAmount(e.target.value)} placeholder="500.00" />
+            </div>
+            {selectedAccountId && parseFloat(topUpAmount) > 0 && (
+              <div className="text-sm space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Current Spend Cap</span>
+                  <span className="font-medium">${Number(adAccounts?.find((a: any) => a.id === selectedAccountId)?.spend_cap ?? 0).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">New Spend Cap</span>
+                  <span className="font-medium text-primary">${(Number(adAccounts?.find((a: any) => a.id === selectedAccountId)?.spend_cap ?? 0) + parseFloat(topUpAmount)).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Wallet After</span>
+                  <span className={cn("font-medium", (walletBalance - parseFloat(topUpAmount)) < 0 ? "text-red-600" : "")}>
+                    ${(walletBalance - parseFloat(topUpAmount)).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTopUpDialogOpen(false)}>Cancel</Button>
+            <Button
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={() => topUpMutation.mutate()}
+              disabled={!selectedAccountId || !topUpAmount || parseFloat(topUpAmount) <= 0 || topUpMutation.isPending}
+            >
+              {topUpMutation.isPending ? "Processing..." : "Top Up Now"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

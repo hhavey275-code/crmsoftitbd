@@ -43,7 +43,6 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Check if caller is admin
     const { data: roleData } = await supabase
       .from("user_roles")
       .select("role")
@@ -61,10 +60,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Determine which user's wallet to deduct
     const walletUserId = target_user_id || callerId;
 
-    // Non-admin can only deduct own wallet
     if (!isAdmin && walletUserId !== callerId) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403,
@@ -72,15 +69,15 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Non-admin: check if account is frozen
-    if (!isAdmin) {
-      const { data: callerProfile } = await supabase
-        .from("profiles")
-        .select("status")
-        .eq("user_id", callerId)
-        .single();
+    // Fetch profile for frozen check and due_limit
+    const { data: userProfile } = await supabase
+      .from("profiles")
+      .select("status, due_limit")
+      .eq("user_id", walletUserId)
+      .single();
 
-      if (callerProfile?.status === "inactive") {
+    if (!isAdmin) {
+      if (userProfile?.status === "inactive") {
         return new Response(
           JSON.stringify({ error: "Your account has been frozen. You cannot perform this action." }),
           { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -101,6 +98,20 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Fetch ad account + BM info first (for account name in description)
+    const { data: account, error: accErr } = await supabase
+      .from("ad_accounts")
+      .select("*, business_managers!inner(access_token, bm_id)")
+      .eq("id", ad_account_id)
+      .single();
+
+    if (accErr || !account) {
+      return new Response(
+        JSON.stringify({ error: "Ad account not found" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Wallet deduction
     if (deduct_wallet) {
       const { data: wallet, error: walletErr } = await supabase
@@ -116,8 +127,11 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Clients cannot exceed wallet balance; admins can (allows negative)
-      if (!isAdmin && wallet.balance < amount) {
+      const dueLimit = Number(userProfile?.due_limit ?? 0);
+      const effectiveBalance = Number(wallet.balance) + dueLimit;
+
+      // Clients cannot exceed wallet balance + due_limit; admins can (allows negative)
+      if (!isAdmin && effectiveBalance < amount) {
         return new Response(
           JSON.stringify({ error: "Insufficient wallet balance" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -138,29 +152,15 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Log transaction
+      // Log transaction with account name
       await supabase.from("transactions").insert({
         user_id: walletUserId,
         amount: -amount,
         balance_after: newBalance,
         type: "ad_topup",
-        description: `Ad account top-up: $${amount}`,
+        description: `Ad account top-up: $${amount} → ${account.account_name}`,
         reference_id: ad_account_id,
       });
-    }
-
-    // Fetch ad account + BM info
-    const { data: account, error: accErr } = await supabase
-      .from("ad_accounts")
-      .select("*, business_managers!inner(access_token, bm_id)")
-      .eq("id", ad_account_id)
-      .single();
-
-    if (accErr || !account) {
-      return new Response(
-        JSON.stringify({ error: "Ad account not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
     }
 
     const bm = (account as any).business_managers;
@@ -198,7 +198,6 @@ Deno.serve(async (req) => {
             .from("wallets")
             .update({ balance: Number(wallet.balance) + amount })
             .eq("id", wallet.id);
-          // Delete the transaction we just created
           await supabase
             .from("transactions")
             .delete()
