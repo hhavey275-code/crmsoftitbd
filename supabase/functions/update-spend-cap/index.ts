@@ -36,28 +36,24 @@ Deno.serve(async (req) => {
       });
     }
 
-    const userId = claimsData.claims.sub;
+    const callerId = claimsData.claims.sub;
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // Check if caller is admin
     const { data: roleData } = await supabase
       .from("user_roles")
       .select("role")
-      .eq("user_id", userId)
+      .eq("user_id", callerId)
       .eq("role", "admin")
       .single();
 
-    if (!roleData) {
-      return new Response(JSON.stringify({ error: "Forbidden" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const isAdmin = !!roleData;
 
-    const { ad_account_id, amount } = await req.json();
+    const { ad_account_id, amount, deduct_wallet, target_user_id } = await req.json();
     if (!ad_account_id || !amount) {
       return new Response(
         JSON.stringify({ error: "ad_account_id and amount required" }),
@@ -65,6 +61,82 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Determine which user's wallet to deduct
+    const walletUserId = target_user_id || callerId;
+
+    // Non-admin can only deduct own wallet
+    if (!isAdmin && walletUserId !== callerId) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Non-admin must have the account assigned
+    if (!isAdmin) {
+      const { data: assignment } = await supabase
+        .from("user_ad_accounts")
+        .select("id")
+        .eq("user_id", callerId)
+        .eq("ad_account_id", ad_account_id)
+        .single();
+      if (!assignment) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // Wallet deduction
+    if (deduct_wallet) {
+      const { data: wallet, error: walletErr } = await supabase
+        .from("wallets")
+        .select("id, balance")
+        .eq("user_id", walletUserId)
+        .single();
+
+      if (walletErr || !wallet) {
+        return new Response(
+          JSON.stringify({ error: "Wallet not found for user" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Clients cannot exceed wallet balance; admins can (allows negative)
+      if (!isAdmin && wallet.balance < amount) {
+        return new Response(
+          JSON.stringify({ error: "Insufficient wallet balance" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const newBalance = Number(wallet.balance) - amount;
+
+      const { error: updateWalletErr } = await supabase
+        .from("wallets")
+        .update({ balance: newBalance })
+        .eq("id", wallet.id);
+
+      if (updateWalletErr) {
+        return new Response(
+          JSON.stringify({ error: "Failed to deduct wallet" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Log transaction
+      await supabase.from("transactions").insert({
+        user_id: walletUserId,
+        amount: -amount,
+        balance_after: newBalance,
+        type: "ad_topup",
+        description: `Ad account top-up: $${amount}`,
+        reference_id: ad_account_id,
+      });
+    }
+
+    // Fetch ad account + BM info
     const { data: account, error: accErr } = await supabase
       .from("ad_accounts")
       .select("*, business_managers!inner(access_token, bm_id)")
@@ -81,10 +153,7 @@ Deno.serve(async (req) => {
     const bm = (account as any).business_managers;
     const oldSpendCap = Number(account.spend_cap);
     const newSpendCap = oldSpendCap + amount;
-    // Meta API accepts spend_cap in cents (smallest currency unit)
-    
 
-    // Meta API requires act_ prefix for the account ID
     const actId = account.account_id.startsWith("act_")
       ? account.account_id
       : `act_${account.account_id}`;
@@ -104,6 +173,30 @@ Deno.serve(async (req) => {
     const metaData = await metaRes.json();
 
     if (metaData.error) {
+      // Rollback wallet deduction on Meta API failure
+      if (deduct_wallet) {
+        const { data: wallet } = await supabase
+          .from("wallets")
+          .select("id, balance")
+          .eq("user_id", walletUserId)
+          .single();
+        if (wallet) {
+          await supabase
+            .from("wallets")
+            .update({ balance: Number(wallet.balance) + amount })
+            .eq("id", wallet.id);
+          // Delete the transaction we just created
+          await supabase
+            .from("transactions")
+            .delete()
+            .eq("reference_id", ad_account_id)
+            .eq("user_id", walletUserId)
+            .eq("amount", -amount)
+            .order("created_at", { ascending: false })
+            .limit(1);
+        }
+      }
+
       return new Response(
         JSON.stringify({
           error: `Meta API error: ${metaData.error.message}`,
