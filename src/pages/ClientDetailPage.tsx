@@ -107,6 +107,7 @@ export default function ClientDetailPage() {
     enabled: !!adAccounts && adAccounts.length > 0,
   });
 
+  const { data: topUpTotal } = useQuery({
     queryKey: ["client-detail-topup-total", userId, dateFrom?.toISOString(), dateTo?.toISOString()],
     queryFn: async () => {
       let query = supabase
