@@ -243,7 +243,6 @@ export default function ClientDetailPage() {
           <Button
             className="bg-blue-600 hover:bg-blue-700 text-white"
             onClick={() => { setTopUpDialogOpen(true); setSelectedAccountId(""); setTopUpAmount(""); }}
-            disabled={!adAccounts || adAccounts.length === 0}
           >
             <ArrowUpCircle className="h-4 w-4 mr-2" />
             Top Up
