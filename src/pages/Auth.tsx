@@ -129,7 +129,7 @@ export default function Auth() {
       <div className="relative z-10 flex flex-1 items-center justify-center p-4">
         <Card className="w-full max-w-lg bg-card/90 backdrop-blur-md shadow-2xl border-border/50 rounded-3xl">
           <CardHeader className="pb-2">
-            <div className="flex items-center gap-3 mb-3">
+            <div className="flex items-center mb-3">
               {logoUrl ? (
                 <img src={logoUrl} alt="Logo" className="h-16 w-16 rounded-xl object-contain" />
               ) : (
@@ -137,7 +137,6 @@ export default function Auth() {
                   <Zap className="h-8 w-8 text-primary-foreground" />
                 </div>
               )}
-              <span className="text-xl font-bold text-foreground">{siteName || "Soft IT BD"}</span>
             </div>
             <RobotMascot isCovering={isPasswordFocused} />
             <div className="mx-auto mt-2 rounded-lg bg-gradient-to-r from-emerald-500 via-cyan-500 to-blue-600 px-5 py-2 shadow-[0_0_20px_rgba(6,182,212,0.4)]">
