@@ -3,12 +3,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
-        headers: corsHeaders,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
     if (claimsError || !claimsData?.claims) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
-        headers: corsHeaders,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -53,15 +53,15 @@ Deno.serve(async (req) => {
     if (!roleData) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403,
-        headers: corsHeaders,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const { ad_account_id, amount, topup_id } = await req.json();
+    const { ad_account_id, amount } = await req.json();
     if (!ad_account_id || !amount) {
       return new Response(
         JSON.stringify({ error: "ad_account_id and amount required" }),
-        { status: 400, headers: corsHeaders }
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
     if (accErr || !account) {
       return new Response(
         JSON.stringify({ error: "Ad account not found" }),
-        { status: 404, headers: corsHeaders }
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -83,8 +83,13 @@ Deno.serve(async (req) => {
     const newSpendCap = oldSpendCap + amount;
     const newSpendCapCents = newSpendCap * 100;
 
+    // Meta API requires act_ prefix for the account ID
+    const actId = account.account_id.startsWith("act_")
+      ? account.account_id
+      : `act_${account.account_id}`;
+
     const metaRes = await fetch(
-      `https://graph.facebook.com/v21.0/${account.account_id}`,
+      `https://graph.facebook.com/v24.0/${actId}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -97,25 +102,13 @@ Deno.serve(async (req) => {
 
     const metaData = await metaRes.json();
 
-    // Update topup record with meta response
-    if (topup_id) {
-      await supabase
-        .from("topups")
-        .update({
-          old_spend_cap: oldSpendCap,
-          new_spend_cap: newSpendCap,
-          meta_response: metaData,
-        })
-        .eq("id", topup_id);
-    }
-
     if (metaData.error) {
       return new Response(
         JSON.stringify({
           error: `Meta API error: ${metaData.error.message}`,
           meta_error: metaData.error,
         }),
-        { status: 400, headers: corsHeaders }
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -136,7 +129,7 @@ Deno.serve(async (req) => {
     console.error("update-spend-cap error:", err);
     return new Response(
       JSON.stringify({ error: err instanceof Error ? err.message : "Unknown error" }),
-      { status: 500, headers: corsHeaders }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

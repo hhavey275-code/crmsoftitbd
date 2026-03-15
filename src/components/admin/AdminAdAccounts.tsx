@@ -211,7 +211,7 @@ export function AdminAdAccounts() {
               onClick={() => topUpMutation.mutate()}
               disabled={!topUpAmount || parseFloat(topUpAmount) <= 0 || topUpMutation.isPending}
             >
-              {topUpMutation.isPending ? "Submitting..." : "Submit Request"}
+              {topUpMutation.isPending ? "Processing..." : "Top Up Now"}
             </Button>
           </DialogFooter>
         </DialogContent>
