@@ -131,8 +131,7 @@ export function AdminAdAccounts() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Account Name</TableHead>
-                <TableHead>Account ID</TableHead>
+                <TableHead>Account</TableHead>
                 <TableHead>Business Manager</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Spend Cap / Spent</TableHead>
@@ -143,8 +142,10 @@ export function AdminAdAccounts() {
             <TableBody>
               {accounts?.map((a: any) => (
                 <TableRow key={a.id}>
-                  <TableCell className="font-medium">{a.account_name}</TableCell>
-                  <TableCell className="font-mono text-sm">{a.account_id}</TableCell>
+                  <TableCell>
+                    <div className="font-medium">{a.account_name}</div>
+                    <div className="text-xs text-muted-foreground font-mono">{a.account_id}</div>
+                  </TableCell>
                   <TableCell>{a.business_managers?.name || "—"}</TableCell>
                   <TableCell><StatusBadge status={a.status} /></TableCell>
                   <TableCell>
