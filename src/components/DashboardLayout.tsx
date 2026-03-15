@@ -17,7 +17,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     <SidebarProvider>
       <div className="min-h-screen flex w-full relative">
         {/* Background with low opacity */}
-        <div className="fixed inset-0 w-screen h-screen opacity-[0.15] pointer-events-none" style={{ zIndex: 0 }}>
+        <div className="fixed inset-0 w-screen h-screen opacity-60 pointer-events-none" style={{ zIndex: 0 }}>
           <Suspense fallback={null}>
             <TechBackground />
           </Suspense>
