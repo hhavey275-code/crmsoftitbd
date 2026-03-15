@@ -28,6 +28,7 @@ export function AdminTopUp() {
     amount: number;
     bdtAmount: number | null;
     usdRate: number | null;
+    proofUrl: string | null;
   } | null>(null);
 
   const { data: requests } = useQuery({
