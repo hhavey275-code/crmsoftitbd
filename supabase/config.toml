@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.scheduled-sync]
 verify_jwt = false
+
+[functions.rename-ad-account]
+verify_jwt = false
