@@ -4,10 +4,10 @@ import { AdminTransactions } from "@/components/admin/AdminTransactions";
 import { ClientTransactions } from "@/components/client/ClientTransactions";
 
 export default function TransactionsPage() {
-  const { role } = useAuth();
+  const { isAdmin } = useAuth();
   return (
     <DashboardLayout>
-      {role === "admin" ? <AdminTransactions /> : <ClientTransactions />}
+      {isAdmin ? <AdminTransactions /> : <ClientTransactions />}
     </DashboardLayout>
   );
 }
