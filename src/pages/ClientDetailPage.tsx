@@ -49,6 +49,7 @@ export default function ClientDetailPage() {
   const [topUpDialogOpen, setTopUpDialogOpen] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [topUpAmount, setTopUpAmount] = useState("");
+  const [billingSortDir, setBillingSortDir] = useState<"asc" | "desc">("desc");
 
   const { data: profile } = useQuery({
     queryKey: ["client-detail-profile", userId],
