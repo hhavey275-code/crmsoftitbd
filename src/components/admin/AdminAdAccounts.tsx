@@ -639,6 +639,8 @@ export function AdminAdAccounts() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={async () => {
                 const ids = Array.from(selectedIds);
+                // Delete orphaned insights first
+                await supabase.from("ad_account_insights").delete().in("ad_account_id", ids);
                 const { error } = await supabase.from("ad_accounts").delete().in("id", ids);
                 if (error) {
                   toast.error(error.message);
@@ -647,6 +649,8 @@ export function AdminAdAccounts() {
                   setSelectedIds(new Set());
                   queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
                   queryClient.invalidateQueries({ queryKey: ["admin-insights-cache"] });
+                  queryClient.invalidateQueries({ queryKey: ["billings-accounts"] });
+                  queryClient.invalidateQueries({ queryKey: ["billings-insights"] });
                 }
               }}
             >

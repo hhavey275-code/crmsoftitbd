@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
 import { CardBrandIcon } from "@/components/CardBrandIcon";
-import { ArrowUp, ArrowDown, AppWindow, RefreshCw, Search } from "lucide-react";
+import { ArrowUp, ArrowDown, AppWindow, RefreshCw, Search, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 
 interface InsightsData {
