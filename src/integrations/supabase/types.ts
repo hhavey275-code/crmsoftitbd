@@ -26,7 +26,7 @@ export type Database = {
           spend_cap: number
           status: string
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           account_id: string
@@ -39,7 +39,7 @@ export type Database = {
           spend_cap?: number
           status?: string
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           account_id?: string
@@ -52,7 +52,7 @@ export type Database = {
           spend_cap?: number
           status?: string
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
