@@ -272,7 +272,7 @@ export function AdminAdAccounts() {
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
-                          <Monitor className="h-4 w-4 text-muted-foreground" />
+                          <AppWindow className="h-4 w-4 text-muted-foreground" />
                         </div>
                         <div>
                           <div className="text-sm text-primary">{a.account_name}</div>
