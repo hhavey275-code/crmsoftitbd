@@ -24,15 +24,23 @@ export function AdminBusinessManagers() {
     queryKey: ["admin-business-managers"],
     queryFn: async () => {
       const { data } = await supabase.from("business_managers").select("*").order("created_at", { ascending: false });
-      return data ?? [];
+      return (data as any[]) ?? [];
     },
   });
 
   const { data: adAccounts } = useQuery({
     queryKey: ["admin-bm-ad-accounts"],
     queryFn: async () => {
-      const { data } = await supabase.from("ad_accounts").select("*, profiles:assigned_user_id(full_name, email)").not("business_manager_id", "is", null);
-      return data ?? [];
+      const { data } = await supabase.from("ad_accounts").select("*").not("business_manager_id", "is", null);
+      return (data as any[]) ?? [];
+    },
+  });
+
+  const { data: assignments } = useQuery({
+    queryKey: ["admin-user-ad-accounts"],
+    queryFn: async () => {
+      const { data } = await (supabase as any).from("user_ad_accounts").select("*");
+      return (data as any[]) ?? [];
     },
   });
 
@@ -40,7 +48,7 @@ export function AdminBusinessManagers() {
     queryKey: ["admin-clients-list"],
     queryFn: async () => {
       const { data } = await supabase.from("profiles").select("user_id, full_name, email");
-      return data ?? [];
+      return (data as any[]) ?? [];
     },
   });
 
@@ -91,18 +99,25 @@ export function AdminBusinessManagers() {
 
   const assignMutation = useMutation({
     mutationFn: async ({ accountId, userId }: { accountId: string; userId: string | null }) => {
-      const { error } = await supabase
-        .from("ad_accounts")
-        .update({ assigned_user_id: userId })
-        .eq("id", accountId);
-      if (error) throw error;
+      await (supabase as any).from("user_ad_accounts").delete().eq("ad_account_id", accountId);
+      if (userId) {
+        const { error } = await (supabase as any).from("user_ad_accounts").insert({
+          user_id: userId,
+          ad_account_id: accountId,
+        });
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       toast.success("Assignment updated");
-      queryClient.invalidateQueries({ queryKey: ["admin-bm-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-user-ad-accounts"] });
     },
     onError: (err: any) => toast.error(err.message),
   });
+
+  const getAssignedUserId = (accountId: string) => {
+    return assignments?.find((a: any) => a.ad_account_id === accountId)?.user_id ?? null;
+  };
 
   const bmAccounts = (bmId: string) => adAccounts?.filter((a: any) => a.business_manager_id === bmId) ?? [];
 
@@ -175,6 +190,7 @@ export function AdminBusinessManagers() {
                   <TableRow>
                     <TableHead>Account Name</TableHead>
                     <TableHead>Account ID</TableHead>
+                    <TableHead>Business Name</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Spend Cap</TableHead>
                     <TableHead>Spent</TableHead>
@@ -186,12 +202,13 @@ export function AdminBusinessManagers() {
                     <TableRow key={a.id}>
                       <TableCell className="font-medium">{a.account_name}</TableCell>
                       <TableCell className="font-mono text-sm">{a.account_id}</TableCell>
+                      <TableCell>{a.business_name || "—"}</TableCell>
                       <TableCell><StatusBadge status={a.status} /></TableCell>
                       <TableCell>${Number(a.spend_cap).toLocaleString()}</TableCell>
                       <TableCell>${Number(a.amount_spent).toLocaleString()}</TableCell>
                       <TableCell>
                         <Select
-                          value={a.assigned_user_id || "unassigned"}
+                          value={getAssignedUserId(a.id) || "unassigned"}
                           onValueChange={(val) => assignMutation.mutate({ accountId: a.id, userId: val === "unassigned" ? null : val })}
                         >
                           <SelectTrigger className="w-[180px]">
@@ -211,7 +228,7 @@ export function AdminBusinessManagers() {
                   ))}
                   {bmAccounts(bm.id).length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center text-muted-foreground">
                         No accounts synced. Click "Sync" to fetch from Meta.
                       </TableCell>
                     </TableRow>

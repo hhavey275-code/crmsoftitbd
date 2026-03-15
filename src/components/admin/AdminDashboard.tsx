@@ -12,7 +12,7 @@ export function AdminDashboard() {
     queryKey: ["admin-profiles"],
     queryFn: async () => {
       const { data } = await supabase.from("profiles").select("*");
-      return data ?? [];
+      return (data as any[]) ?? [];
     },
   });
 
@@ -20,27 +20,27 @@ export function AdminDashboard() {
     queryKey: ["admin-wallets"],
     queryFn: async () => {
       const { data } = await supabase.from("wallets").select("*");
-      return data ?? [];
+      return (data as any[]) ?? [];
     },
   });
 
   const { data: pendingRequests } = useQuery({
     queryKey: ["admin-pending-topups"],
     queryFn: async () => {
-      const { data } = await supabase.from("top_up_requests").select("*").eq("status", "pending").order("created_at", { ascending: false });
-      return data ?? [];
+      const { data } = await (supabase as any).from("topups").select("*").eq("status", "pending").order("created_at", { ascending: false });
+      return (data as any[]) ?? [];
     },
   });
 
   const { data: recentTx } = useQuery({
     queryKey: ["admin-recent-tx"],
     queryFn: async () => {
-      const { data } = await supabase.from("transactions").select("*").order("created_at", { ascending: false }).limit(5);
-      return data ?? [];
+      const { data } = await (supabase as any).from("wallet_transactions").select("*").order("created_at", { ascending: false }).limit(5);
+      return (data as any[]) ?? [];
     },
   });
 
-  const totalBalance = wallets?.reduce((sum, w) => sum + Number(w.balance), 0) ?? 0;
+  const totalBalance = wallets?.reduce((sum: number, w: any) => sum + Number(w.balance), 0) ?? 0;
 
   return (
     <div className="space-y-6">
@@ -66,16 +66,14 @@ export function AdminDashboard() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Amount</TableHead>
-                    <TableHead>Method</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Date</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pendingRequests?.slice(0, 5).map((r) => (
+                  {pendingRequests?.slice(0, 5).map((r: any) => (
                     <TableRow key={r.id}>
                       <TableCell className="font-medium">${Number(r.amount).toLocaleString()}</TableCell>
-                      <TableCell className="capitalize">{r.payment_method.replace("_", " ")}</TableCell>
                       <TableCell><StatusBadge status={r.status} /></TableCell>
                       <TableCell className="text-muted-foreground">{format(new Date(r.created_at), "MMM d, yyyy")}</TableCell>
                     </TableRow>
@@ -103,7 +101,7 @@ export function AdminDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {recentTx?.map((tx) => (
+                  {recentTx?.map((tx: any) => (
                     <TableRow key={tx.id}>
                       <TableCell className="capitalize">{tx.type.replace("_", " ")}</TableCell>
                       <TableCell className="font-medium">${Number(tx.amount).toLocaleString()}</TableCell>

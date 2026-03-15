@@ -1,10 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 export function AdminAdAccounts() {
@@ -15,9 +14,17 @@ export function AdminAdAccounts() {
     queryFn: async () => {
       const { data } = await supabase
         .from("ad_accounts")
-        .select("*, business_managers(name), profiles:assigned_user_id(full_name, email)")
+        .select("*, business_managers(name)")
         .order("created_at", { ascending: false });
-      return data ?? [];
+      return (data as any[]) ?? [];
+    },
+  });
+
+  const { data: assignments } = useQuery({
+    queryKey: ["admin-user-ad-accounts"],
+    queryFn: async () => {
+      const { data } = await (supabase as any).from("user_ad_accounts").select("*");
+      return (data as any[]) ?? [];
     },
   });
 
@@ -25,24 +32,33 @@ export function AdminAdAccounts() {
     queryKey: ["admin-clients-list"],
     queryFn: async () => {
       const { data } = await supabase.from("profiles").select("user_id, full_name, email");
-      return data ?? [];
+      return (data as any[]) ?? [];
     },
   });
 
   const assignMutation = useMutation({
     mutationFn: async ({ accountId, userId }: { accountId: string; userId: string | null }) => {
-      const { error } = await supabase
-        .from("ad_accounts")
-        .update({ assigned_user_id: userId })
-        .eq("id", accountId);
-      if (error) throw error;
+      await (supabase as any).from("user_ad_accounts").delete().eq("ad_account_id", accountId);
+      if (userId) {
+        const { error } = await (supabase as any).from("user_ad_accounts").insert({
+          user_id: userId,
+          ad_account_id: accountId,
+        });
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       toast.success("Assignment updated");
       queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-user-ad-accounts"] });
     },
     onError: (err: any) => toast.error(err.message),
   });
+
+  const getAssignedUserId = (accountId: string) => {
+    const assignment = assignments?.find((a: any) => a.ad_account_id === accountId);
+    return assignment?.user_id ?? null;
+  };
 
   return (
     <div className="space-y-6">
@@ -75,7 +91,7 @@ export function AdminAdAccounts() {
                   <TableCell>${Number(a.amount_spent).toLocaleString()}</TableCell>
                   <TableCell>
                     <Select
-                      value={a.assigned_user_id || "unassigned"}
+                      value={getAssignedUserId(a.id) || "unassigned"}
                       onValueChange={(val) => assignMutation.mutate({ accountId: a.id, userId: val === "unassigned" ? null : val })}
                     >
                       <SelectTrigger className="w-[160px]">

@@ -20,7 +20,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Validate user
     const supabaseUser = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
@@ -39,7 +38,6 @@ Deno.serve(async (req) => {
 
     const userId = claimsData.claims.sub;
 
-    // Use service role for DB operations
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -68,7 +66,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get BM details
     const { data: bm, error: bmError } = await supabase
       .from("business_managers")
       .select("*")
@@ -82,8 +79,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Call Meta Graph API to get owned ad accounts
-    const metaUrl = `https://graph.facebook.com/v21.0/${bm.bm_id}/owned_ad_accounts?fields=id,name,account_id,account_status,spend_cap,amount_spent&access_token=${bm.access_token}&limit=100`;
+    const metaUrl = `https://graph.facebook.com/v21.0/${bm.bm_id}/owned_ad_accounts?fields=id,name,account_id,account_status,spend_cap,amount_spent,business_name&access_token=${bm.access_token}&limit=100`;
 
     const metaRes = await fetch(metaUrl);
     const metaData = await metaRes.json();
@@ -109,8 +105,8 @@ Deno.serve(async (req) => {
             account_id: `act_${accountId}`,
             account_name: account.name || `Ad Account ${accountId}`,
             business_manager_id: bm.id,
-            user_id: userId, // admin as creator
-            platform: "Meta",
+            business_name: account.business_name || null,
+            user_id: userId,
             status:
               account.account_status === 1
                 ? "active"

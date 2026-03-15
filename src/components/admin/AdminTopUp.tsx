@@ -6,8 +6,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -17,30 +15,27 @@ export function AdminTopUp() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [actionDialog, setActionDialog] = useState<{ id: string; action: "approved" | "rejected"; userId: string; amount: number; adAccountId: string | null } | null>(null);
-  const [note, setNote] = useState("");
 
   const { data: requests } = useQuery({
     queryKey: ["admin-topup-requests"],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("top_up_requests")
+      const { data } = await (supabase as any)
+        .from("topups")
         .select("*, profiles!inner(full_name, email), ad_accounts(account_name, account_id)")
         .order("created_at", { ascending: false });
-      return data ?? [];
+      return (data as any[]) ?? [];
     },
   });
 
   const processMutation = useMutation({
     mutationFn: async ({ id, action, userId, amount, adAccountId }: { id: string; action: "approved" | "rejected"; userId: string; amount: number; adAccountId: string | null }) => {
-      // Update the request status
-      const { error: updateError } = await supabase
-        .from("top_up_requests")
-        .update({ status: action, admin_note: note || null, reviewed_by: user?.id })
+      const { error: updateError } = await (supabase as any)
+        .from("topups")
+        .update({ status: action })
         .eq("id", id);
       if (updateError) throw updateError;
 
       if (action === "approved") {
-        // Get current wallet balance
         const { data: wallet } = await supabase.from("wallets").select("balance").eq("user_id", userId).single();
         const currentBalance = Number(wallet?.balance ?? 0);
 
@@ -50,22 +45,18 @@ export function AdminTopUp() {
 
         const newBalance = currentBalance - amount;
 
-        // Deduct from wallet
         const { error: walletError } = await supabase.from("wallets").update({ balance: newBalance }).eq("user_id", userId);
         if (walletError) throw walletError;
 
-        // Insert transaction
-        const { error: txError } = await supabase.from("transactions").insert({
+        const { error: txError } = await (supabase as any).from("wallet_transactions").insert({
           user_id: userId,
           type: "ad_spend",
           amount,
-          balance_after: newBalance,
-          description: `Top-up approved for ad account`,
           reference_id: id,
+          status: "completed",
         });
         if (txError) throw txError;
 
-        // Call update-spend-cap edge function if ad account is linked
         if (adAccountId) {
           try {
             const { data: { session } } = await supabase.auth.getSession();
@@ -77,13 +68,12 @@ export function AdminTopUp() {
                   "Content-Type": "application/json",
                   Authorization: `Bearer ${session?.access_token}`,
                 },
-                body: JSON.stringify({ ad_account_id: adAccountId, amount }),
+                body: JSON.stringify({ ad_account_id: adAccountId, amount, topup_id: id }),
               }
             );
             const result = await res.json();
             if (!res.ok) {
               console.error("Spend cap update failed:", result.error);
-              // Don't throw — wallet already deducted, log the failure
             }
           } catch (apiErr) {
             console.error("Meta API call failed:", apiErr);
@@ -96,7 +86,6 @@ export function AdminTopUp() {
       queryClient.invalidateQueries({ queryKey: ["admin-topup-requests"] });
       queryClient.invalidateQueries({ queryKey: ["admin-wallets"] });
       setActionDialog(null);
-      setNote("");
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -115,8 +104,8 @@ export function AdminTopUp() {
                 <TableHead>Client</TableHead>
                 <TableHead>Ad Account</TableHead>
                 <TableHead>Amount</TableHead>
-                <TableHead>Method</TableHead>
-                <TableHead>Reference</TableHead>
+                <TableHead>Old Cap</TableHead>
+                <TableHead>New Cap</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Actions</TableHead>
@@ -130,17 +119,17 @@ export function AdminTopUp() {
                     {r.ad_accounts ? `${r.ad_accounts.account_name} (${r.ad_accounts.account_id})` : "—"}
                   </TableCell>
                   <TableCell className="font-semibold">${Number(r.amount).toLocaleString()}</TableCell>
-                  <TableCell className="capitalize">{r.payment_method.replace("_", " ")}</TableCell>
-                  <TableCell className="text-sm">{r.payment_reference || "—"}</TableCell>
+                  <TableCell>${Number(r.old_spend_cap).toLocaleString()}</TableCell>
+                  <TableCell>${Number(r.new_spend_cap).toLocaleString()}</TableCell>
                   <TableCell><StatusBadge status={r.status} /></TableCell>
                   <TableCell className="text-muted-foreground">{format(new Date(r.created_at), "MMM d, yyyy")}</TableCell>
                   <TableCell>
                     {r.status === "pending" && (
                       <div className="flex gap-1">
-                        <Button size="sm" variant="ghost" className="text-emerald-600 hover:text-emerald-700" onClick={() => setActionDialog({ id: r.id, action: "approved", userId: r.user_id, amount: r.amount, adAccountId: r.ad_account_id })}>
+                        <Button size="sm" variant="ghost" className="hover:text-primary" onClick={() => setActionDialog({ id: r.id, action: "approved", userId: r.user_id, amount: r.amount, adAccountId: r.ad_account_id })}>
                           <Check className="h-4 w-4" />
                         </Button>
-                        <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => setActionDialog({ id: r.id, action: "rejected", userId: r.user_id, amount: r.amount, adAccountId: r.ad_account_id })}>
+                        <Button size="sm" variant="ghost" className="hover:text-destructive" onClick={() => setActionDialog({ id: r.id, action: "rejected", userId: r.user_id, amount: r.amount, adAccountId: r.ad_account_id })}>
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
@@ -156,24 +145,18 @@ export function AdminTopUp() {
         </CardContent>
       </Card>
 
-      <Dialog open={!!actionDialog} onOpenChange={() => { setActionDialog(null); setNote(""); }}>
+      <Dialog open={!!actionDialog} onOpenChange={() => setActionDialog(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{actionDialog?.action === "approved" ? "Approve" : "Reject"} Top-Up Request</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              {actionDialog?.action === "approved"
-                ? `This will deduct $${actionDialog?.amount?.toLocaleString()} from the client's wallet and update the ad account spend cap via Meta API.`
-                : "The client will be notified of the rejection."}
-            </p>
-            <div className="space-y-2">
-              <Label>Note (optional)</Label>
-              <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add a note..." />
-            </div>
-          </div>
+          <p className="text-sm text-muted-foreground">
+            {actionDialog?.action === "approved"
+              ? `This will deduct $${actionDialog?.amount?.toLocaleString()} from the client's wallet and update the ad account spend cap via Meta API.`
+              : "The client will be notified of the rejection."}
+          </p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setActionDialog(null); setNote(""); }}>Cancel</Button>
+            <Button variant="outline" onClick={() => setActionDialog(null)}>Cancel</Button>
             <Button
               variant={actionDialog?.action === "approved" ? "default" : "destructive"}
               onClick={() => actionDialog && processMutation.mutate(actionDialog)}

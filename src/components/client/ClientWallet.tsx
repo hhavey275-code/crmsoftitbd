@@ -21,8 +21,8 @@ export function ClientWallet() {
   const { data: topUps } = useQuery({
     queryKey: ["client-topup-history", user?.id],
     queryFn: async () => {
-      const { data } = await supabase.from("top_up_requests").select("*").eq("user_id", user!.id).order("created_at", { ascending: false });
-      return data ?? [];
+      const { data } = await (supabase as any).from("topups").select("*").eq("user_id", user!.id).order("created_at", { ascending: false });
+      return (data as any[]) ?? [];
     },
     enabled: !!user,
   });
@@ -47,18 +47,18 @@ export function ClientWallet() {
             <TableHeader>
               <TableRow>
                 <TableHead>Amount</TableHead>
-                <TableHead>Method</TableHead>
-                <TableHead>Reference</TableHead>
+                <TableHead>Old Cap</TableHead>
+                <TableHead>New Cap</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {topUps?.map((t) => (
+              {topUps?.map((t: any) => (
                 <TableRow key={t.id}>
                   <TableCell className="font-semibold">${Number(t.amount).toLocaleString()}</TableCell>
-                  <TableCell className="capitalize">{t.payment_method.replace("_", " ")}</TableCell>
-                  <TableCell className="text-sm">{t.payment_reference || "—"}</TableCell>
+                  <TableCell>${Number(t.old_spend_cap).toLocaleString()}</TableCell>
+                  <TableCell>${Number(t.new_spend_cap).toLocaleString()}</TableCell>
                   <TableCell><StatusBadge status={t.status} /></TableCell>
                   <TableCell className="text-muted-foreground">{format(new Date(t.created_at), "MMM d, yyyy")}</TableCell>
                 </TableRow>

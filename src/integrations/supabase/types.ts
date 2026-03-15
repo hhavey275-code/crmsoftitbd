@@ -19,11 +19,9 @@ export type Database = {
           account_id: string
           account_name: string
           amount_spent: number
-          assigned_user_id: string | null
           business_manager_id: string | null
           created_at: string
           id: string
-          platform: string
           spend_cap: number
           status: string
           updated_at: string
@@ -33,11 +31,9 @@ export type Database = {
           account_id: string
           account_name: string
           amount_spent?: number
-          assigned_user_id?: string | null
           business_manager_id?: string | null
           created_at?: string
           id?: string
-          platform?: string
           spend_cap?: number
           status?: string
           updated_at?: string
@@ -47,11 +43,9 @@ export type Database = {
           account_id?: string
           account_name?: string
           amount_spent?: number
-          assigned_user_id?: string | null
           business_manager_id?: string | null
           created_at?: string
           id?: string
-          platform?: string
           spend_cap?: number
           status?: string
           updated_at?: string
