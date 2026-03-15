@@ -362,8 +362,17 @@ export function ClientAdAccounts() {
                           {a.business_managers?.name && (
                             <div className="text-xs text-muted-foreground">{a.business_managers.name}</div>
                           )}
-                          <div className="mt-0.5">
+                        <div className="mt-0.5 flex items-center gap-1.5">
                             <span className="text-xs text-muted-foreground font-mono">{a.account_id.replace(/^act_/, '')}</span>
+                            <a
+                              href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${a.account_id.replace(/^act_/, '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-muted-foreground hover:text-primary"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
                           </div>
                         </div>
                       </div>
