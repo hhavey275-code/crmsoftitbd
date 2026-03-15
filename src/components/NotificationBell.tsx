@@ -8,15 +8,9 @@ import { Bell, CheckCheck } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 
-// Short notification beep as base64 (tiny wav)
-const NOTIFICATION_SOUND = "data:audio/wav;base64,UklGRl9vT19teleUQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YTtvT19v";
-
 function playNotificationSound() {
-  const enabled = localStorage.getItem("notification_sound") !== "false";
-  if (!enabled) return;
+  if (localStorage.getItem("notification_sound") === "false") return;
   try {
-    const audio = new Audio();
-    // Use a simple oscillator beep instead of base64
     const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -28,7 +22,7 @@ function playNotificationSound() {
     osc.start();
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
     osc.stop(ctx.currentTime + 0.3);
-  } catch (e) {
+  } catch {
     // Audio context not available
   }
 }
