@@ -3,10 +3,13 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { NotificationBell } from "@/components/NotificationBell";
+import { ChatWidget } from "@/components/ChatWidget";
+import { useAuth } from "@/contexts/AuthContext";
 import { Zap } from "lucide-react";
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { logoUrl, headerAnnouncement } = useSiteSettings();
+  const { isAdmin } = useAuth();
 
   return (
     <SidebarProvider>
@@ -42,6 +45,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           </main>
         </div>
       </div>
+      {!isAdmin && <ChatWidget />}
     </SidebarProvider>
   );
 }
