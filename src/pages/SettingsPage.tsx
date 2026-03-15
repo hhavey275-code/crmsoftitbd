@@ -123,6 +123,36 @@ export default function SettingsPage() {
       <div className="space-y-6">
         <h1 className="text-2xl font-bold">Settings</h1>
 
+        {/* Site Name - Admin only */}
+        {role === "admin" && (
+          <Card className="max-w-xl">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Type className="h-5 w-5 text-primary" />
+                Site Name
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Change the platform name displayed in the sidebar and across the app.
+              </p>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 space-y-2">
+                  <Label>Platform Name</Label>
+                  <Input
+                    value={siteNameInput}
+                    onChange={(e) => setSiteNameInput(e.target.value)}
+                    placeholder="Meta Ad Top-Up"
+                  />
+                </div>
+                <Button onClick={handleSaveSiteName} disabled={savingSiteName} className="mt-6">
+                  {savingSiteName ? "Saving..." : "Save Name"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* USD Rate - Admin only */}
         {role === "admin" && (
           <Card className="max-w-xl">
