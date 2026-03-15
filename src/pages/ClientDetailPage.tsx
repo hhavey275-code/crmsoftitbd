@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,7 +21,7 @@ import { toast } from "sonner";
 import {
   User, Building2, Phone, CalendarDays, Wallet, MonitorSmartphone,
   CheckCircle, XCircle, TrendingUp, TrendingDown, DollarSign, CalendarIcon, Save,
-  Plus, Minus, ArrowUpCircle, CreditCard, Shield
+  Plus, Minus, ArrowUpCircle, CreditCard, Shield, ArrowUp, ArrowDown, ArrowUpDown, AppWindow
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 
@@ -49,6 +49,7 @@ export default function ClientDetailPage() {
   const [topUpDialogOpen, setTopUpDialogOpen] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [topUpAmount, setTopUpAmount] = useState("");
+  const [billingSortDir, setBillingSortDir] = useState<"asc" | "desc">("desc");
 
   const { data: profile } = useQuery({
     queryKey: ["client-detail-profile", userId],
@@ -90,6 +91,28 @@ export default function ClientDetailPage() {
     },
     enabled: !!userId,
   });
+
+  const { data: insights = {} } = useQuery({
+    queryKey: ["client-detail-insights", userId],
+    queryFn: async () => {
+      if (!adAccounts || adAccounts.length === 0) return {};
+      const ids = adAccounts.map((a: any) => a.id);
+      const { data } = await supabase.functions.invoke("get-account-insights", {
+        body: { ad_account_ids: ids, source: "cache" },
+      });
+      return (data?.insights as Record<string, any>) ?? {};
+    },
+    enabled: !!userId && !!adAccounts && adAccounts.length > 0,
+  });
+
+  const billingAccounts = useMemo(() => {
+    if (!adAccounts) return [];
+    return [...adAccounts].sort((a, b) => {
+      const balA = Number(insights[a.id]?.balance ?? 0);
+      const balB = Number(insights[b.id]?.balance ?? 0);
+      return billingSortDir === "asc" ? balA - balB : balB - balA;
+    });
+  }, [adAccounts, insights, billingSortDir]);
 
   const { data: topUpTotal } = useQuery({
     queryKey: ["client-detail-topup-total", userId, dateFrom?.toISOString(), dateTo?.toISOString()],
@@ -528,6 +551,78 @@ export default function ClientDetailPage() {
                       </TableCell>
                     </TableRow>
                   ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Billings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Billings</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {billingAccounts.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">No ad accounts assigned</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Account</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>How you'll pay</TableHead>
+                    <TableHead>
+                      <button
+                        className="flex items-center text-xs font-medium"
+                        onClick={() => setBillingSortDir(d => d === "asc" ? "desc" : "asc")}
+                      >
+                        Current balance
+                        {billingSortDir === "asc" ? <ArrowUp className="h-3 w-3 ml-1" /> : <ArrowDown className="h-3 w-3 ml-1" />}
+                      </button>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {billingAccounts.map((acc: any) => {
+                    const ins = insights[acc.id];
+                    const balance = Number(ins?.balance ?? 0);
+                    return (
+                      <TableRow key={acc.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
+                              <AppWindow className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                            <div>
+                              <div className="text-sm text-primary">{acc.account_name}</div>
+                              <div className="text-xs text-muted-foreground font-mono">ID: {acc.account_id.replace(/^act_/, '')}</div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge status={acc.status} />
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            {ins?.cards && ins.cards.length > 0 ? (
+                              ins.cards.map((card: any, i: number) => (
+                                <div key={i} className="flex items-center gap-1.5">
+                                  <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
+                                  <span>{card.display_string}</span>
+                                </div>
+                              ))
+                            ) : (
+                              <span className="text-muted-foreground">No payment method</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-semibold">
+                          ${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}
