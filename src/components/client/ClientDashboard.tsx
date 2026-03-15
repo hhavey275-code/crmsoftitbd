@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { MetricCard } from "@/components/MetricCard";
-import { Wallet, MonitorSmartphone, TrendingUp, CalendarIcon } from "lucide-react";
+import { Wallet, MonitorSmartphone, TrendingUp, CalendarIcon, ShoppingCart, DollarSign } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,19 @@ export function ClientDashboard() {
     enabled: !!user,
   });
 
+  // Fetch insights (today_spend, today_orders, etc.) for all assigned ad accounts
+  const { data: insights } = useQuery({
+    queryKey: ["client-insights", adAccounts?.map((a: any) => a.id)],
+    queryFn: async () => {
+      const ids = adAccounts!.map((a: any) => a.id);
+      const { data } = await supabase.functions.invoke("get-account-insights", {
+        body: { ad_account_ids: ids, source: "cache" },
+      });
+      return data?.insights ?? {};
+    },
+    enabled: !!adAccounts && adAccounts.length > 0,
+  });
+
   const { data: topUpTotal } = useQuery({
     queryKey: ["client-topup-total", user?.id, dateFrom?.toISOString(), dateTo?.toISOString()],
     queryFn: async () => {
@@ -79,6 +92,20 @@ export function ClientDashboard() {
 
   const totalRemaining = adAccounts?.reduce((sum: number, a: any) => sum + (Number(a.spend_cap) - Number(a.amount_spent)), 0) ?? 0;
 
+  // Aggregate insights across all ad accounts
+  const aggregatedTodaySpend = insights
+    ? Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.today_spend ?? 0), 0)
+    : 0;
+  const aggregatedYesterdaySpend = insights
+    ? Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.yesterday_spend ?? 0), 0)
+    : 0;
+  const aggregatedTodayOrders = insights
+    ? Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.today_orders ?? 0), 0)
+    : 0;
+  const aggregatedYesterdayOrders = insights
+    ? Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.yesterday_orders ?? 0), 0)
+    : 0;
+
   const greeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return "Good morning";
@@ -108,6 +135,40 @@ export function ClientDashboard() {
         </Card>
       )}
 
+      {/* Today's Performance - Aggregated across all ad accounts */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <MetricCard
+          title="Today's Spend"
+          value={`$${aggregatedTodaySpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          subtitle={`Yesterday: $${aggregatedYesterdaySpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          icon={DollarSign}
+          iconBg="bg-emerald-50 dark:bg-emerald-900/30"
+          iconColor="text-emerald-600"
+        />
+        <MetricCard
+          title="Today's Orders"
+          value={aggregatedTodayOrders.toLocaleString()}
+          subtitle={`Yesterday: ${aggregatedYesterdayOrders.toLocaleString()}`}
+          icon={ShoppingCart}
+          iconBg="bg-blue-50 dark:bg-blue-900/30"
+          iconColor="text-blue-600"
+        />
+        <MetricCard
+          title="Wallet Balance"
+          value={`$${Number(wallet?.balance ?? 0).toLocaleString()}`}
+          icon={Wallet}
+          iconBg="bg-violet-50 dark:bg-violet-900/30"
+          iconColor="text-violet-600"
+        />
+        <MetricCard
+          title="Total Ad Accounts"
+          value={adAccounts?.length ?? 0}
+          icon={MonitorSmartphone}
+          iconBg="bg-amber-50 dark:bg-amber-900/30"
+          iconColor="text-amber-600"
+        />
+      </div>
+
       {/* Date Range for Total Top-Up */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium text-muted-foreground">Top-Up Period:</span>
@@ -136,21 +197,7 @@ export function ClientDashboard() {
         </Popover>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard
-          title="Wallet Balance"
-          value={`$${Number(wallet?.balance ?? 0).toLocaleString()}`}
-          icon={Wallet}
-          iconBg="bg-emerald-50 dark:bg-emerald-900/30"
-          iconColor="text-emerald-600"
-        />
-        <MetricCard
-          title="Total Ad Accounts"
-          value={adAccounts?.length ?? 0}
-          icon={MonitorSmartphone}
-          iconBg="bg-blue-50 dark:bg-blue-900/30"
-          iconColor="text-blue-600"
-        />
+      <div className="grid gap-4 sm:grid-cols-2">
         <MetricCard
           title="Total Top-Up"
           value={`$${Number(topUpTotal ?? 0).toLocaleString()}`}
@@ -164,8 +211,8 @@ export function ClientDashboard() {
           value={`$${totalRemaining.toLocaleString()}`}
           subtitle="Across all ad accounts"
           icon={Wallet}
-          iconBg="bg-violet-50 dark:bg-violet-900/30"
-          iconColor="text-violet-600"
+          iconBg="bg-rose-50 dark:bg-rose-900/30"
+          iconColor="text-rose-600"
         />
       </div>
 
