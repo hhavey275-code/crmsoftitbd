@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { StatusBadge } from "@/components/StatusBadge";
 import { SpendProgressBar } from "@/components/SpendProgressBar";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -51,6 +52,11 @@ export default function ClientDetailPage() {
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [topUpAmount, setTopUpAmount] = useState("");
 
+  // Bulk assign/unassign
+  const [showAssignDialog, setShowAssignDialog] = useState(false);
+  const [assignSelectedIds, setAssignSelectedIds] = useState<Set<string>>(new Set());
+  const [unassignSelectedIds, setUnassignSelectedIds] = useState<Set<string>>(new Set());
+
   const { data: profile } = useQuery({
     queryKey: ["client-detail-profile", userId],
     queryFn: async () => {
@@ -77,7 +83,7 @@ export default function ClientDetailPage() {
     enabled: !!userId,
   });
 
-  const { data: adAccounts } = useQuery({
+  const { data: adAccounts, refetch: refetchAdAccounts } = useQuery({
     queryKey: ["client-detail-ad-accounts", userId],
     queryFn: async () => {
       const { data: assignments } = await (supabase as any)
@@ -90,6 +96,16 @@ export default function ClientDetailPage() {
       return (data as any[]) ?? [];
     },
     enabled: !!userId,
+  });
+
+  // All ad accounts for assign dialog
+  const { data: allAdAccounts } = useQuery({
+    queryKey: ["all-ad-accounts-for-assign"],
+    queryFn: async () => {
+      const { data } = await supabase.from("ad_accounts").select("id, account_name, account_id");
+      return (data as any[]) ?? [];
+    },
+    enabled: showAssignDialog,
   });
 
   const [insightsLoading, setInsightsLoading] = useState(false);
@@ -516,8 +532,32 @@ export default function ClientDetailPage() {
 
             {/* Ad Accounts */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-lg">Ad Accounts ({adAccounts?.length ?? 0})</CardTitle>
+                <div className="flex items-center gap-2">
+                  {unassignSelectedIds.size > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        const ids = Array.from(unassignSelectedIds);
+                        for (const adAccountId of ids) {
+                          await (supabase as any).from("user_ad_accounts").delete().eq("user_id", userId!).eq("ad_account_id", adAccountId);
+                        }
+                        toast.success(`${ids.length} account(s) unassigned`);
+                        setUnassignSelectedIds(new Set());
+                        refetchAdAccounts();
+                        queryClient.invalidateQueries({ queryKey: ["admin-user-ad-accounts"] });
+                      }}
+                    >
+                      Unassign {unassignSelectedIds.size} Selected
+                    </Button>
+                  )}
+                  <Button size="sm" onClick={() => { setShowAssignDialog(true); setAssignSelectedIds(new Set()); }}>
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    Assign Accounts
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {adAccounts?.length === 0 ? (
@@ -526,6 +566,18 @@ export default function ClientDetailPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-[40px]">
+                          <Checkbox
+                            checked={adAccounts?.length > 0 && adAccounts?.every((a: any) => unassignSelectedIds.has(a.id))}
+                            onCheckedChange={() => {
+                              if (adAccounts?.every((a: any) => unassignSelectedIds.has(a.id))) {
+                                setUnassignSelectedIds(new Set());
+                              } else {
+                                setUnassignSelectedIds(new Set(adAccounts?.map((a: any) => a.id)));
+                              }
+                            }}
+                          />
+                        </TableHead>
                         <TableHead>Account</TableHead>
                         <TableHead>Budget</TableHead>
                         <TableHead>Status</TableHead>
@@ -536,6 +588,19 @@ export default function ClientDetailPage() {
                     <TableBody>
                       {adAccounts?.map((acc: any) => (
                         <TableRow key={acc.id}>
+                          <TableCell>
+                            <Checkbox
+                              checked={unassignSelectedIds.has(acc.id)}
+                              onCheckedChange={() => {
+                                setUnassignSelectedIds(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(acc.id)) next.delete(acc.id);
+                                  else next.add(acc.id);
+                                  return next;
+                                });
+                              }}
+                            />
+                          </TableCell>
                           <TableCell>
                             <p className="font-medium">{acc.account_name}</p>
                             <p className="text-xs text-muted-foreground">{acc.account_id}</p>
@@ -618,6 +683,62 @@ export default function ClientDetailPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Assign Accounts Dialog */}
+      <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
+        <DialogContent className="max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Assign Ad Accounts</DialogTitle>
+            <DialogDescription>Select accounts to assign to this client.</DialogDescription>
+          </DialogHeader>
+          <div className="py-2 space-y-2 max-h-[50vh] overflow-y-auto">
+            {(() => {
+              const assignedIds = new Set(adAccounts?.map((a: any) => a.id) ?? []);
+              const unassigned = allAdAccounts?.filter((a: any) => !assignedIds.has(a.id)) ?? [];
+              if (unassigned.length === 0) return <p className="text-sm text-muted-foreground text-center py-4">No unassigned accounts available</p>;
+              return unassigned.map((acc: any) => (
+                <label key={acc.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-muted cursor-pointer">
+                  <Checkbox
+                    checked={assignSelectedIds.has(acc.id)}
+                    onCheckedChange={() => {
+                      setAssignSelectedIds(prev => {
+                        const next = new Set(prev);
+                        if (next.has(acc.id)) next.delete(acc.id);
+                        else next.add(acc.id);
+                        return next;
+                      });
+                    }}
+                  />
+                  <div>
+                    <p className="text-sm font-medium">{acc.account_name}</p>
+                    <p className="text-xs text-muted-foreground">{acc.account_id}</p>
+                  </div>
+                </label>
+              ));
+            })()}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAssignDialog(false)}>Cancel</Button>
+            <Button
+              disabled={assignSelectedIds.size === 0}
+              onClick={async () => {
+                const ids = Array.from(assignSelectedIds);
+                const { error } = await (supabase as any).from("user_ad_accounts").insert(
+                  ids.map(adAccountId => ({ user_id: userId, ad_account_id: adAccountId }))
+                );
+                if (error) { toast.error(error.message); return; }
+                toast.success(`${ids.length} account(s) assigned`);
+                setShowAssignDialog(false);
+                setAssignSelectedIds(new Set());
+                refetchAdAccounts();
+                queryClient.invalidateQueries({ queryKey: ["admin-user-ad-accounts"] });
+              }}
+            >
+              Assign {assignSelectedIds.size > 0 ? `${assignSelectedIds.size} ` : ""}Selected
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Wallet Adjust Dialog */}
       <Dialog open={!!walletDialogType} onOpenChange={(open) => !open && setWalletDialogType(null)}>
