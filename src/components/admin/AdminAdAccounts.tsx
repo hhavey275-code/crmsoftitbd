@@ -257,15 +257,25 @@ export function AdminAdAccounts() {
             </span>
           )}
           {showSelect && selectedIds.size > 0 && (
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => refreshSelectedMutation.mutate()}
-              disabled={refreshSelectedMutation.isPending}
-            >
-              <RefreshCw className={`h-4 w-4 mr-1 ${refreshSelectedMutation.isPending ? 'animate-spin' : ''}`} />
-              {refreshSelectedMutation.isPending ? "Updating..." : `Update ${selectedIds.size} Selected`}
-            </Button>
+            <>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setShowDeleteConfirm(true)}
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Delete {selectedIds.size} Selected
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => refreshSelectedMutation.mutate()}
+                disabled={refreshSelectedMutation.isPending}
+              >
+                <RefreshCw className={`h-4 w-4 mr-1 ${refreshSelectedMutation.isPending ? 'animate-spin' : ''}`} />
+                {refreshSelectedMutation.isPending ? "Updating..." : `Update ${selectedIds.size} Selected`}
+              </Button>
+            </>
           )}
           <Button
             variant="outline"
