@@ -31,7 +31,7 @@ export function AdminClients() {
     mutationFn: async ({ userId, newStatus }: { userId: string; newStatus: string }) => {
       const { error } = await supabase
         .from("profiles")
-        .update({ status: newStatus } as any)
+        .update({ status: newStatus })
         .eq("user_id", userId);
       if (error) throw error;
     },
