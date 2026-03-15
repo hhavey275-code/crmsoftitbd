@@ -140,12 +140,11 @@ export function AdminAdAccounts() {
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Button
-                        variant="outline"
                         size="sm"
                         onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
                       >
                         <ArrowUpCircle className="h-4 w-4 mr-1" />
-                        Increase Limit
+                        Top Up
                       </Button>
                       <Button
                         variant="ghost"
