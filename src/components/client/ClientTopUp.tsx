@@ -72,6 +72,14 @@ export function ClientTopUp() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Top-Up Wallet</h1>
 
+      {isInactive && (
+        <Card className="border-destructive bg-destructive/10">
+          <CardContent className="p-4 flex items-center gap-3">
+            <span className="text-destructive font-semibold">⚠️ Your account was freezed for violating our policy. You cannot submit top-up requests.</span>
+          </CardContent>
+        </Card>
+      )}
+
       {/* USD Rate Info */}
       <Card className="max-w-lg border-cyan-200 bg-cyan-50/50 dark:bg-cyan-950/20 dark:border-cyan-800">
         <CardContent className="p-4 flex items-center gap-3">
