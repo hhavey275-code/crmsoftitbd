@@ -109,7 +109,7 @@ export default function BillingsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Account</TableHead>
-                    <TableHead className="text-right">
+                    <TableHead className="text-right w-[110px]">
                       <button
                         className="flex items-center text-xs font-medium ml-auto"
                         onClick={() => setSortDir(d => d === "asc" ? "desc" : "asc")}
@@ -164,7 +164,7 @@ export default function BillingsPage() {
                             target="_blank"
                             rel="noopener noreferrer"
                           >
-                            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">
+                            <Button variant="default" size="sm" className="h-7 px-3 text-xs">
                               Billing
                             </Button>
                           </a>
