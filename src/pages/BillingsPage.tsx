@@ -22,6 +22,9 @@ interface InsightsData {
 export default function BillingsPage() {
   const { user } = useAuth();
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [cardFilter, setCardFilter] = useState("all");
   const queryClient = useQueryClient();
 
   const { data: accounts } = useQuery({
