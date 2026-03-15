@@ -22,7 +22,7 @@ import { toast } from "sonner";
 import {
   User, Building2, Phone, CalendarDays, Wallet, MonitorSmartphone,
   CheckCircle, XCircle, TrendingUp, TrendingDown, DollarSign, CalendarIcon, Save,
-  Plus, Minus, ArrowUpCircle, CreditCard, Shield, Receipt
+  Plus, Minus, ArrowUpCircle, CreditCard, Shield, Receipt, ShoppingCart, RefreshCw
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 
@@ -90,6 +90,21 @@ export default function ClientDetailPage() {
       return (data as any[]) ?? [];
     },
     enabled: !!userId,
+  });
+
+  const [insightsLoading, setInsightsLoading] = useState(false);
+
+  const { data: insights, refetch: refetchInsights } = useQuery({
+    queryKey: ["client-detail-insights", userId, adAccounts?.map((a: any) => a.id)],
+    queryFn: async () => {
+      if (!adAccounts || adAccounts.length === 0) return {};
+      const ids = adAccounts.map((a: any) => a.id);
+      const { data } = await supabase.functions.invoke("get-account-insights", {
+        body: { ad_account_ids: ids, source: "cache" },
+      });
+      return data?.insights ?? {};
+    },
+    enabled: !!adAccounts && adAccounts.length > 0,
   });
 
   const { data: topUpTotal } = useQuery({
@@ -422,6 +437,55 @@ export default function ClientDetailPage() {
           </div>
 
           <TabsContent value="overview" className="space-y-6 mt-0">
+            {/* Today's Performance */}
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium text-muted-foreground">Today's Performance</h3>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={insightsLoading || !adAccounts || adAccounts.length === 0}
+                onClick={async () => {
+                  if (!adAccounts || adAccounts.length === 0) return;
+                  setInsightsLoading(true);
+                  try {
+                    const ids = adAccounts.map((a: any) => a.id);
+                    await supabase.functions.invoke("get-account-insights", {
+                      body: { ad_account_ids: ids, source: "meta" },
+                    });
+                    await refetchInsights();
+                    toast.success("Insights updated from Meta!");
+                  } catch {
+                    toast.error("Failed to update from Meta");
+                  } finally {
+                    setInsightsLoading(false);
+                  }
+                }}
+              >
+                <RefreshCw className={cn("h-3.5 w-3.5 mr-1.5", insightsLoading && "animate-spin")} />
+                {insightsLoading ? "Updating..." : "Update from Meta"}
+              </Button>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <MetricCard
+                title="Today's Spend"
+                value={`$${(insights ? Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.today_spend ?? 0), 0) : 0).toLocaleString()}`}
+                subtitle={`Yesterday: $${(insights ? Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.yesterday_spend ?? 0), 0) : 0).toLocaleString()}`}
+                icon={DollarSign}
+                iconBg="bg-emerald-100 dark:bg-emerald-900/50"
+                iconColor="text-emerald-600"
+                gradientClass="bg-gradient-to-br from-emerald-50 to-green-100/50 dark:from-emerald-950/40 dark:to-green-900/20 border-emerald-200 dark:border-emerald-800"
+              />
+              <MetricCard
+                title="Today's Orders"
+                value={(insights ? Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.today_orders ?? 0), 0) : 0).toLocaleString()}
+                subtitle={`Yesterday: ${(insights ? Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.yesterday_orders ?? 0), 0) : 0).toLocaleString()}`}
+                icon={ShoppingCart}
+                iconBg="bg-blue-100 dark:bg-blue-900/50"
+                iconColor="text-blue-600"
+                gradientClass="bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/40 dark:to-blue-900/20 border-blue-200 dark:border-blue-800"
+              />
+            </div>
+
             {/* Metric Cards */}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div className="relative">

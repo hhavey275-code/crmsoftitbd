@@ -1,10 +1,9 @@
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { MetricCard } from "@/components/MetricCard";
-import { Wallet, MonitorSmartphone, TrendingUp, CalendarIcon, ShoppingCart, DollarSign, RefreshCw } from "lucide-react";
-import { toast } from "sonner";
+import { Wallet, MonitorSmartphone, TrendingUp, CalendarIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -15,9 +14,7 @@ import { format, startOfMonth, endOfMonth } from "date-fns";
 
 export function ClientDashboard() {
   const { user, profile } = useAuth();
-  const queryClient = useQueryClient();
   const isInactive = (profile as any)?.status === "inactive";
-  const [updatingMeta, setUpdatingMeta] = useState(false);
 
   const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfMonth(new Date()));
   const [dateTo, setDateTo] = useState<Date | undefined>(endOfMonth(new Date()));
@@ -44,19 +41,6 @@ export function ClientDashboard() {
       return (data as any[]) ?? [];
     },
     enabled: !!user,
-  });
-
-  // Fetch insights (today_spend, today_orders, etc.) for all assigned ad accounts
-  const { data: insights } = useQuery({
-    queryKey: ["client-insights", adAccounts?.map((a: any) => a.id)],
-    queryFn: async () => {
-      const ids = adAccounts!.map((a: any) => a.id);
-      const { data } = await supabase.functions.invoke("get-account-insights", {
-        body: { ad_account_ids: ids, source: "cache" },
-      });
-      return data?.insights ?? {};
-    },
-    enabled: !!adAccounts && adAccounts.length > 0,
   });
 
   const { data: topUpTotal } = useQuery({
@@ -95,20 +79,6 @@ export function ClientDashboard() {
 
   const totalRemaining = adAccounts?.reduce((sum: number, a: any) => sum + (Number(a.spend_cap) - Number(a.amount_spent)), 0) ?? 0;
 
-  // Aggregate insights across all ad accounts
-  const aggregatedTodaySpend = insights
-    ? Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.today_spend ?? 0), 0)
-    : 0;
-  const aggregatedYesterdaySpend = insights
-    ? Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.yesterday_spend ?? 0), 0)
-    : 0;
-  const aggregatedTodayOrders = insights
-    ? Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.today_orders ?? 0), 0)
-    : 0;
-  const aggregatedYesterdayOrders = insights
-    ? Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.yesterday_orders ?? 0), 0)
-    : 0;
-
   const greeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return "Good morning";
@@ -138,51 +108,8 @@ export function ClientDashboard() {
         </Card>
       )}
 
-      {/* Today's Performance - Aggregated across all ad accounts */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-muted-foreground">Today's Performance</h2>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={updatingMeta || !adAccounts || adAccounts.length === 0}
-          onClick={async () => {
-            if (!adAccounts || adAccounts.length === 0) return;
-            setUpdatingMeta(true);
-            try {
-              const ids = adAccounts.map((a: any) => a.id);
-              await supabase.functions.invoke("get-account-insights", {
-                body: { ad_account_ids: ids, source: "meta" },
-              });
-              await queryClient.invalidateQueries({ queryKey: ["client-insights"] });
-              toast.success("Data updated from Meta successfully!");
-            } catch {
-              toast.error("Failed to update from Meta");
-            } finally {
-              setUpdatingMeta(false);
-            }
-          }}
-        >
-          <RefreshCw className={cn("h-3.5 w-3.5 mr-1.5", updatingMeta && "animate-spin")} />
-          {updatingMeta ? "Updating..." : "Update from Meta"}
-        </Button>
-      </div>
+      {/* Quick Stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard
-          title="Today's Spend"
-          value={`$${aggregatedTodaySpend.toLocaleString()}`}
-          subtitle={`Yesterday: $${aggregatedYesterdaySpend.toLocaleString()}`}
-          icon={DollarSign}
-          iconBg="bg-emerald-50 dark:bg-emerald-900/30"
-          iconColor="text-emerald-600"
-        />
-        <MetricCard
-          title="Today's Orders"
-          value={aggregatedTodayOrders.toLocaleString()}
-          subtitle={`Yesterday: ${aggregatedYesterdayOrders.toLocaleString()}`}
-          icon={ShoppingCart}
-          iconBg="bg-blue-50 dark:bg-blue-900/30"
-          iconColor="text-blue-600"
-        />
         <MetricCard
           title="Wallet Balance"
           value={`$${Number(wallet?.balance ?? 0).toLocaleString()}`}
@@ -196,6 +123,22 @@ export function ClientDashboard() {
           icon={MonitorSmartphone}
           iconBg="bg-amber-50 dark:bg-amber-900/30"
           iconColor="text-amber-600"
+        />
+        <MetricCard
+          title="Total Remaining Balance"
+          value={`$${totalRemaining.toLocaleString()}`}
+          subtitle="Across all ad accounts"
+          icon={Wallet}
+          iconBg="bg-rose-50 dark:bg-rose-900/30"
+          iconColor="text-rose-600"
+        />
+        <MetricCard
+          title="Total Top-Up"
+          value={`$${Number(topUpTotal ?? 0).toLocaleString()}`}
+          subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"}
+          icon={TrendingUp}
+          iconBg="bg-emerald-50 dark:bg-emerald-900/30"
+          iconColor="text-emerald-600"
         />
       </div>
 
@@ -225,25 +168,6 @@ export function ClientDashboard() {
             <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className="p-3 pointer-events-auto" />
           </PopoverContent>
         </Popover>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <MetricCard
-          title="Total Top-Up"
-          value={`$${Number(topUpTotal ?? 0).toLocaleString()}`}
-          subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"}
-          icon={TrendingUp}
-          iconBg="bg-amber-50 dark:bg-amber-900/30"
-          iconColor="text-amber-600"
-        />
-        <MetricCard
-          title="Total Remaining Balance"
-          value={`$${totalRemaining.toLocaleString()}`}
-          subtitle="Across all ad accounts"
-          icon={Wallet}
-          iconBg="bg-rose-50 dark:bg-rose-900/30"
-          iconColor="text-rose-600"
-        />
       </div>
 
       {/* Transaction History */}
