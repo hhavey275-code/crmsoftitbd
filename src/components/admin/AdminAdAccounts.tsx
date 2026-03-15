@@ -290,6 +290,20 @@ export function AdminAdAccounts() {
                 Delete {selectedIds.size} Selected
               </Button>
               <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => { setShowAssignDialog(true); setAssignClientId(""); }}
+              >
+                Assign {selectedIds.size} Selected
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowUnassignConfirm(true)}
+              >
+                Unassign {selectedIds.size} Selected
+              </Button>
+              <Button
                 variant="default"
                 size="sm"
                 onClick={() => refreshSelectedMutation.mutate()}
