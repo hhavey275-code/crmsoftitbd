@@ -16,7 +16,7 @@ export default function Auth() {
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { logoUrl } = useSiteSettings();
+  const { logoUrl, welcomeTitle, welcomeNote } = useSiteSettings();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,9 +68,9 @@ export default function Auth() {
                 <Zap className="h-6 w-6 text-primary-foreground" />
               </div>
             )}
-            <CardTitle className="text-2xl">Welcome</CardTitle>
+            <CardTitle className="text-2xl">{welcomeTitle || "Welcome"}</CardTitle>
             <CardDescription>
-              {isLogin ? "Sign in to your account" : "Create a new account"}
+              {welcomeNote || (isLogin ? "Sign in to your account" : "Create a new account")}
             </CardDescription>
           </CardHeader>
           <form onSubmit={handleSubmit}>

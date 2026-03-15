@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Upload, Zap, DollarSign, Type, Megaphone, Volume2, Lock } from "lucide-react";
+import { Upload, Zap, DollarSign, Type, Megaphone, Volume2, Lock, Hand } from "lucide-react";
 
 export default function SettingsPage() {
   const { profile, user, role, isAdmin } = useAuth();
@@ -20,7 +20,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const { logoUrl, siteName: currentSiteName, headerAnnouncement: currentAnnouncement, refetch } = useSiteSettings();
+  const { logoUrl, siteName: currentSiteName, headerAnnouncement: currentAnnouncement, welcomeTitle: currentWelcomeTitle, welcomeNote: currentWelcomeNote, refetch } = useSiteSettings();
 
   // Site Name state
   const [siteNameInput, setSiteNameInput] = useState("");
@@ -29,6 +29,11 @@ export default function SettingsPage() {
   // Header Announcement state
   const [announcementInput, setAnnouncementInput] = useState("");
   const [savingAnnouncement, setSavingAnnouncement] = useState(false);
+
+  // Welcome Title/Note state
+  const [welcomeTitleInput, setWelcomeTitleInput] = useState("");
+  const [welcomeNoteInput, setWelcomeNoteInput] = useState("");
+  const [savingWelcome, setSavingWelcome] = useState(false);
 
   // Password change state
   const [newPassword, setNewPassword] = useState("");
@@ -61,6 +66,13 @@ export default function SettingsPage() {
   // Sync announcement input when data loads
   if (currentAnnouncement && !announcementInput && !savingAnnouncement) {
     setAnnouncementInput(currentAnnouncement);
+  }
+  // Sync welcome inputs when data loads
+  if (currentWelcomeTitle && !welcomeTitleInput && !savingWelcome) {
+    setWelcomeTitleInput(currentWelcomeTitle);
+  }
+  if (currentWelcomeNote && !welcomeNoteInput && !savingWelcome) {
+    setWelcomeNoteInput(currentWelcomeNote);
   }
 
   const handleSave = async () => {
@@ -119,6 +131,23 @@ export default function SettingsPage() {
     } else {
       toast.success("USD rate updated!");
       refetchRate();
+    }
+  };
+
+  const handleSaveWelcome = async () => {
+    setSavingWelcome(true);
+    const { error: e1 } = await supabase
+      .from("site_settings")
+      .upsert({ key: "welcome_title", value: welcomeTitleInput.trim() }, { onConflict: "key" });
+    const { error: e2 } = await supabase
+      .from("site_settings")
+      .upsert({ key: "welcome_note", value: welcomeNoteInput.trim() }, { onConflict: "key" });
+    setSavingWelcome(false);
+    if (e1 || e2) {
+      toast.error("Failed to save welcome settings");
+    } else {
+      toast.success("Welcome settings updated!");
+      refetch();
     }
   };
 
@@ -269,6 +298,43 @@ export default function SettingsPage() {
                   {savingRate ? "Saving..." : "Save Rate"}
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Welcome Title & Note - Admin only */}
+        {isAdmin && (
+          <Card className="max-w-xl">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Hand className="h-5 w-5 text-violet-600" />
+                Auth Page Welcome
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Customize the welcome title and note shown on the login/signup page.
+              </p>
+              <div className="space-y-2">
+                <Label>Welcome Title</Label>
+                <Input
+                  value={welcomeTitleInput}
+                  onChange={(e) => setWelcomeTitleInput(e.target.value)}
+                  placeholder="Welcome"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Welcome Note</Label>
+                <Textarea
+                  value={welcomeNoteInput}
+                  onChange={(e) => setWelcomeNoteInput(e.target.value)}
+                  placeholder="Sign in to your account to manage your ad campaigns"
+                  rows={2}
+                />
+              </div>
+              <Button onClick={handleSaveWelcome} disabled={savingWelcome}>
+                {savingWelcome ? "Saving..." : "Save Welcome Settings"}
+              </Button>
             </CardContent>
           </Card>
         )}
