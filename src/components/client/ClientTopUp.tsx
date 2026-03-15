@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -45,6 +45,31 @@ export function ClientTopUp() {
     setProofPreview(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
+
+  const handlePaste = useCallback((e: ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (!file) return;
+        if (file.size > 5 * 1024 * 1024) {
+          toast.error("File size must be under 5MB");
+          return;
+        }
+        setProofFile(file);
+        setProofPreview(URL.createObjectURL(file));
+        toast.success("Screenshot pasted!");
+        return;
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    document.addEventListener("paste", handlePaste);
+    return () => document.removeEventListener("paste", handlePaste);
+  }, [handlePaste]);
 
   const { data: usdRate } = useQuery({
     queryKey: ["usd-rate", user?.id],
@@ -148,16 +173,16 @@ export function ClientTopUp() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card className="shadow-sm">
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
               <ArrowUpCircle className="h-5 w-5 text-primary" />
               Submit Top-Up Request
             </CardTitle>
-            <CardDescription>Select a bank, enter BDT amount, and submit your payment details</CardDescription>
+            <CardDescription className="text-xs">Select a bank, enter BDT amount, and submit your payment details</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="p-4 pt-2 space-y-3">
             <div className="space-y-2">
               <Label>Payment Bank</Label>
               <Select value={selectedBank} onValueChange={setSelectedBank}>
@@ -213,12 +238,12 @@ export function ClientTopUp() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Payment Proof</CardTitle>
-            <CardDescription>Attach your payment reference and screenshot</CardDescription>
+        <Card className="shadow-sm">
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-base">Payment Proof</CardTitle>
+            <CardDescription className="text-xs">Attach your payment reference and screenshot</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="p-4 pt-2 space-y-3">
             <div className="space-y-2">
               <Label>Payment Reference / Transaction ID</Label>
               <Input value={paymentRef} onChange={(e) => setPaymentRef(e.target.value)} placeholder="e.g. TXN123456" />
@@ -241,7 +266,7 @@ export function ClientTopUp() {
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <ImageIcon className="h-6 w-6 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Click to attach payment screenshot</span>
+                  <span className="text-sm text-muted-foreground">Click to attach or Ctrl+V to paste screenshot</span>
                 </Button>
               ) : (
                 <div className="relative inline-block">
@@ -261,11 +286,11 @@ export function ClientTopUp() {
       </div>
 
       {/* My Requests History */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">My Requests</CardTitle>
+      <Card className="shadow-sm">
+        <CardHeader className="p-4 pb-2">
+          <CardTitle className="text-base">My Requests</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 pt-2">
           <Table>
             <TableHeader>
               <TableRow>
