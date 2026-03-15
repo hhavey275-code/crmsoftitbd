@@ -14,6 +14,8 @@ import {
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Sidebar,
   SidebarContent,
@@ -29,32 +31,58 @@ import {
 import { Button } from "@/components/ui/button";
 
 const adminNavItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Clients", url: "/clients", icon: Users },
-  { title: "Ad Accounts", url: "/ad-accounts", icon: MonitorSmartphone },
-  { title: "Billings", url: "/billings", icon: Receipt },
-  { title: "Business Managers", url: "/business-managers", icon: Building2 },
-  { title: "Top-Up Request", url: "/top-up", icon: ArrowUpCircle },
-  { title: "Transactions", url: "/transactions", icon: History },
-  { title: "Banks", url: "/banks", icon: Landmark },
-  { title: "Settings", url: "/settings", icon: Settings },
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, key: "dashboard" },
+  { title: "Clients", url: "/clients", icon: Users, key: "clients" },
+  { title: "Ad Accounts", url: "/ad-accounts", icon: MonitorSmartphone, key: "ad-accounts" },
+  { title: "Billings", url: "/billings", icon: Receipt, key: "billings" },
+  { title: "Business Managers", url: "/business-managers", icon: Building2, key: "business-managers" },
+  { title: "Top-Up Request", url: "/top-up", icon: ArrowUpCircle, key: "top-up" },
+  { title: "Transactions", url: "/transactions", icon: History, key: "transactions" },
+  { title: "Banks", url: "/banks", icon: Landmark, key: "banks" },
+  { title: "Settings", url: "/settings", icon: Settings, key: "settings" },
 ];
 
 const clientNavItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Ad Accounts", url: "/ad-accounts", icon: MonitorSmartphone },
-  { title: "Top-Up Request", url: "/top-up", icon: ArrowUpCircle },
-  { title: "Transactions", url: "/transactions", icon: History },
-  { title: "Settings", url: "/settings", icon: Settings },
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, key: "dashboard" },
+  { title: "Ad Accounts", url: "/ad-accounts", icon: MonitorSmartphone, key: "ad-accounts" },
+  { title: "Top-Up Request", url: "/top-up", icon: ArrowUpCircle, key: "top-up" },
+  { title: "Transactions", url: "/transactions", icon: History, key: "transactions" },
+  { title: "Settings", url: "/settings", icon: Settings, key: "settings" },
 ];
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const { signOut, profile, role } = useAuth();
+  const { signOut, profile, role, isAdmin, isSuperAdmin, user } = useAuth();
   const { logoUrl, siteName } = useSiteSettings();
 
-  const navItems = role === "admin" ? adminNavItems : clientNavItems;
+  // Fetch menu permissions for admin (non-superadmin) users
+  const { data: menuPermissions } = useQuery({
+    queryKey: ["menu-permissions", user?.id],
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("menu_permissions")
+        .select("menu_key")
+        .eq("user_id", user!.id);
+      return (data as any[])?.map((p: any) => p.menu_key) ?? [];
+    },
+    enabled: !!user && role === "admin",
+  });
+
+  let navItems: typeof adminNavItems;
+  if (isSuperAdmin) {
+    navItems = adminNavItems;
+  } else if (role === "admin") {
+    // Filter based on menu_permissions - if no permissions set, show all
+    if (menuPermissions && menuPermissions.length > 0) {
+      navItems = adminNavItems.filter(item => menuPermissions.includes(item.key));
+    } else {
+      navItems = adminNavItems;
+    }
+  } else {
+    navItems = clientNavItems;
+  }
+
   const displayName = siteName || "Meta Ad Top-Up";
 
   return (

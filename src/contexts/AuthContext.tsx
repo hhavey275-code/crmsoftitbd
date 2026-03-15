@@ -12,6 +12,8 @@ interface AuthContextType {
   profile: Database["public"]["Tables"]["profiles"]["Row"] | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  isAdmin: boolean;
+  isSuperAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -21,6 +23,8 @@ const AuthContext = createContext<AuthContextType>({
   profile: null,
   loading: true,
   signOut: async () => {},
+  isAdmin: false,
+  isSuperAdmin: false,
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -76,8 +80,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setProfile(null);
   };
 
+  const isSuperAdmin = role === "superadmin";
+  const isAdmin = role === "admin" || role === "superadmin";
+
   return (
-    <AuthContext.Provider value={{ user, session, role, profile, loading, signOut }}>
+    <AuthContext.Provider value={{ user, session, role, profile, loading, signOut, isAdmin, isSuperAdmin }}>
       {children}
     </AuthContext.Provider>
   );

@@ -104,3 +104,19 @@
     font-family: 'Inter', sans-serif;
   }
 }
+
+/* Scrolling announcement ticker */
+@keyframes ticker-scroll {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+.announcement-ticker {
+  overflow: hidden;
+  position: relative;
+}
+
+.announcement-ticker span {
+  display: inline-block;
+  animation: ticker-scroll 20s linear infinite;
+}

@@ -37,7 +37,7 @@ export default function Auth() {
           },
         });
         if (error) throw error;
-        toast.success("Account created! Check your email to confirm.");
+        toast.success("Account created! Please wait for admin approval after confirming your email.");
       }
     } catch (err: any) {
       toast.error(err.message);
@@ -48,7 +48,6 @@ export default function Auth() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      {/* Title Bar */}
       <header className="h-14 flex items-center gap-3 border-b bg-card px-6">
         {logoUrl ? (
           <img src={logoUrl} alt="Logo" className="h-8 w-8 rounded object-contain" />
@@ -57,10 +56,8 @@ export default function Auth() {
             <Zap className="h-4 w-4 text-primary-foreground" />
           </div>
         )}
-        <span className="text-base font-semibold text-foreground">Meta Ad Top-Up</span>
       </header>
 
-      {/* Login Form */}
       <div className="flex flex-1 items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
@@ -71,7 +68,7 @@ export default function Auth() {
                 <Zap className="h-6 w-6 text-primary-foreground" />
               </div>
             )}
-            <CardTitle className="text-2xl">Meta Ad Top-Up</CardTitle>
+            <CardTitle className="text-2xl">Welcome</CardTitle>
             <CardDescription>
               {isLogin ? "Sign in to your account" : "Create a new account"}
             </CardDescription>
