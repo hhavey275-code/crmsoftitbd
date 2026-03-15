@@ -57,6 +57,8 @@ Deno.serve(async (req) => {
         insights[row.ad_account_id] = {
           today_spend: Number(row.today_spend),
           yesterday_spend: Number(row.yesterday_spend),
+          today_orders: Number(row.today_orders ?? 0),
+          yesterday_orders: Number(row.yesterday_orders ?? 0),
           balance: Number(row.balance),
           cards: row.cards ?? [],
           updated_at: row.updated_at,
