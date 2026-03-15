@@ -109,13 +109,15 @@ export default function BillingsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Account</TableHead>
-                    <TableHead className="text-right">
+                    <TableHead className="text-right w-[110px]">
                       <button
                         className="flex items-center text-xs font-medium ml-auto"
                         onClick={() => setSortDir(d => d === "asc" ? "desc" : "asc")}
                       >
                         Balance
                         {sortDir === "asc" ? <ArrowUp className="h-3 w-3 ml-1" /> : <ArrowDown className="h-3 w-3 ml-1" />}
+                      </button>
+                    </TableHead>
                       </button>
                     </TableHead>
                     <TableHead>Status</TableHead>
