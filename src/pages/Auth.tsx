@@ -132,7 +132,7 @@ export default function Auth() {
             {logoUrl && (
               <img src={logoUrl} alt="Logo" className="mx-auto mb-2 h-24 w-24 rounded-xl object-contain" />
             )}
-            <EyeMascot isCovering={isPasswordFocused} />
+            <RobotMascot isCovering={isPasswordFocused} />
             <CardTitle className="text-2xl">{welcomeTitle || "Welcome"}</CardTitle>
             <CardDescription className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500 text-base drop-shadow-[0_0_10px_rgba(0,150,255,0.5)]">
               {welcomeNote || (isLogin ? "Sign in to your account" : "Create a new account")}
