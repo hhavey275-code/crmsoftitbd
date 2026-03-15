@@ -7,7 +7,7 @@ export function SpendProgressBar({ amountSpent, spendCap }: SpendProgressBarProp
   if (spendCap <= 0) {
     return (
       <div className="w-full">
-        <div className="text-xs font-medium text-muted-foreground">No cap</div>
+        <div className="text-sm font-medium text-muted-foreground">No cap</div>
       </div>
     );
   }
@@ -17,25 +17,20 @@ export function SpendProgressBar({ amountSpent, spendCap }: SpendProgressBarProp
   const remaining = Math.max(spendCap - amountSpent, 0);
 
   const barColor =
-    ratio >= 0.9
+    ratio >= 0.8
       ? "bg-destructive"
-      : ratio >= 0.7
-        ? "bg-amber-500"
+      : ratio >= 0.5
+        ? "bg-yellow-500"
         : "bg-primary";
 
   return (
-    <div className="w-full min-w-[90px]">
-      <div className="flex items-baseline justify-between gap-2 mb-1">
-        <span className="text-xs font-semibold tabular-nums">
-          ${remaining.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-        </span>
-        <span className="text-[10px] text-muted-foreground tabular-nums">
-          / ${spendCap.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-        </span>
+    <div className="w-full min-w-[80px]">
+      <div className="text-sm font-medium whitespace-nowrap">
+        ${remaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} left
       </div>
-      <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+      <div className="h-1.5 w-full max-w-[80px] rounded-full bg-muted overflow-hidden mt-1">
         <div
-          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+          className={`h-full rounded-full transition-all ${barColor}`}
           style={{ width: `${percentage}%` }}
         />
       </div>
