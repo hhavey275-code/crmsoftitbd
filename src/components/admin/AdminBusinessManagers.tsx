@@ -71,20 +71,26 @@ export function AdminBusinessManagers() {
 
   const addBmMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("business_managers").insert({
+      const { data, error } = await supabase.from("business_managers").insert({
         bm_id: bmId,
         name: bmName,
         access_token: accessToken,
-      });
+      }).select().single();
       if (error) throw error;
+      return data;
     },
-    onSuccess: () => {
-      toast.success("Business Manager connected");
+    onSuccess: async (data) => {
+      toast.success("Business Manager connected! Syncing ad accounts...");
       queryClient.invalidateQueries({ queryKey: ["admin-business-managers"] });
       setOpen(false);
       setBmId("");
       setBmName("");
       setAccessToken("");
+      // Auto-sync ad accounts after connecting
+      if (data?.id) {
+        setExpandedBm(data.id);
+        syncMutation.mutate(data.id);
+      }
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -140,13 +146,58 @@ export function AdminBusinessManagers() {
 
   const bmAccounts = (bmId: string) => adAccounts?.filter((a: any) => a.business_manager_id === bmId) ?? [];
 
+  const syncAllMutation = useMutation({
+    mutationFn: async () => {
+      if (!bms || bms.length === 0) throw new Error("No Business Managers to sync");
+      const { data: { session } } = await supabase.auth.getSession();
+      const results = await Promise.allSettled(
+        bms.map(async (bm: any) => {
+          const res = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-bm-accounts`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${session?.access_token}`,
+              },
+              body: JSON.stringify({ business_manager_id: bm.id }),
+            }
+          );
+          const result = await res.json();
+          if (!res.ok) throw new Error(result.error || "Sync failed");
+          return result;
+        })
+      );
+      const succeeded = results.filter(r => r.status === "fulfilled").length;
+      return { succeeded, total: bms.length };
+    },
+    onSuccess: (result) => {
+      toast.success(`Synced ${result.succeeded} of ${result.total} Business Managers`);
+      queryClient.invalidateQueries({ queryKey: ["admin-bm-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-business-managers"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-sync-logs"] });
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Business Managers</h1>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button><Plus className="mr-2 h-4 w-4" /> Connect BM</Button>
+        <div className="flex items-center gap-2">
+          {bms && bms.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => syncAllMutation.mutate()}
+              disabled={syncAllMutation.isPending}
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${syncAllMutation.isPending ? "animate-spin" : ""}`} />
+              {syncAllMutation.isPending ? "Syncing All..." : "Sync All"}
+            </Button>
+          )}
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button><Plus className="mr-2 h-4 w-4" /> Connect BM</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -173,7 +224,8 @@ export function AdminBusinessManagers() {
               </Button>
             </DialogFooter>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
 
       {bms?.map((bm: any) => (
