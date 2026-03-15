@@ -447,7 +447,7 @@ export function ClientAdAccounts() {
                 <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No ad accounts assigned to you yet</TableCell></TableRow>
               )}
               {accounts && accounts.length > 0 && paginatedAccounts.length === 0 && (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No accounts match your filters</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No accounts match your filters</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
