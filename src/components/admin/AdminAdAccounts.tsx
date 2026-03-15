@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,11 +13,18 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { ArrowUpCircle, ExternalLink, Wallet, AlertTriangle } from "lucide-react";
 
+interface InsightsData {
+  today_spend: number;
+  yesterday_spend: number;
+  current_balance: number;
+}
+
 export function AdminAdAccounts() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [topUpAccount, setTopUpAccount] = useState<any>(null);
   const [topUpAmount, setTopUpAmount] = useState("");
+  const [insights, setInsights] = useState<Record<string, InsightsData>>({});
 
   const { data: accounts } = useQuery({
     queryKey: ["admin-ad-accounts"],
@@ -53,6 +60,17 @@ export function AdminAdAccounts() {
       return (data as any[]) ?? [];
     },
   });
+
+  useEffect(() => {
+    if (accounts && accounts.length > 0) {
+      const ids = accounts.map((a: any) => a.id);
+      supabase.functions.invoke("get-account-insights", {
+        body: { ad_account_ids: ids },
+      }).then(({ data }) => {
+        if (data?.insights) setInsights(data.insights);
+      }).catch(() => {});
+    }
+  }, [accounts]);
 
   const getAssignedUserId = (accountId: string) => {
     const assignment = assignments?.find((a: any) => a.ad_account_id === accountId);
@@ -113,66 +131,81 @@ export function AdminAdAccounts() {
             <TableHeader>
               <TableRow>
                 <TableHead>Account</TableHead>
-                <TableHead>Business Manager</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Spend Cap / Spent</TableHead>
+                <TableHead>Today / Yesterday</TableHead>
+                <TableHead>Balance</TableHead>
                 <TableHead>Assigned To</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {accounts?.map((a: any) => (
-                <TableRow
-                  key={a.id}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => navigate(`/ad-accounts/${a.id}`)}
-                >
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                        <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
-                          <path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.879V14.89h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.989C18.343 21.129 22 16.99 22 12c0-5.523-4.477-10-10-10z"/>
-                        </svg>
+              {accounts?.map((a: any) => {
+                const ins = insights[a.id];
+                return (
+                  <TableRow
+                    key={a.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => navigate(`/ad-accounts/${a.id}`)}
+                  >
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                          <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+                            <path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.879V14.89h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.989C18.343 21.129 22 16.99 22 12c0-5.523-4.477-10-10-10z"/>
+                          </svg>
+                        </div>
+                        <div>
+                          <div className="font-semibold text-primary">{a.account_name}</div>
+                          <div className="text-xs text-muted-foreground font-mono">ID: {a.account_id.replace(/^act_/, '')}</div>
+                          {a.business_managers?.name && (
+                            <div className="text-[11px] text-muted-foreground">{a.business_managers.name}</div>
+                          )}
+                        </div>
                       </div>
-                      <div>
-                        <div className="font-semibold text-primary">{a.account_name}</div>
-                        <div className="text-xs text-muted-foreground font-mono">ID: {a.account_id}</div>
+                    </TableCell>
+                    <TableCell><StatusBadge status={a.status} /></TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} />
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-xs space-y-1">
+                        <div>Today: <span className="font-medium">${ins?.today_spend?.toLocaleString() ?? '—'}</span></div>
+                        <div>Yesterday: <span className="font-medium">${ins?.yesterday_spend?.toLocaleString() ?? '—'}</span></div>
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{a.business_managers?.name || "—"}</TableCell>
-                  <TableCell><StatusBadge status={a.status} /></TableCell>
-                  <TableCell onClick={(e) => e.stopPropagation()}>
-                    <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} />
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm">{getClientName(getAssignedUserId(a.id))}</span>
-                  </TableCell>
-                  <TableCell onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
-                      >
-                        <ArrowUpCircle className="h-4 w-4 mr-1" />
-                        Top Up
-                      </Button>
-                      <Button variant="ghost" size="sm" asChild>
-                        <a
-                          href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${a.account_id.replace(/^act_/, '')}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm font-semibold">${ins?.current_balance?.toLocaleString() ?? (Number(a.spend_cap) - Number(a.amount_spent)).toLocaleString()}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm">{getClientName(getAssignedUserId(a.id))}</span>
+                    </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
                         >
-                          <ExternalLink className="h-4 w-4 mr-1" />
-                          Billing
-                        </a>
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                          <ArrowUpCircle className="h-4 w-4 mr-1" />
+                          Top Up
+                        </Button>
+                        <Button variant="ghost" size="sm" asChild>
+                          <a
+                            href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${a.account_id.replace(/^act_/, '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <ExternalLink className="h-4 w-4 mr-1" />
+                            Billing
+                          </a>
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
               {(!accounts || accounts.length === 0) && (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No ad accounts</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No ad accounts</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -184,7 +217,7 @@ export function AdminAdAccounts() {
           <DialogHeader>
             <DialogTitle>Increase Spend Limit</DialogTitle>
             <DialogDescription>
-              Top up <span className="font-semibold">{topUpAccount?.account_name}</span> ({topUpAccount?.account_id})
+              Top up <span className="font-semibold">{topUpAccount?.account_name}</span> ({topUpAccount?.account_id?.replace(/^act_/, '')})
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
