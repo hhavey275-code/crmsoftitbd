@@ -9,6 +9,7 @@ import {
   Building2,
   Landmark,
   Users,
+  Receipt,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -31,6 +32,7 @@ const adminNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Clients", url: "/clients", icon: Users },
   { title: "Ad Accounts", url: "/ad-accounts", icon: MonitorSmartphone },
+  { title: "Billings", url: "/billings", icon: Receipt },
   { title: "Business Managers", url: "/business-managers", icon: Building2 },
   { title: "Top-Up Request", url: "/top-up", icon: ArrowUpCircle },
   { title: "Transactions", url: "/transactions", icon: History },
@@ -41,6 +43,7 @@ const adminNavItems = [
 const clientNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Ad Accounts", url: "/ad-accounts", icon: MonitorSmartphone },
+  { title: "Billings", url: "/billings", icon: Receipt },
   { title: "Top-Up Request", url: "/top-up", icon: ArrowUpCircle },
   { title: "Transactions", url: "/transactions", icon: History },
   { title: "Settings", url: "/settings", icon: Settings },
