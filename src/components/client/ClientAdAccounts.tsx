@@ -396,24 +396,15 @@ export function ClientAdAccounts() {
                       </div>
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
-                      <a
-                        href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${a.account_id.replace(/^act_/, '')}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:text-primary/80"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
-                    </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <Button
-                        size="sm"
-                        variant="outline"
+                        size="icon"
+                        variant="default"
+                        className="h-8 w-8"
                         disabled={isInactive}
                         onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
+                        title="Top Up"
                       >
-                        <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
-                        <span className="hidden sm:inline">Top Up</span>
+                        <ArrowUpCircle className="h-4 w-4" />
                       </Button>
                     </TableCell>
                   </TableRow>
