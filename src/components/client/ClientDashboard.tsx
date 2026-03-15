@@ -46,18 +46,6 @@ export function ClientDashboard() {
     enabled: !!user,
   });
 
-  // Fetch insights (today_spend, today_orders, etc.) for all assigned ad accounts
-  const { data: insights } = useQuery({
-    queryKey: ["client-insights", adAccounts?.map((a: any) => a.id)],
-    queryFn: async () => {
-      const ids = adAccounts!.map((a: any) => a.id);
-      const { data } = await supabase.functions.invoke("get-account-insights", {
-        body: { ad_account_ids: ids, source: "cache" },
-      });
-      return data?.insights ?? {};
-    },
-    enabled: !!adAccounts && adAccounts.length > 0,
-  });
 
   const { data: topUpTotal } = useQuery({
     queryKey: ["client-topup-total", user?.id, dateFrom?.toISOString(), dateTo?.toISOString()],
