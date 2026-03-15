@@ -30,6 +30,11 @@ export default function SettingsPage() {
   const [announcementInput, setAnnouncementInput] = useState("");
   const [savingAnnouncement, setSavingAnnouncement] = useState(false);
 
+  // Welcome Title/Note state
+  const [welcomeTitleInput, setWelcomeTitleInput] = useState("");
+  const [welcomeNoteInput, setWelcomeNoteInput] = useState("");
+  const [savingWelcome, setSavingWelcome] = useState(false);
+
   // Password change state
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
