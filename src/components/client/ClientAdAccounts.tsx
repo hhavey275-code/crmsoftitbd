@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { ArrowUpCircle, ExternalLink, Wallet, CreditCard, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, Monitor } from "lucide-react";
+import { ArrowUpCircle, ExternalLink, Wallet, CreditCard, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, AppWindow } from "lucide-react";
 
 interface InsightsData {
   today_spend: number;
