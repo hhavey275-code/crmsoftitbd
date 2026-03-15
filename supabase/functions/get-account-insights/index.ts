@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { ad_account_ids } = await req.json();
+    const { ad_account_ids, source = "cache" } = await req.json();
     if (!ad_account_ids || !Array.isArray(ad_account_ids) || ad_account_ids.length === 0) {
       return new Response(JSON.stringify({ error: "ad_account_ids required" }), {
         status: 400,
@@ -24,7 +24,32 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    // Fetch accounts with their BM access tokens
+    // If source is "cache", read from DB and return
+    if (source === "cache") {
+      const { data: cached, error: cacheError } = await supabase
+        .from("ad_account_insights")
+        .select("*")
+        .in("ad_account_id", ad_account_ids);
+
+      if (cacheError) throw cacheError;
+
+      const insights: Record<string, any> = {};
+      for (const row of (cached ?? [])) {
+        insights[row.ad_account_id] = {
+          today_spend: Number(row.today_spend),
+          yesterday_spend: Number(row.yesterday_spend),
+          balance: Number(row.balance),
+          cards: row.cards ?? [],
+          updated_at: row.updated_at,
+        };
+      }
+
+      return new Response(JSON.stringify({ insights }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // source === "meta" — fetch from Meta API and upsert to DB
     const { data: accounts, error } = await supabase
       .from("ad_accounts")
       .select("id, account_id, amount_spent, spend_cap, business_manager_id, business_managers(access_token)")
@@ -103,6 +128,28 @@ Deno.serve(async (req) => {
     });
 
     await Promise.all(promises);
+
+    // Upsert all insights into DB
+    const upsertRows = Object.entries(insights).map(([adAccountId, data]: [string, any]) => ({
+      ad_account_id: adAccountId,
+      today_spend: data.today_spend,
+      yesterday_spend: data.yesterday_spend,
+      balance: data.balance,
+      cards: data.cards,
+      updated_at: new Date().toISOString(),
+    }));
+
+    if (upsertRows.length > 0) {
+      await supabase
+        .from("ad_account_insights")
+        .upsert(upsertRows, { onConflict: "ad_account_id" });
+    }
+
+    // Add updated_at to response
+    const now = new Date().toISOString();
+    for (const key of Object.keys(insights)) {
+      insights[key].updated_at = now;
+    }
 
     return new Response(JSON.stringify({ insights }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
