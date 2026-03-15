@@ -33,11 +33,11 @@ import { Button } from "@/components/ui/button";
 
 const adminNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, key: "dashboard" },
-  { title: "Clients", url: "/clients", icon: Users, key: "clients" },
   { title: "Ad Accounts", url: "/ad-accounts", icon: MonitorSmartphone, key: "ad-accounts" },
   { title: "Billings", url: "/billings", icon: Receipt, key: "billings" },
   { title: "Business Managers", url: "/business-managers", icon: Building2, key: "business-managers" },
   { title: "Top-Up Request", url: "/top-up", icon: ArrowUpCircle, key: "top-up" },
+  { title: "Clients", url: "/clients", icon: Users, key: "clients" },
   { title: "Transactions", url: "/transactions", icon: History, key: "transactions" },
   { title: "Banks", url: "/banks", icon: Landmark, key: "banks" },
   { title: "Chat Support", url: "/chat", icon: MessageCircle, key: "chat" },

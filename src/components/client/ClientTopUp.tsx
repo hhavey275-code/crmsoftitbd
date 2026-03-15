@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
 import { toast } from "sonner";
-import { ArrowUpCircle, Banknote, DollarSign, MessageSquare } from "lucide-react";
+import { ArrowUpCircle, Banknote, DollarSign, MessageSquare, ImageIcon, X } from "lucide-react";
 import { format } from "date-fns";
 
 export function ClientTopUp() {
@@ -21,6 +21,30 @@ export function ClientTopUp() {
   const isInactive = (profile as any)?.status === "inactive";
   const [selectedBank, setSelectedBank] = useState("");
   const [paymentRef, setPaymentRef] = useState("");
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [proofPreview, setProofPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File size must be under 5MB");
+      return;
+    }
+    setProofFile(file);
+    setProofPreview(URL.createObjectURL(file));
+  };
+
+  const clearFile = () => {
+    setProofFile(null);
+    setProofPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   const { data: usdRate } = useQuery({
     queryKey: ["usd-rate", user?.id],
@@ -65,6 +89,22 @@ export function ClientTopUp() {
 
   const submitMutation = useMutation({
     mutationFn: async () => {
+      let proofUrl: string | null = null;
+
+      // Upload payment proof if provided
+      if (proofFile) {
+        const ext = proofFile.name.split(".").pop();
+        const filePath = `${user!.id}/${Date.now()}.${ext}`;
+        const { error: uploadError } = await supabase.storage
+          .from("payment-proofs")
+          .upload(filePath, proofFile);
+        if (uploadError) throw uploadError;
+        const { data: urlData } = supabase.storage
+          .from("payment-proofs")
+          .getPublicUrl(filePath);
+        proofUrl = urlData.publicUrl;
+      }
+
       const { error } = await supabase.from("top_up_requests").insert({
         user_id: user!.id,
         amount: parseFloat(usdEquivalent),
@@ -73,6 +113,7 @@ export function ClientTopUp() {
         bank_account_id: selectedBank,
         payment_reference: paymentRef || null,
         payment_method: "bank_transfer",
+        proof_url: proofUrl,
       } as any);
       if (error) throw error;
     },
@@ -83,6 +124,7 @@ export function ClientTopUp() {
       setBdtAmount("");
       setSelectedBank("");
       setPaymentRef("");
+      clearFile();
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -163,6 +205,39 @@ export function ClientTopUp() {
           <div className="space-y-2">
             <Label>Payment Reference / Transaction ID</Label>
             <Input value={paymentRef} onChange={(e) => setPaymentRef(e.target.value)} placeholder="e.g. TXN123456" />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Payment Screenshot</Label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            {!proofPreview ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-dashed h-20 flex flex-col gap-1"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Click to attach payment screenshot</span>
+              </Button>
+            ) : (
+              <div className="relative inline-block">
+                <img src={proofPreview} alt="Payment proof" className="max-h-40 rounded-md border" />
+                <button
+                  type="button"
+                  onClick={clearFile}
+                  className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-0.5"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
           </div>
 
           <Button
