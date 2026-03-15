@@ -114,6 +114,23 @@ export default function Auth() {
                 <Label htmlFor="password">Password</Label>
                 <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required minLength={6} />
               </div>
+              {!isLogin && (
+                <div className="space-y-2">
+                  <Label htmlFor="monthlySpend">Monthly Approx. Spending (USD)</Label>
+                  <Select value={monthlySpend} onValueChange={setMonthlySpend}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select spending range" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="$0 - $500">$0 - $500</SelectItem>
+                      <SelectItem value="$500 - $2,000">$500 - $2,000</SelectItem>
+                      <SelectItem value="$2,000 - $5,000">$2,000 - $5,000</SelectItem>
+                      <SelectItem value="$5,000 - $10,000">$5,000 - $10,000</SelectItem>
+                      <SelectItem value="$10,000+">$10,000+</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </CardContent>
             <CardFooter className="flex flex-col gap-3">
               <Button type="submit" className="w-full" disabled={loading}>
