@@ -12,6 +12,39 @@ import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 const TechBackground = lazy(() => import("@/components/TechBackground"));
 
+/* Cute animated mascot that covers eyes when typing password */
+function EyeMascot({ isCovering }: { isCovering: boolean }) {
+  return (
+    <div className="mx-auto mb-4 relative w-28 h-28">
+      {/* Face */}
+      <div className="w-28 h-28 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 shadow-lg flex items-center justify-center relative overflow-visible">
+        {/* Eyes */}
+        <div className="flex gap-4 relative z-10">
+          <div className={`w-5 h-5 rounded-full bg-white flex items-center justify-center transition-all duration-300 ${isCovering ? "scale-y-[0.1]" : ""}`}>
+            <div className={`w-2.5 h-2.5 rounded-full bg-gray-900 transition-all duration-300 ${isCovering ? "opacity-0" : ""}`} />
+          </div>
+          <div className={`w-5 h-5 rounded-full bg-white flex items-center justify-center transition-all duration-300 ${isCovering ? "scale-y-[0.1]" : ""}`}>
+            <div className={`w-2.5 h-2.5 rounded-full bg-gray-900 transition-all duration-300 ${isCovering ? "opacity-0" : ""}`} />
+          </div>
+        </div>
+        {/* Hands covering eyes */}
+        <div
+          className={`absolute left-1 z-20 w-10 h-7 rounded-full bg-gradient-to-br from-blue-300 to-blue-500 shadow-md transition-all duration-500 ease-in-out ${
+            isCovering ? "top-[38%] opacity-100" : "top-[80%] opacity-0"
+          }`}
+        />
+        <div
+          className={`absolute right-1 z-20 w-10 h-7 rounded-full bg-gradient-to-br from-blue-300 to-blue-500 shadow-md transition-all duration-500 ease-in-out ${
+            isCovering ? "top-[38%] opacity-100" : "top-[80%] opacity-0"
+          }`}
+        />
+        {/* Mouth */}
+        <div className={`absolute bottom-5 w-6 h-3 rounded-b-full border-b-2 border-white/60 transition-all duration-300 ${isCovering ? "w-4 h-2 bottom-5" : ""}`} />
+      </div>
+    </div>
+  );
+}
+
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
@@ -20,6 +53,7 @@ export default function Auth() {
   const [businessName, setBusinessName] = useState("");
   const [monthlySpend, setMonthlySpend] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
   const navigate = useNavigate();
   const { logoUrl, welcomeTitle, welcomeNote } = useSiteSettings();
 
@@ -50,7 +84,6 @@ export default function Auth() {
             monthly_spend: monthlySpend || null,
           } as any).eq("user_id", signUpData.user.id);
         }
-        if (error) throw error;
         toast.success("Account created! Please wait for admin approval after confirming your email.");
       }
     } catch (err: any) {
@@ -62,7 +95,6 @@ export default function Auth() {
 
   return (
     <div className="relative flex min-h-screen flex-col bg-background overflow-hidden">
-      {/* 3D Tech Background */}
       <Suspense fallback={null}>
         <TechBackground />
       </Suspense>
@@ -78,22 +110,20 @@ export default function Auth() {
       </header>
 
       <div className="relative z-10 flex flex-1 items-center justify-center p-4">
-        <Card className="w-full max-w-md bg-card/90 backdrop-blur-md shadow-2xl border-border/50">
-          <CardHeader className="text-center">
+        <Card className="w-full max-w-lg bg-card/90 backdrop-blur-md shadow-2xl border-border/50 rounded-3xl">
+          <CardHeader className="text-center pb-2">
             {logoUrl ? (
               <img src={logoUrl} alt="Logo" className="mx-auto mb-4 h-24 w-24 rounded-xl object-contain" />
             ) : (
-              <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-xl bg-primary">
-                <Zap className="h-12 w-12 text-primary-foreground" />
-              </div>
+              <EyeMascot isCovering={isPasswordFocused} />
             )}
             <CardTitle className="text-2xl">{welcomeTitle || "Welcome"}</CardTitle>
-            <CardDescription>
+            <CardDescription className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500 text-base drop-shadow-[0_0_10px_rgba(0,150,255,0.5)]">
               {welcomeNote || (isLogin ? "Sign in to your account" : "Create a new account")}
             </CardDescription>
           </CardHeader>
           <form onSubmit={handleSubmit}>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 px-8">
               {!isLogin && (
                 <div className="space-y-2">
                   <Label htmlFor="fullName">Full Name</Label>
@@ -112,7 +142,17 @@ export default function Auth() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
-                <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required minLength={6} />
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onFocus={() => setIsPasswordFocused(true)}
+                  onBlur={() => setIsPasswordFocused(false)}
+                  placeholder="••••••••"
+                  required
+                  minLength={6}
+                />
               </div>
               {!isLogin && (
                 <div className="space-y-2">
@@ -132,7 +172,7 @@ export default function Auth() {
                 </div>
               )}
             </CardContent>
-            <CardFooter className="flex flex-col gap-3">
+            <CardFooter className="flex flex-col gap-3 px-8">
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? "Please wait..." : isLogin ? "Sign In" : "Sign Up"}
               </Button>
