@@ -6,65 +6,22 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
-import { ArrowUp, ArrowDown, AppWindow } from "lucide-react";
+import { CardBrandIcon } from "@/components/CardBrandIcon";
+import { ArrowUp, ArrowDown, AppWindow, ExternalLink } from "lucide-react";
 
 interface InsightsData {
   balance: number;
   cards: { id: string; display_string: string; type: number }[];
 }
 
-function CardBrandIcon({ displayString }: { displayString: string }) {
-  const lower = displayString?.toLowerCase() ?? "";
-  if (lower.includes("visa")) {
-    return (
-      <span className="inline-flex items-center justify-center rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-white" style={{ background: "linear-gradient(135deg, #1a1f71, #2566af)" }}>
-        VISA
-      </span>
-    );
-  }
-  if (lower.includes("master")) {
-    return (
-      <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5">
-        <span className="h-4 w-4 rounded-full bg-[#eb001b] inline-block -mr-1.5 opacity-90" />
-        <span className="h-4 w-4 rounded-full bg-[#f79e1b] inline-block opacity-90" />
-      </span>
-    );
-  }
-  if (lower.includes("amex") || lower.includes("american")) {
-    return (
-      <span className="inline-flex items-center justify-center rounded px-1.5 py-0.5 text-[10px] font-bold text-white bg-[#2e77bc]">
-        AMEX
-      </span>
-    );
-  }
-  // Generic / available funds
-  return (
-    <span className="inline-flex items-center justify-center rounded px-1.5 py-0.5 bg-emerald-500 text-white">
-      <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></svg>
-    </span>
-  );
-}
-
 export default function BillingsPage() {
-  const { user, role } = useAuth();
+  const { user } = useAuth();
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
-  // Fetch ad accounts based on role
   const { data: accounts } = useQuery({
-    queryKey: ["billings-accounts", user?.id, role],
+    queryKey: ["billings-accounts", user?.id],
     queryFn: async () => {
-      if (role === "admin") {
-        const { data } = await supabase.from("ad_accounts").select("*");
-        return (data as any[]) ?? [];
-      }
-      // Client: get assigned accounts
-      const { data: assignments } = await (supabase as any)
-        .from("user_ad_accounts")
-        .select("ad_account_id")
-        .eq("user_id", user!.id);
-      if (!assignments || assignments.length === 0) return [];
-      const ids = assignments.map((a: any) => a.ad_account_id);
-      const { data } = await supabase.from("ad_accounts").select("*").in("id", ids);
+      const { data } = await supabase.from("ad_accounts").select("*");
       return (data as any[]) ?? [];
     },
     enabled: !!user,
@@ -104,10 +61,10 @@ export default function BillingsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-[250px]">Account</TableHead>
-                    <TableHead className="w-[120px]">Status</TableHead>
-                    <TableHead className="w-[200px]">How you'll pay</TableHead>
-                    <TableHead className="w-[150px] text-right">
+                    <TableHead>Account</TableHead>
+                    <TableHead className="w-[100px]">Status</TableHead>
+                    <TableHead className="w-[160px]">How you'll pay</TableHead>
+                    <TableHead className="w-[120px] text-right">
                       <button
                         className="flex items-center text-xs font-medium ml-auto"
                         onClick={() => setSortDir(d => d === "asc" ? "desc" : "asc")}
@@ -116,6 +73,7 @@ export default function BillingsPage() {
                         {sortDir === "asc" ? <ArrowUp className="h-3 w-3 ml-1" /> : <ArrowDown className="h-3 w-3 ml-1" />}
                       </button>
                     </TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -124,36 +82,47 @@ export default function BillingsPage() {
                     const balance = Number(ins?.balance ?? 0);
                     return (
                       <TableRow key={acc.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
-                              <AppWindow className="h-4 w-4 text-muted-foreground" />
+                        <TableCell className="py-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
+                              <AppWindow className="h-3.5 w-3.5 text-muted-foreground" />
                             </div>
                             <div>
-                              <div className="text-sm text-primary">{acc.account_name}</div>
+                              <div className="text-sm text-primary leading-tight">{acc.account_name}</div>
                               <div className="text-xs text-muted-foreground font-mono">ID: {acc.account_id.replace(/^act_/, '')}</div>
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="py-3">
                           <StatusBadge status={acc.status} />
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="py-3">
                           <div className="text-sm">
                             {ins?.cards && ins.cards.length > 0 ? (
                               ins.cards.map((card: any, i: number) => (
-                                <div key={i} className="flex items-center gap-2">
-                                  <CardBrandIcon displayString={card.display_string} />
-                                  <span>{card.display_string}</span>
+                                <div key={i} className="flex items-center gap-1.5">
+                                  <CardBrandIcon displayString={card.display_string} size="xs" />
+                                  <span className="text-xs">{card.display_string}</span>
                                 </div>
                               ))
                             ) : (
-                              <span className="text-muted-foreground">No payment method</span>
+                              <span className="text-xs text-muted-foreground">No payment method</span>
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="text-right font-semibold">
+                        <TableCell className="py-3 text-right font-semibold text-sm">
                           ${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
+                          <a
+                            href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${acc.account_id.replace(/^act_/, '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:text-primary/80"
+                            title="Go to Billing"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
                         </TableCell>
                       </TableRow>
                     );
