@@ -92,6 +92,28 @@ export default function ClientDetailPage() {
     enabled: !!userId,
   });
 
+  const { data: insights = {} } = useQuery({
+    queryKey: ["client-detail-insights", userId],
+    queryFn: async () => {
+      if (!adAccounts || adAccounts.length === 0) return {};
+      const ids = adAccounts.map((a: any) => a.id);
+      const { data } = await supabase.functions.invoke("get-account-insights", {
+        body: { ad_account_ids: ids, source: "cache" },
+      });
+      return (data?.insights as Record<string, any>) ?? {};
+    },
+    enabled: !!userId && !!adAccounts && adAccounts.length > 0,
+  });
+
+  const billingAccounts = useMemo(() => {
+    if (!adAccounts) return [];
+    return [...adAccounts].sort((a, b) => {
+      const balA = Number(insights[a.id]?.balance ?? 0);
+      const balB = Number(insights[b.id]?.balance ?? 0);
+      return billingSortDir === "asc" ? balA - balB : balB - balA;
+    });
+  }, [adAccounts, insights, billingSortDir]);
+
   const { data: topUpTotal } = useQuery({
     queryKey: ["client-detail-topup-total", userId, dateFrom?.toISOString(), dateTo?.toISOString()],
     queryFn: async () => {
