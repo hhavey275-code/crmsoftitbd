@@ -88,10 +88,8 @@ export function ClientAdAccounts() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Account Name</TableHead>
-                <TableHead>Account ID</TableHead>
-                <TableHead>Business Name</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Account</TableHead>
+                <TableHead className="hidden sm:table-cell">Status</TableHead>
                 <TableHead>Spend Cap / Spent</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -99,10 +97,11 @@ export function ClientAdAccounts() {
             <TableBody>
               {accounts?.map((a: any) => (
                 <TableRow key={a.id}>
-                  <TableCell className="font-medium">{a.account_name}</TableCell>
-                  <TableCell className="font-mono text-sm">{a.account_id}</TableCell>
-                  <TableCell>{a.business_name || "—"}</TableCell>
-                  <TableCell><StatusBadge status={a.status} /></TableCell>
+                  <TableCell>
+                    <div className="font-medium">{a.account_name}</div>
+                    <div className="text-xs text-muted-foreground font-mono">{a.account_id}</div>
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell"><StatusBadge status={a.status} /></TableCell>
                   <TableCell>
                     <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} />
                   </TableCell>
@@ -113,9 +112,9 @@ export function ClientAdAccounts() {
                         onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
                       >
                         <ArrowUpCircle className="h-4 w-4 mr-1" />
-                        Top Up
+                        <span className="hidden sm:inline">Top Up</span>
                       </Button>
-                      <Button variant="ghost" size="sm" asChild>
+                      <Button variant="ghost" size="sm" asChild className="hidden sm:inline-flex">
                         <a
                           href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${a.account_id.replace(/^act_/, '')}`}
                           target="_blank"
@@ -130,7 +129,7 @@ export function ClientAdAccounts() {
                 </TableRow>
               ))}
               {(!accounts || accounts.length === 0) && (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No ad accounts assigned to you yet</TableCell></TableRow>
+                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No ad accounts assigned to you yet</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
