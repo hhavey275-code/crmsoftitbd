@@ -134,6 +134,23 @@ export default function SettingsPage() {
     }
   };
 
+  const handleSaveWelcome = async () => {
+    setSavingWelcome(true);
+    const { error: e1 } = await supabase
+      .from("site_settings")
+      .upsert({ key: "welcome_title", value: welcomeTitleInput.trim() }, { onConflict: "key" });
+    const { error: e2 } = await supabase
+      .from("site_settings")
+      .upsert({ key: "welcome_note", value: welcomeNoteInput.trim() }, { onConflict: "key" });
+    setSavingWelcome(false);
+    if (e1 || e2) {
+      toast.error("Failed to save welcome settings");
+    } else {
+      toast.success("Welcome settings updated!");
+      refetch();
+    }
+  };
+
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
