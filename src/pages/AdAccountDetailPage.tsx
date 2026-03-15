@@ -181,7 +181,7 @@ export default function AdAccountDetailPage() {
                       </Button>
                     </div>
                   )}
-                  <p className="text-sm text-muted-foreground font-mono mt-1">ID: {account.account_id}</p>
+                  <p className="text-sm text-muted-foreground font-mono mt-1">ID: {account.account_id.replace(/^act_/, '')}</p>
                 </div>
               </div>
               <StatusBadge status={account.status} />

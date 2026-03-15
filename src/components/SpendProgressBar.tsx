@@ -39,8 +39,8 @@ export function SpendProgressBar({ amountSpent, spendCap }: SpendProgressBarProp
           style={{ width: `${percentage}%` }}
         />
       </div>
-      <div className="text-xs mt-1 text-muted-foreground">
-        Remaining: <span className={`font-medium ${ratio >= 0.8 ? 'text-destructive' : ratio >= 0.5 ? 'text-yellow-600' : 'text-green-600'}`}>${remaining.toLocaleString()}</span>
+      <div className="text-xs mt-1 text-muted-foreground font-semibold">
+        Remaining: <span className={`${ratio >= 0.8 ? 'text-destructive' : ratio >= 0.5 ? 'text-yellow-600' : 'text-green-600'}`}>${remaining.toLocaleString()}</span>
       </div>
     </div>
   );
