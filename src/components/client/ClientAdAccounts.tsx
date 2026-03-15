@@ -34,6 +34,10 @@ export function ClientAdAccounts() {
   const [sortField, setSortField] = useState<string>("account_name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showSelect, setShowSelect] = useState(false);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [cardFilter, setCardFilter] = useState("all");
 
   const isInactive = (profile as any)?.status === "inactive";
   const dueLimit = Number((profile as any)?.due_limit ?? 0);
