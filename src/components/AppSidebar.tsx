@@ -10,6 +10,7 @@ import {
   Landmark,
   Users,
   Receipt,
+  MessageCircle,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
