@@ -12,7 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { ArrowUpCircle, ExternalLink, Wallet, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, CreditCard, RefreshCw, AppWindow } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowUpCircle, ExternalLink, Wallet, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, CreditCard, RefreshCw, AppWindow, Search, ListChecks } from "lucide-react";
 import { CardBrandIcon } from "@/components/CardBrandIcon";
 
 interface InsightsData {
@@ -31,6 +32,10 @@ export function AdminAdAccounts() {
   const [sortField, setSortField] = useState<string>("account_name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showSelect, setShowSelect] = useState(false);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [cardFilter, setCardFilter] = useState("all");
 
   const { data: accounts } = useQuery({
     queryKey: ["admin-ad-accounts"],
@@ -141,25 +146,45 @@ export function AdminAdAccounts() {
     return sortDir === "asc" ? <ArrowUp className="h-3 w-3 ml-1" /> : <ArrowDown className="h-3 w-3 ml-1" />;
   };
 
+  const uniqueCards = useMemo(() => {
+    const cards = new Set<string>();
+    Object.values(insights).forEach((ins: any) => {
+      ins?.cards?.forEach((c: any) => cards.add(c.display_string));
+    });
+    return Array.from(cards);
+  }, [insights]);
+
   const sortedAccounts = useMemo(() => {
     if (!accounts) return [];
-    return [...accounts].sort((a, b) => {
-      let valA: any, valB: any;
-      const insA = insights[a.id];
-      const insB = insights[b.id];
-      switch (sortField) {
-        case "account_name": valA = a.account_name?.toLowerCase(); valB = b.account_name?.toLowerCase(); break;
-        case "today_spend": valA = insA?.today_spend ?? 0; valB = insB?.today_spend ?? 0; break;
-        case "yesterday_spend": valA = insA?.yesterday_spend ?? 0; valB = insB?.yesterday_spend ?? 0; break;
-        case "balance": valA = insA?.balance ?? 0; valB = insB?.balance ?? 0; break;
-        case "spend_cap": valA = Number(a.spend_cap); valB = Number(b.spend_cap); break;
-        default: valA = a.account_name?.toLowerCase(); valB = b.account_name?.toLowerCase();
-      }
-      if (valA < valB) return sortDir === "asc" ? -1 : 1;
-      if (valA > valB) return sortDir === "asc" ? 1 : -1;
-      return 0;
-    });
-  }, [accounts, insights, sortField, sortDir]);
+    const q = search.toLowerCase();
+    return [...accounts]
+      .filter((a: any) => {
+        if (q && !a.account_name?.toLowerCase().includes(q) && !a.account_id?.toLowerCase().includes(q)) return false;
+        if (statusFilter !== "all" && a.status?.toLowerCase() !== statusFilter) return false;
+        if (cardFilter !== "all") {
+          const ins = insights[a.id];
+          const hasCard = ins?.cards?.some((c: any) => c.display_string === cardFilter);
+          if (!hasCard) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        let valA: any, valB: any;
+        const insA = insights[a.id];
+        const insB = insights[b.id];
+        switch (sortField) {
+          case "account_name": valA = a.account_name?.toLowerCase(); valB = b.account_name?.toLowerCase(); break;
+          case "today_spend": valA = insA?.today_spend ?? 0; valB = insB?.today_spend ?? 0; break;
+          case "yesterday_spend": valA = insA?.yesterday_spend ?? 0; valB = insB?.yesterday_spend ?? 0; break;
+          case "balance": valA = insA?.balance ?? 0; valB = insB?.balance ?? 0; break;
+          case "spend_cap": valA = Number(a.spend_cap); valB = Number(b.spend_cap); break;
+          default: valA = a.account_name?.toLowerCase(); valB = b.account_name?.toLowerCase();
+        }
+        if (valA < valB) return sortDir === "asc" ? -1 : 1;
+        if (valA > valB) return sortDir === "asc" ? 1 : -1;
+        return 0;
+      });
+  }, [accounts, insights, sortField, sortDir, search, statusFilter, cardFilter]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
@@ -229,7 +254,7 @@ export function AdminAdAccounts() {
               Last synced: {lastUpdated.toLocaleString()}
             </span>
           )}
-          {selectedIds.size > 0 && (
+          {showSelect && selectedIds.size > 0 && (
             <Button
               variant="default"
               size="sm"
@@ -251,18 +276,65 @@ export function AdminAdAccounts() {
           </Button>
         </div>
       </div>
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by name or ID..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 h-9"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[140px] h-9">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="disabled">Disabled</SelectItem>
+            <SelectItem value="unsettled">Unsettled</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={cardFilter} onValueChange={setCardFilter}>
+          <SelectTrigger className="w-[160px] h-9">
+            <SelectValue placeholder="Card" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Cards</SelectItem>
+            {uniqueCards.map((card) => (
+              <SelectItem key={card} value={card}>{card}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button
+          variant={showSelect ? "secondary" : "ghost"}
+          size="icon"
+          className="h-9 w-9"
+          onClick={() => {
+            setShowSelect((v) => !v);
+            if (showSelect) setSelectedIds(new Set());
+          }}
+          title="Toggle selection"
+        >
+          <ListChecks className="h-4 w-4" />
+        </Button>
+      </div>
       <Card>
         <CardContent className="pt-6">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[40px]" onClick={(e) => e.stopPropagation()}>
-                  <Checkbox
-                    checked={allSelected}
-                    onCheckedChange={toggleSelectAll}
-                    aria-label="Select all"
-                  />
-                </TableHead>
+                {showSelect && (
+                  <TableHead className="w-[40px]" onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={allSelected}
+                      onCheckedChange={toggleSelectAll}
+                      aria-label="Select all"
+                    />
+                  </TableHead>
+                )}
                 <TableHead className="w-[200px]">
                   <button className="flex items-center text-xs font-medium" onClick={() => toggleSort("account_name")}>
                     Ad Account <SortIcon field="account_name" />
@@ -315,13 +387,15 @@ export function AdminAdAccounts() {
                     onClick={() => navigate(`/ad-accounts/${a.id}`)}
                     data-state={selectedIds.has(a.id) ? "selected" : undefined}
                   >
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        checked={selectedIds.has(a.id)}
-                        onCheckedChange={() => toggleSelect(a.id)}
-                        aria-label={`Select ${a.account_name}`}
-                      />
-                    </TableCell>
+                    {showSelect && (
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedIds.has(a.id)}
+                          onCheckedChange={() => toggleSelect(a.id)}
+                          aria-label={`Select ${a.account_name}`}
+                        />
+                      </TableCell>
+                    )}
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
