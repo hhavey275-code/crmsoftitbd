@@ -10,7 +10,6 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { SpendProgressBar } from "@/components/SpendProgressBar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -91,6 +90,27 @@ export default function ClientDetailPage() {
     enabled: !!userId,
   });
 
+  // Total spending from transactions table filtered by date range
+  const { data: totalSpendingFiltered } = useQuery({
+    queryKey: ["client-detail-spending", userId, dateFrom?.toISOString(), dateTo?.toISOString()],
+    queryFn: async () => {
+      let query = supabase
+        .from("transactions")
+        .select("amount")
+        .eq("user_id", userId!)
+        .eq("type", "deduction");
+      if (dateFrom) query = query.gte("created_at", dateFrom.toISOString());
+      if (dateTo) {
+        const end = new Date(dateTo);
+        end.setHours(23, 59, 59, 999);
+        query = query.lte("created_at", end.toISOString());
+      }
+      const { data } = await query;
+      return (data as any[])?.reduce((sum: number, r: any) => sum + Math.abs(Number(r.amount)), 0) ?? 0;
+    },
+    enabled: !!userId,
+  });
+
   const saveRateMutation = useMutation({
     mutationFn: async () => {
       const value = rateInput.trim() === "" ? null : parseFloat(rateInput);
@@ -132,7 +152,7 @@ export default function ClientDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
               <div className="flex items-center gap-3 rounded-lg border p-4">
                 <User className="h-5 w-5 text-muted-foreground" />
                 <div>
@@ -163,42 +183,37 @@ export default function ClientDetailPage() {
                   </p>
                 </div>
               </div>
-            </div>
-
-            {/* USD Rate Section */}
-            <div className="mt-4 flex items-center gap-3 rounded-lg border border-cyan-200 bg-cyan-50/50 dark:bg-cyan-950/20 dark:border-cyan-800 p-4">
-              <DollarSign className="h-5 w-5 text-cyan-600" />
-              <div className="flex-1">
-                <p className="text-xs text-muted-foreground">Client USD Rate</p>
-                {editingRate ? (
-                  <div className="flex items-center gap-2 mt-1">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      className="w-32 h-8"
-                      value={rateInput}
-                      onChange={(e) => setRateInput(e.target.value)}
-                      placeholder="e.g. 125"
-                    />
-                    <Button size="sm" onClick={() => saveRateMutation.mutate()} disabled={saveRateMutation.isPending}>
-                      <Save className="h-3 w-3 mr-1" /> Save
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setEditingRate(false)}>Cancel</Button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium text-cyan-700 dark:text-cyan-400">
-                      {clientRate ? `৳${clientRate}` : `Using global rate (৳${globalRate})`}
-                    </p>
-                    <Button
-                      size="sm"
-                      variant="outline"
+              {/* USD Rate - inline editable */}
+              <div className="flex items-center gap-3 rounded-lg border border-cyan-200 bg-cyan-50/50 dark:bg-cyan-950/20 dark:border-cyan-800 p-4">
+                <DollarSign className="h-5 w-5 text-cyan-600" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-muted-foreground">USD Rate</p>
+                  {editingRate ? (
+                    <div className="flex items-center gap-1 mt-1">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        className="w-20 h-7 text-sm"
+                        value={rateInput}
+                        onChange={(e) => setRateInput(e.target.value)}
+                        placeholder="e.g. 125"
+                      />
+                      <Button size="icon" className="h-7 w-7" onClick={() => saveRateMutation.mutate()} disabled={saveRateMutation.isPending}>
+                        <Save className="h-3 w-3" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingRate(false)}>
+                        <XCircle className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <p
+                      className="font-medium text-cyan-700 dark:text-cyan-400 cursor-pointer hover:underline"
                       onClick={() => { setRateInput(clientRate?.toString() ?? ""); setEditingRate(true); }}
                     >
-                      Edit
-                    </Button>
-                  </div>
-                )}
+                      {clientRate ? `৳${clientRate}` : `Global (৳${globalRate})`}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -210,9 +225,9 @@ export default function ClientDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Date Range for Total Top-Up */}
+        {/* Date Range Filter */}
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground">Top-Up Period:</span>
+          <span className="text-sm font-medium text-muted-foreground">Period:</span>
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className={cn("w-[140px] justify-start text-left font-normal", !dateFrom && "text-muted-foreground")}>
@@ -293,7 +308,7 @@ export default function ClientDetailPage() {
           <MetricCard
             title="Total Spending"
             value={`$${totalSpending.toLocaleString()}`}
-            subtitle="Across all ad accounts"
+            subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time (cumulative)"}
             icon={TrendingDown}
             iconBg="bg-purple-100 dark:bg-purple-900/50"
             iconColor="text-purple-600"

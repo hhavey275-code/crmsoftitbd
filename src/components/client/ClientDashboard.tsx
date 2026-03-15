@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { MetricCard } from "@/components/MetricCard";
-import { Wallet, MonitorSmartphone, DollarSign, TrendingUp, TrendingDown, CalendarIcon, CheckCircle, XCircle } from "lucide-react";
+import { Wallet, MonitorSmartphone, TrendingUp, CalendarIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -62,20 +62,7 @@ export function ClientDashboard() {
     enabled: !!user,
   });
 
-  const { data: usdRate } = useQuery({
-    queryKey: ["usd-rate"],
-    queryFn: async () => {
-      const { data } = await supabase.from("site_settings").select("value").eq("key", "usd_rate").single();
-      return data?.value ?? "120";
-    },
-  });
-
-  const activeAccounts = adAccounts?.filter((a: any) => a.status === "active") ?? [];
-  const disabledAccounts = adAccounts?.filter((a: any) => a.status !== "active") ?? [];
   const totalRemaining = adAccounts?.reduce((sum: number, a: any) => sum + (Number(a.spend_cap) - Number(a.amount_spent)), 0) ?? 0;
-  const totalSpending = adAccounts?.reduce((sum: number, a: any) => sum + Number(a.amount_spent), 0) ?? 0;
-
-  const effectiveRate = (profile as any)?.usd_rate ?? usdRate;
 
   return (
     <div className="space-y-6">
@@ -88,14 +75,6 @@ export function ClientDashboard() {
           </CardContent>
         </Card>
       )}
-
-      {/* USD Rate */}
-      <Card className="max-w-xs border-cyan-200 bg-cyan-50/50 dark:bg-cyan-950/20 dark:border-cyan-800">
-        <CardContent className="p-4 flex items-center gap-3">
-          <DollarSign className="h-5 w-5 text-cyan-600" />
-          <p className="text-sm font-medium">Your USD Rate: <span className="text-lg font-bold text-cyan-700 dark:text-cyan-400">৳{effectiveRate}</span> per $1</p>
-        </CardContent>
-      </Card>
 
       {/* Date Range for Total Top-Up */}
       <div className="flex flex-wrap items-center gap-2">
@@ -143,22 +122,6 @@ export function ClientDashboard() {
           gradientClass="bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/40 dark:to-blue-900/20 border-blue-200 dark:border-blue-800"
         />
         <MetricCard
-          title="Active Ad Accounts"
-          value={activeAccounts.length}
-          icon={CheckCircle}
-          iconBg="bg-emerald-100 dark:bg-emerald-900/50"
-          iconColor="text-emerald-600"
-          gradientClass="bg-gradient-to-br from-emerald-50 to-green-100/50 dark:from-emerald-950/40 dark:to-green-900/20 border-emerald-200 dark:border-emerald-800"
-        />
-        <MetricCard
-          title="Disabled Ad Accounts"
-          value={disabledAccounts.length}
-          icon={XCircle}
-          iconBg="bg-red-100 dark:bg-red-900/50"
-          iconColor="text-red-600"
-          gradientClass="bg-gradient-to-br from-red-50 to-rose-100/50 dark:from-red-950/40 dark:to-rose-900/20 border-red-200 dark:border-red-800"
-        />
-        <MetricCard
           title="Total Top-Up"
           value={`$${Number(topUpTotal ?? 0).toLocaleString()}`}
           subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"}
@@ -175,15 +138,6 @@ export function ClientDashboard() {
           iconBg="bg-indigo-100 dark:bg-indigo-900/50"
           iconColor="text-indigo-600"
           gradientClass="bg-gradient-to-br from-indigo-50 to-violet-100/50 dark:from-indigo-950/40 dark:to-violet-900/20 border-indigo-200 dark:border-indigo-800"
-        />
-        <MetricCard
-          title="Total Spending"
-          value={`$${totalSpending.toLocaleString()}`}
-          subtitle="Across all ad accounts"
-          icon={TrendingDown}
-          iconBg="bg-purple-100 dark:bg-purple-900/50"
-          iconColor="text-purple-600"
-          gradientClass="bg-gradient-to-br from-purple-50 to-violet-100/50 dark:from-purple-950/40 dark:to-violet-900/20 border-purple-200 dark:border-purple-800"
         />
       </div>
     </div>
