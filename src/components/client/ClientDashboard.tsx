@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { MetricCard } from "@/components/MetricCard";
-import { Wallet, MonitorSmartphone, TrendingUp, CalendarIcon, ShoppingCart, DollarSign, RefreshCw } from "lucide-react";
+import { Wallet, MonitorSmartphone, TrendingUp, CalendarIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
