@@ -642,6 +642,72 @@ export function AdminAdAccounts() {
         </DialogContent>
       </Dialog>
 
+      {/* Assign Selected Dialog */}
+      <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign {selectedIds.size} Account(s) to Client</DialogTitle>
+            <DialogDescription>Select a client to assign the selected ad accounts to. Existing assignments will be replaced.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label>Client</Label>
+            <Select value={assignClientId} onValueChange={setAssignClientId}>
+              <SelectTrigger className="mt-1.5"><SelectValue placeholder="Select a client" /></SelectTrigger>
+              <SelectContent>
+                {clients?.map((c: any) => (
+                  <SelectItem key={c.user_id} value={c.user_id}>{c.full_name || c.email}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAssignDialog(false)}>Cancel</Button>
+            <Button
+              disabled={!assignClientId}
+              onClick={async () => {
+                const ids = Array.from(selectedIds);
+                // Remove existing assignments for these accounts
+                await (supabase as any).from("user_ad_accounts").delete().in("ad_account_id", ids);
+                // Insert new assignments
+                const { error } = await (supabase as any).from("user_ad_accounts").insert(
+                  ids.map(adAccountId => ({ user_id: assignClientId, ad_account_id: adAccountId }))
+                );
+                if (error) { toast.error(error.message); return; }
+                toast.success(`${ids.length} account(s) assigned`);
+                setShowAssignDialog(false);
+                setSelectedIds(new Set());
+                queryClient.invalidateQueries({ queryKey: ["admin-user-ad-accounts"] });
+              }}
+            >
+              Assign
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Unassign Selected Confirmation */}
+      <AlertDialog open={showUnassignConfirm} onOpenChange={setShowUnassignConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unassign {selectedIds.size} Account(s)?</AlertDialogTitle>
+            <AlertDialogDescription>This will remove client assignments from the selected ad accounts.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={async () => {
+              const ids = Array.from(selectedIds);
+              const { error } = await (supabase as any).from("user_ad_accounts").delete().in("ad_account_id", ids);
+              if (error) { toast.error(error.message); return; }
+              toast.success(`${ids.length} account(s) unassigned`);
+              setSelectedIds(new Set());
+              queryClient.invalidateQueries({ queryKey: ["admin-user-ad-accounts"] });
+            }}>
+              Unassign
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Delete Confirmation */}
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent>
@@ -657,7 +723,6 @@ export function AdminAdAccounts() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={async () => {
                 const ids = Array.from(selectedIds);
-                // Delete orphaned insights first
                 await supabase.from("ad_account_insights").delete().in("ad_account_id", ids);
                 const { error } = await supabase.from("ad_accounts").delete().in("id", ids);
                 if (error) {

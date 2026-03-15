@@ -531,8 +531,32 @@ export default function ClientDetailPage() {
 
             {/* Ad Accounts */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-lg">Ad Accounts ({adAccounts?.length ?? 0})</CardTitle>
+                <div className="flex items-center gap-2">
+                  {unassignSelectedIds.size > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        const ids = Array.from(unassignSelectedIds);
+                        for (const adAccountId of ids) {
+                          await (supabase as any).from("user_ad_accounts").delete().eq("user_id", userId!).eq("ad_account_id", adAccountId);
+                        }
+                        toast.success(`${ids.length} account(s) unassigned`);
+                        setUnassignSelectedIds(new Set());
+                        refetchAdAccounts();
+                        queryClient.invalidateQueries({ queryKey: ["admin-user-ad-accounts"] });
+                      }}
+                    >
+                      Unassign {unassignSelectedIds.size} Selected
+                    </Button>
+                  )}
+                  <Button size="sm" onClick={() => { setShowAssignDialog(true); setAssignSelectedIds(new Set()); }}>
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    Assign Accounts
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {adAccounts?.length === 0 ? (
@@ -541,6 +565,18 @@ export default function ClientDetailPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-[40px]">
+                          <Checkbox
+                            checked={adAccounts?.length > 0 && adAccounts?.every((a: any) => unassignSelectedIds.has(a.id))}
+                            onCheckedChange={() => {
+                              if (adAccounts?.every((a: any) => unassignSelectedIds.has(a.id))) {
+                                setUnassignSelectedIds(new Set());
+                              } else {
+                                setUnassignSelectedIds(new Set(adAccounts?.map((a: any) => a.id)));
+                              }
+                            }}
+                          />
+                        </TableHead>
                         <TableHead>Account</TableHead>
                         <TableHead>Budget</TableHead>
                         <TableHead>Status</TableHead>
@@ -551,6 +587,19 @@ export default function ClientDetailPage() {
                     <TableBody>
                       {adAccounts?.map((acc: any) => (
                         <TableRow key={acc.id}>
+                          <TableCell>
+                            <Checkbox
+                              checked={unassignSelectedIds.has(acc.id)}
+                              onCheckedChange={() => {
+                                setUnassignSelectedIds(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(acc.id)) next.delete(acc.id);
+                                  else next.add(acc.id);
+                                  return next;
+                                });
+                              }}
+                            />
+                          </TableCell>
                           <TableCell>
                             <p className="font-medium">{acc.account_name}</p>
                             <p className="text-xs text-muted-foreground">{acc.account_id}</p>
