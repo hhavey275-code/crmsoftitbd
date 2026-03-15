@@ -15,7 +15,9 @@ import { format, startOfMonth, endOfMonth } from "date-fns";
 
 export function ClientDashboard() {
   const { user, profile } = useAuth();
+  const queryClient = useQueryClient();
   const isInactive = (profile as any)?.status === "inactive";
+  const [updatingMeta, setUpdatingMeta] = useState(false);
 
   const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfMonth(new Date()));
   const [dateTo, setDateTo] = useState<Date | undefined>(endOfMonth(new Date()));
