@@ -72,8 +72,21 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Non-admin must have the account assigned
+    // Non-admin: check if account is frozen
     if (!isAdmin) {
+      const { data: callerProfile } = await supabase
+        .from("profiles")
+        .select("status")
+        .eq("user_id", callerId)
+        .single();
+
+      if (callerProfile?.status === "inactive") {
+        return new Response(
+          JSON.stringify({ error: "Your account has been frozen. You cannot perform this action." }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       const { data: assignment } = await supabase
         .from("user_ad_accounts")
         .select("id")
