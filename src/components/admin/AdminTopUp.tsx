@@ -145,6 +145,7 @@ export function AdminTopUp() {
     setActionDialog({
       id: r.id, action, userId: r.user_id, amount: r.amount,
       bdtAmount: r.bdt_amount, usdRate: r.usd_rate,
+      proofUrl: r.proof_url,
     });
   };
 
