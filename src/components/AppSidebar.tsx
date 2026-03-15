@@ -8,6 +8,7 @@ import {
   LogOut,
   Zap,
   Building2,
+  Landmark,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -38,6 +39,7 @@ const commonNavItems = [
 
 const adminOnlyItems = [
   { title: "Business Managers", url: "/business-managers", icon: Building2 },
+  { title: "Banks", url: "/banks", icon: Landmark },
 ];
 
 export function AppSidebar() {
@@ -55,7 +57,7 @@ export function AppSidebar() {
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="px-4 py-4">
+          <SidebarGroupLabel className="px-4 py-4 mt-4">
             {!collapsed && (
               <div className="flex items-center gap-3">
                 {logoUrl ? (

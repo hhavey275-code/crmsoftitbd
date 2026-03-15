@@ -64,6 +64,42 @@ export type Database = {
           },
         ]
       }
+      bank_accounts: {
+        Row: {
+          account_name: string
+          account_number: string
+          bank_name: string
+          branch: string | null
+          created_at: string | null
+          id: string
+          routing_number: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          account_name: string
+          account_number: string
+          bank_name: string
+          branch?: string | null
+          created_at?: string | null
+          id?: string
+          routing_number?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          account_name?: string
+          account_number?: string
+          bank_name?: string
+          branch?: string | null
+          created_at?: string | null
+          id?: string
+          routing_number?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       business_managers: {
         Row: {
           access_token: string
@@ -96,6 +132,35 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      client_banks: {
+        Row: {
+          assigned_at: string | null
+          bank_account_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          assigned_at?: string | null
+          bank_account_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          assigned_at?: string | null
+          bank_account_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_banks_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -191,6 +256,8 @@ export type Database = {
           ad_account_id: string | null
           admin_note: string | null
           amount: number
+          bank_account_id: string | null
+          bdt_amount: number | null
           created_at: string
           id: string
           payment_method: string
@@ -199,12 +266,15 @@ export type Database = {
           reviewed_by: string | null
           status: string
           updated_at: string
+          usd_rate: number | null
           user_id: string
         }
         Insert: {
           ad_account_id?: string | null
           admin_note?: string | null
           amount: number
+          bank_account_id?: string | null
+          bdt_amount?: number | null
           created_at?: string
           id?: string
           payment_method?: string
@@ -213,12 +283,15 @@ export type Database = {
           reviewed_by?: string | null
           status?: string
           updated_at?: string
+          usd_rate?: number | null
           user_id: string
         }
         Update: {
           ad_account_id?: string | null
           admin_note?: string | null
           amount?: number
+          bank_account_id?: string | null
+          bdt_amount?: number | null
           created_at?: string
           id?: string
           payment_method?: string
@@ -227,6 +300,7 @@ export type Database = {
           reviewed_by?: string | null
           status?: string
           updated_at?: string
+          usd_rate?: number | null
           user_id?: string
         }
         Relationships: [
@@ -235,6 +309,13 @@ export type Database = {
             columns: ["ad_account_id"]
             isOneToOne: false
             referencedRelation: "ad_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "top_up_requests_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
             referencedColumns: ["id"]
           },
         ]

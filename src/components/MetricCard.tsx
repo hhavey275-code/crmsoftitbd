@@ -9,12 +9,13 @@ interface MetricCardProps {
   icon: LucideIcon;
   iconBg?: string;
   iconColor?: string;
+  gradientClass?: string;
   className?: string;
 }
 
-export function MetricCard({ title, value, subtitle, icon: Icon, iconBg, iconColor, className }: MetricCardProps) {
+export function MetricCard({ title, value, subtitle, icon: Icon, iconBg, iconColor, gradientClass, className }: MetricCardProps) {
   return (
-    <Card className={cn("hover:shadow-md transition-shadow", className)}>
+    <Card className={cn("hover:shadow-md transition-shadow overflow-hidden", gradientClass, className)}>
       <CardContent className="p-6">
         <div className="flex items-start justify-between">
           <div className="space-y-1">
