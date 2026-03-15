@@ -72,7 +72,7 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
   const navigate = useNavigate();
-  const { logoUrl, welcomeTitle, welcomeNote } = useSiteSettings();
+  const { logoUrl, siteName } = useSiteSettings();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,15 +130,19 @@ export default function Auth() {
         <Card className="w-full max-w-lg bg-card/90 backdrop-blur-md shadow-2xl border-border/50 rounded-3xl">
           <CardHeader className="pb-2">
             <div className="flex items-center gap-3 mb-3">
-              {logoUrl && (
+              {logoUrl ? (
                 <img src={logoUrl} alt="Logo" className="h-16 w-16 rounded-xl object-contain" />
+              ) : (
+                <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary">
+                  <Zap className="h-8 w-8 text-primary-foreground" />
+                </div>
               )}
-              <CardTitle className="text-2xl">{welcomeTitle || "Welcome"}</CardTitle>
+              <span className="text-xl font-bold text-foreground">{siteName || "Soft IT BD"}</span>
             </div>
             <RobotMascot isCovering={isPasswordFocused} />
             <div className="mx-auto mt-2 rounded-lg bg-gradient-to-r from-emerald-500 via-cyan-500 to-blue-600 px-5 py-2 shadow-[0_0_20px_rgba(6,182,212,0.4)]">
               <p className="text-sm font-bold text-white tracking-wide text-center">
-                {welcomeNote || (isLogin ? "Sign in to your account" : "Create a new account")}
+                {isLogin ? "Sign in to your account" : "Create a new account"}
               </p>
             </div>
           </CardHeader>
