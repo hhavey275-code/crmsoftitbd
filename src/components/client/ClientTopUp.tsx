@@ -238,12 +238,12 @@ export function ClientTopUp() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Payment Proof</CardTitle>
-            <CardDescription>Attach your payment reference and screenshot</CardDescription>
+        <Card className="shadow-sm">
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-base">Payment Proof</CardTitle>
+            <CardDescription className="text-xs">Attach your payment reference and screenshot</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="p-4 pt-2 space-y-3">
             <div className="space-y-2">
               <Label>Payment Reference / Transaction ID</Label>
               <Input value={paymentRef} onChange={(e) => setPaymentRef(e.target.value)} placeholder="e.g. TXN123456" />
