@@ -14,71 +14,66 @@ import { Check, X } from "lucide-react";
 export function AdminTopUp() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [actionDialog, setActionDialog] = useState<{ id: string; action: "approved" | "rejected"; userId: string; amount: number; adAccountId: string | null } | null>(null);
+  const [actionDialog, setActionDialog] = useState<{
+    id: string;
+    action: "approved" | "rejected";
+    userId: string;
+    amount: number;
+    bdtAmount: number | null;
+    usdRate: number | null;
+  } | null>(null);
 
   const { data: requests } = useQuery({
     queryKey: ["admin-topup-requests"],
     queryFn: async () => {
-      const { data } = await (supabase as any)
-        .from("topups")
-        .select("*, profiles!inner(full_name, email), ad_accounts(account_name, account_id)")
+      const { data } = await supabase
+        .from("top_up_requests")
+        .select("*")
         .order("created_at", { ascending: false });
-      return (data as any[]) ?? [];
+      
+      // Fetch profiles separately for display
+      const userIds = [...new Set((data ?? []).map((r: any) => r.user_id))];
+      const { data: profiles } = await supabase.from("profiles").select("user_id, full_name, email").in("user_id", userIds);
+      const profileMap: Record<string, any> = {};
+      profiles?.forEach((p: any) => { profileMap[p.user_id] = p; });
+
+      return (data ?? []).map((r: any) => ({
+        ...r,
+        profile: profileMap[r.user_id] || null,
+      }));
     },
   });
 
   const processMutation = useMutation({
-    mutationFn: async ({ id, action, userId, amount, adAccountId }: { id: string; action: "approved" | "rejected"; userId: string; amount: number; adAccountId: string | null }) => {
-      const { error: updateError } = await (supabase as any)
-        .from("topups")
-        .update({ status: action })
+    mutationFn: async ({ id, action, userId, amount }: {
+      id: string; action: "approved" | "rejected"; userId: string; amount: number;
+    }) => {
+      // Update request status
+      const { error: updateError } = await supabase
+        .from("top_up_requests")
+        .update({ status: action, reviewed_by: user!.id } as any)
         .eq("id", id);
       if (updateError) throw updateError;
 
       if (action === "approved") {
+        // Add USD amount to wallet
         const { data: wallet } = await supabase.from("wallets").select("balance").eq("user_id", userId).single();
         const currentBalance = Number(wallet?.balance ?? 0);
-
-        if (currentBalance < amount) {
-          throw new Error("Insufficient wallet balance");
-        }
-
-        const newBalance = currentBalance - amount;
+        const newBalance = currentBalance + amount;
 
         const { error: walletError } = await supabase.from("wallets").update({ balance: newBalance }).eq("user_id", userId);
         if (walletError) throw walletError;
 
-        const { error: txError } = await (supabase as any).from("wallet_transactions").insert({
+        // Create transaction record
+        const { error: txError } = await supabase.from("transactions").insert({
           user_id: userId,
-          type: "ad_spend",
-          amount,
+          type: "top_up",
+          amount: amount,
+          balance_after: newBalance,
           reference_id: id,
-          status: "completed",
+          description: "Wallet top-up approved",
         });
         if (txError) throw txError;
-
-        if (adAccountId) {
-          try {
-            const { data: { session } } = await supabase.auth.getSession();
-            const res = await fetch(
-              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-spend-cap`,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${session?.access_token}`,
-                },
-                body: JSON.stringify({ ad_account_id: adAccountId, amount, topup_id: id }),
-              }
-            );
-            const result = await res.json();
-            if (!res.ok) {
-              console.error("Spend cap update failed:", result.error);
-            }
-          } catch (apiErr) {
-            console.error("Meta API call failed:", apiErr);
-          }
-        }
       }
     },
     onSuccess: (_, { action }) => {
@@ -102,10 +97,10 @@ export function AdminTopUp() {
             <TableHeader>
               <TableRow>
                 <TableHead>Client</TableHead>
-                <TableHead>Ad Account</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Old Cap</TableHead>
-                <TableHead>New Cap</TableHead>
+                <TableHead>BDT Amount</TableHead>
+                <TableHead>Rate</TableHead>
+                <TableHead>USD Amount</TableHead>
+                <TableHead>Reference</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Actions</TableHead>
@@ -114,22 +109,26 @@ export function AdminTopUp() {
             <TableBody>
               {requests?.map((r: any) => (
                 <TableRow key={r.id}>
-                  <TableCell className="font-medium">{r.profiles?.full_name || r.profiles?.email}</TableCell>
-                  <TableCell className="text-sm">
-                    {r.ad_accounts ? `${r.ad_accounts.account_name} (${r.ad_accounts.account_id})` : "—"}
-                  </TableCell>
+                  <TableCell className="font-medium">{r.profile?.full_name || r.profile?.email || "Unknown"}</TableCell>
+                  <TableCell>{r.bdt_amount ? `৳${Number(r.bdt_amount).toLocaleString()}` : "—"}</TableCell>
+                  <TableCell>{r.usd_rate ? `৳${r.usd_rate}` : "—"}</TableCell>
                   <TableCell className="font-semibold">${Number(r.amount).toLocaleString()}</TableCell>
-                  <TableCell>${Number(r.old_spend_cap).toLocaleString()}</TableCell>
-                  <TableCell>${Number(r.new_spend_cap).toLocaleString()}</TableCell>
+                  <TableCell className="text-sm">{r.payment_reference || "—"}</TableCell>
                   <TableCell><StatusBadge status={r.status} /></TableCell>
                   <TableCell className="text-muted-foreground">{format(new Date(r.created_at), "MMM d, yyyy")}</TableCell>
                   <TableCell>
                     {r.status === "pending" && (
                       <div className="flex gap-1">
-                        <Button size="sm" variant="ghost" className="hover:text-primary" onClick={() => setActionDialog({ id: r.id, action: "approved", userId: r.user_id, amount: r.amount, adAccountId: r.ad_account_id })}>
+                        <Button size="sm" variant="ghost" className="hover:text-primary" onClick={() => setActionDialog({
+                          id: r.id, action: "approved", userId: r.user_id, amount: r.amount,
+                          bdtAmount: r.bdt_amount, usdRate: r.usd_rate,
+                        })}>
                           <Check className="h-4 w-4" />
                         </Button>
-                        <Button size="sm" variant="ghost" className="hover:text-destructive" onClick={() => setActionDialog({ id: r.id, action: "rejected", userId: r.user_id, amount: r.amount, adAccountId: r.ad_account_id })}>
+                        <Button size="sm" variant="ghost" className="hover:text-destructive" onClick={() => setActionDialog({
+                          id: r.id, action: "rejected", userId: r.user_id, amount: r.amount,
+                          bdtAmount: r.bdt_amount, usdRate: r.usd_rate,
+                        })}>
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
@@ -152,7 +151,7 @@ export function AdminTopUp() {
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
             {actionDialog?.action === "approved"
-              ? `This will deduct $${actionDialog?.amount?.toLocaleString()} from the client's wallet and update the ad account spend cap via Meta API.`
+              ? `This will add $${actionDialog?.amount?.toLocaleString()} USD to the client's wallet${actionDialog?.bdtAmount ? ` (৳${Number(actionDialog.bdtAmount).toLocaleString()} BDT @ ৳${actionDialog.usdRate}/USD)` : ""}.`
               : "The client will be notified of the rejection."}
           </p>
           <DialogFooter>
