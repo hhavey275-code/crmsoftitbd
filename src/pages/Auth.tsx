@@ -17,6 +17,8 @@ export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [businessName, setBusinessName] = useState("");
+  const [monthlySpend, setMonthlySpend] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { logoUrl, welcomeTitle, welcomeNote } = useSiteSettings();
