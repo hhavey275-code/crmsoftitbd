@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { ArrowUpCircle, ExternalLink, Wallet, CreditCard, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, AppWindow } from "lucide-react";
+import { CardBrandIcon } from "@/components/CardBrandIcon";
 
 interface InsightsData {
   today_spend: number;
@@ -305,7 +306,7 @@ export function ClientAdAccounts() {
                         {ins?.cards && ins.cards.length > 0 ? (
                           ins.cards.map((card: any, i: number) => (
                             <div key={i} className="flex items-center gap-1.5">
-                              <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
+                              <CardBrandIcon displayString={card.display_string} size="xs" />
                               <span>{card.display_string}</span>
                             </div>
                           ))
