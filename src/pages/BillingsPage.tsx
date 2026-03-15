@@ -19,12 +19,15 @@ interface InsightsData {
   updated_at?: string;
 }
 
+const PAGE_SIZE = 20;
+
 export default function BillingsPage() {
   const { user } = useAuth();
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [cardFilter, setCardFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
   const queryClient = useQueryClient();
 
   const { data: accounts } = useQuery({
