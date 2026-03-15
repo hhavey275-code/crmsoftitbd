@@ -30,7 +30,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/wallet" element={<ProtectedRoute><WalletPage /></ProtectedRoute>} />
+            
             <Route path="/ad-accounts" element={<ProtectedRoute><AdAccountsPage /></ProtectedRoute>} />
             <Route path="/ad-accounts/:id" element={<ProtectedRoute><AdAccountDetailPage /></ProtectedRoute>} />
             <Route path="/top-up" element={<ProtectedRoute><TopUpPage /></ProtectedRoute>} />

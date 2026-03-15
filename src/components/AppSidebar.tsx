@@ -28,30 +28,23 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 
-const commonNavItems = [
+const adminNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Wallet", url: "/wallet", icon: Wallet },
   { title: "Ad Accounts", url: "/ad-accounts", icon: MonitorSmartphone },
-  { title: "Top-Up", url: "/top-up", icon: ArrowUpCircle },
+  { title: "Business Managers", url: "/business-managers", icon: Building2 },
+  { title: "Top-Up Request", url: "/top-up", icon: ArrowUpCircle },
   { title: "Transactions", url: "/transactions", icon: History },
+  { title: "Banks", url: "/banks", icon: Landmark },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
-const adminOnlyItems = [
-  { title: "Business Managers", url: "/business-managers", icon: Building2 },
-  { title: "Banks", url: "/banks", icon: Landmark },
+const clientNavItems = [
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Ad Accounts", url: "/ad-accounts", icon: MonitorSmartphone },
+  { title: "Top-Up Request", url: "/top-up", icon: ArrowUpCircle },
+  { title: "Transactions", url: "/transactions", icon: History },
+  { title: "Settings", url: "/settings", icon: Settings },
 ];
-
-export function AppSidebar() {
-  const { state } = useSidebar();
-  const collapsed = state === "collapsed";
-  const location = useLocation();
-  const { signOut, profile, role } = useAuth();
-  const { logoUrl } = useSiteSettings();
-
-  const navItems = role === "admin"
-    ? [...commonNavItems.slice(0, 1), ...adminOnlyItems, ...commonNavItems.slice(1)]
-    : commonNavItems;
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
