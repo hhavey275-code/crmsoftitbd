@@ -168,6 +168,8 @@ Deno.serve(async (req) => {
       ad_account_id: adAccountId,
       today_spend: data.today_spend,
       yesterday_spend: data.yesterday_spend,
+      today_orders: data.today_orders ?? 0,
+      yesterday_orders: data.yesterday_orders ?? 0,
       balance: data.balance,
       cards: data.cards,
       updated_at: new Date().toISOString(),
