@@ -33,7 +33,7 @@ export default function Auth() {
         toast.success("Welcome back!");
         navigate("/dashboard");
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data: signUpData, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -41,6 +41,15 @@ export default function Auth() {
             emailRedirectTo: window.location.origin,
           },
         });
+        if (error) throw error;
+
+        // Update profile with business name and monthly spend
+        if (signUpData.user) {
+          await supabase.from("profiles").update({
+            company: businessName || null,
+            monthly_spend: monthlySpend || null,
+          } as any).eq("user_id", signUpData.user.id);
+        }
         if (error) throw error;
         toast.success("Account created! Please wait for admin approval after confirming your email.");
       }
