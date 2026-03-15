@@ -9,8 +9,8 @@ export function AdminTransactions() {
   const { data: transactions } = useQuery({
     queryKey: ["admin-transactions"],
     queryFn: async () => {
-      const { data } = await supabase.from("wallet_transactions").select("*").order("created_at", { ascending: false });
-      return data ?? [];
+      const { data } = await (supabase as any).from("wallet_transactions").select("*").order("created_at", { ascending: false });
+      return (data as any[]) ?? [];
     },
   });
 
@@ -32,7 +32,7 @@ export function AdminTransactions() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {transactions?.map((tx) => (
+              {transactions?.map((tx: any) => (
                 <TableRow key={tx.id}>
                   <TableCell className="capitalize font-medium">{tx.type.replace("_", " ")}</TableCell>
                   <TableCell className="font-semibold">${Number(tx.amount).toLocaleString()}</TableCell>

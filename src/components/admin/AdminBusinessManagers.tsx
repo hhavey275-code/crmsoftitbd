@@ -24,7 +24,7 @@ export function AdminBusinessManagers() {
     queryKey: ["admin-business-managers"],
     queryFn: async () => {
       const { data } = await supabase.from("business_managers").select("*").order("created_at", { ascending: false });
-      return data ?? [];
+      return (data as any[]) ?? [];
     },
   });
 
@@ -32,15 +32,15 @@ export function AdminBusinessManagers() {
     queryKey: ["admin-bm-ad-accounts"],
     queryFn: async () => {
       const { data } = await supabase.from("ad_accounts").select("*").not("business_manager_id", "is", null);
-      return data ?? [];
+      return (data as any[]) ?? [];
     },
   });
 
   const { data: assignments } = useQuery({
     queryKey: ["admin-user-ad-accounts"],
     queryFn: async () => {
-      const { data } = await supabase.from("user_ad_accounts").select("*");
-      return data ?? [];
+      const { data } = await (supabase as any).from("user_ad_accounts").select("*");
+      return (data as any[]) ?? [];
     },
   });
 
@@ -48,7 +48,7 @@ export function AdminBusinessManagers() {
     queryKey: ["admin-clients-list"],
     queryFn: async () => {
       const { data } = await supabase.from("profiles").select("user_id, full_name, email");
-      return data ?? [];
+      return (data as any[]) ?? [];
     },
   });
 
@@ -99,10 +99,9 @@ export function AdminBusinessManagers() {
 
   const assignMutation = useMutation({
     mutationFn: async ({ accountId, userId }: { accountId: string; userId: string | null }) => {
-      // Remove existing assignment
-      await supabase.from("user_ad_accounts").delete().eq("ad_account_id", accountId);
+      await (supabase as any).from("user_ad_accounts").delete().eq("ad_account_id", accountId);
       if (userId) {
-        const { error } = await supabase.from("user_ad_accounts").insert({
+        const { error } = await (supabase as any).from("user_ad_accounts").insert({
           user_id: userId,
           ad_account_id: accountId,
         });
@@ -117,7 +116,7 @@ export function AdminBusinessManagers() {
   });
 
   const getAssignedUserId = (accountId: string) => {
-    return assignments?.find((a) => a.ad_account_id === accountId)?.user_id ?? null;
+    return assignments?.find((a: any) => a.ad_account_id === accountId)?.user_id ?? null;
   };
 
   const bmAccounts = (bmId: string) => adAccounts?.filter((a: any) => a.business_manager_id === bmId) ?? [];

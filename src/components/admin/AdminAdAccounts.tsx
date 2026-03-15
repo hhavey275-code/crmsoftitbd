@@ -16,15 +16,15 @@ export function AdminAdAccounts() {
         .from("ad_accounts")
         .select("*, business_managers(name)")
         .order("created_at", { ascending: false });
-      return data ?? [];
+      return (data as any[]) ?? [];
     },
   });
 
   const { data: assignments } = useQuery({
     queryKey: ["admin-user-ad-accounts"],
     queryFn: async () => {
-      const { data } = await supabase.from("user_ad_accounts").select("*");
-      return data ?? [];
+      const { data } = await (supabase as any).from("user_ad_accounts").select("*");
+      return (data as any[]) ?? [];
     },
   });
 
@@ -32,17 +32,15 @@ export function AdminAdAccounts() {
     queryKey: ["admin-clients-list"],
     queryFn: async () => {
       const { data } = await supabase.from("profiles").select("user_id, full_name, email");
-      return data ?? [];
+      return (data as any[]) ?? [];
     },
   });
 
   const assignMutation = useMutation({
     mutationFn: async ({ accountId, userId }: { accountId: string; userId: string | null }) => {
-      // Remove existing assignment for this account
-      await supabase.from("user_ad_accounts").delete().eq("ad_account_id", accountId);
-      // Insert new assignment if not unassigned
+      await (supabase as any).from("user_ad_accounts").delete().eq("ad_account_id", accountId);
       if (userId) {
-        const { error } = await supabase.from("user_ad_accounts").insert({
+        const { error } = await (supabase as any).from("user_ad_accounts").insert({
           user_id: userId,
           ad_account_id: accountId,
         });
@@ -58,14 +56,8 @@ export function AdminAdAccounts() {
   });
 
   const getAssignedUserId = (accountId: string) => {
-    const assignment = assignments?.find((a) => a.ad_account_id === accountId);
+    const assignment = assignments?.find((a: any) => a.ad_account_id === accountId);
     return assignment?.user_id ?? null;
-  };
-
-  const getClientName = (userId: string | null) => {
-    if (!userId) return null;
-    const client = clients?.find((c) => c.user_id === userId);
-    return client?.full_name || client?.email || userId;
   };
 
   return (

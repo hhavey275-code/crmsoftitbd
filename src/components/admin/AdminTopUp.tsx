@@ -19,17 +19,17 @@ export function AdminTopUp() {
   const { data: requests } = useQuery({
     queryKey: ["admin-topup-requests"],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data } = await (supabase as any)
         .from("topups")
         .select("*, profiles!inner(full_name, email), ad_accounts(account_name, account_id)")
         .order("created_at", { ascending: false });
-      return data ?? [];
+      return (data as any[]) ?? [];
     },
   });
 
   const processMutation = useMutation({
     mutationFn: async ({ id, action, userId, amount, adAccountId }: { id: string; action: "approved" | "rejected"; userId: string; amount: number; adAccountId: string | null }) => {
-      const { error: updateError } = await supabase
+      const { error: updateError } = await (supabase as any)
         .from("topups")
         .update({ status: action })
         .eq("id", id);
@@ -48,7 +48,7 @@ export function AdminTopUp() {
         const { error: walletError } = await supabase.from("wallets").update({ balance: newBalance }).eq("user_id", userId);
         if (walletError) throw walletError;
 
-        const { error: txError } = await supabase.from("wallet_transactions").insert({
+        const { error: txError } = await (supabase as any).from("wallet_transactions").insert({
           user_id: userId,
           type: "ad_spend",
           amount,
@@ -68,7 +68,7 @@ export function AdminTopUp() {
                   "Content-Type": "application/json",
                   Authorization: `Bearer ${session?.access_token}`,
                 },
-                body: JSON.stringify({ ad_account_id: adAccountId, amount }),
+                body: JSON.stringify({ ad_account_id: adAccountId, amount, topup_id: id }),
               }
             );
             const result = await res.json();
@@ -126,10 +126,10 @@ export function AdminTopUp() {
                   <TableCell>
                     {r.status === "pending" && (
                       <div className="flex gap-1">
-                        <Button size="sm" variant="ghost" className="text-emerald-600 hover:text-emerald-700" onClick={() => setActionDialog({ id: r.id, action: "approved", userId: r.user_id, amount: r.amount, adAccountId: r.ad_account_id })}>
+                        <Button size="sm" variant="ghost" className="hover:text-primary" onClick={() => setActionDialog({ id: r.id, action: "approved", userId: r.user_id, amount: r.amount, adAccountId: r.ad_account_id })}>
                           <Check className="h-4 w-4" />
                         </Button>
-                        <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => setActionDialog({ id: r.id, action: "rejected", userId: r.user_id, amount: r.amount, adAccountId: r.ad_account_id })}>
+                        <Button size="sm" variant="ghost" className="hover:text-destructive" onClick={() => setActionDialog({ id: r.id, action: "rejected", userId: r.user_id, amount: r.amount, adAccountId: r.ad_account_id })}>
                           <X className="h-4 w-4" />
                         </Button>
                       </div>

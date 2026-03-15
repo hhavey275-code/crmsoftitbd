@@ -12,8 +12,8 @@ export function ClientTransactions() {
   const { data: transactions } = useQuery({
     queryKey: ["client-transactions", user?.id],
     queryFn: async () => {
-      const { data } = await supabase.from("wallet_transactions").select("*").eq("user_id", user!.id).order("created_at", { ascending: false });
-      return data ?? [];
+      const { data } = await (supabase as any).from("wallet_transactions").select("*").eq("user_id", user!.id).order("created_at", { ascending: false });
+      return (data as any[]) ?? [];
     },
     enabled: !!user,
   });
@@ -36,7 +36,7 @@ export function ClientTransactions() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {transactions?.map((tx) => (
+              {transactions?.map((tx: any) => (
                 <TableRow key={tx.id}>
                   <TableCell className="capitalize font-medium">{tx.type.replace("_", " ")}</TableCell>
                   <TableCell className="font-semibold">${Number(tx.amount).toLocaleString()}</TableCell>

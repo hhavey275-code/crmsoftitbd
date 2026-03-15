@@ -19,28 +19,28 @@ export function ClientTopUp() {
   const { data: adAccounts } = useQuery({
     queryKey: ["client-assigned-accounts", user?.id],
     queryFn: async () => {
-      const { data: assignments } = await supabase
+      const { data: assignments } = await (supabase as any)
         .from("user_ad_accounts")
         .select("ad_account_id")
         .eq("user_id", user!.id);
       
       if (!assignments || assignments.length === 0) return [];
       
-      const accountIds = assignments.map((a) => a.ad_account_id);
+      const accountIds = assignments.map((a: any) => a.ad_account_id);
       const { data } = await supabase
         .from("ad_accounts")
         .select("*")
         .in("id", accountIds)
         .eq("status", "active");
-      return data ?? [];
+      return (data as any[]) ?? [];
     },
     enabled: !!user,
   });
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      const selectedAcc = adAccounts?.find((a) => a.id === selectedAccount);
-      const { error } = await supabase.from("topups").insert({
+      const selectedAcc = adAccounts?.find((a: any) => a.id === selectedAccount);
+      const { error } = await (supabase as any).from("topups").insert({
         user_id: user!.id,
         amount: parseFloat(amount),
         ad_account_id: selectedAccount || null,
@@ -77,7 +77,7 @@ export function ClientTopUp() {
                 <SelectValue placeholder="Select an ad account" />
               </SelectTrigger>
               <SelectContent>
-                {adAccounts?.map((a) => (
+                {adAccounts?.map((a: any) => (
                   <SelectItem key={a.id} value={a.id}>
                     {a.account_name} ({a.account_id})
                   </SelectItem>

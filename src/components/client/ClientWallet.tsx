@@ -21,8 +21,8 @@ export function ClientWallet() {
   const { data: topUps } = useQuery({
     queryKey: ["client-topup-history", user?.id],
     queryFn: async () => {
-      const { data } = await supabase.from("topups").select("*").eq("user_id", user!.id).order("created_at", { ascending: false });
-      return data ?? [];
+      const { data } = await (supabase as any).from("topups").select("*").eq("user_id", user!.id).order("created_at", { ascending: false });
+      return (data as any[]) ?? [];
     },
     enabled: !!user,
   });
@@ -54,7 +54,7 @@ export function ClientWallet() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {topUps?.map((t) => (
+              {topUps?.map((t: any) => (
                 <TableRow key={t.id}>
                   <TableCell className="font-semibold">${Number(t.amount).toLocaleString()}</TableCell>
                   <TableCell>${Number(t.old_spend_cap).toLocaleString()}</TableCell>

@@ -23,14 +23,14 @@ export function ClientDashboard() {
   const { data: adAccounts } = useQuery({
     queryKey: ["client-ad-accounts", user?.id],
     queryFn: async () => {
-      const { data: assignments } = await supabase
+      const { data: assignments } = await (supabase as any)
         .from("user_ad_accounts")
         .select("ad_account_id")
         .eq("user_id", user!.id);
       if (!assignments || assignments.length === 0) return [];
-      const ids = assignments.map((a) => a.ad_account_id);
+      const ids = assignments.map((a: any) => a.ad_account_id);
       const { data } = await supabase.from("ad_accounts").select("*").in("id", ids);
-      return data ?? [];
+      return (data as any[]) ?? [];
     },
     enabled: !!user,
   });
@@ -38,8 +38,8 @@ export function ClientDashboard() {
   const { data: pendingTopUps } = useQuery({
     queryKey: ["client-pending-topups", user?.id],
     queryFn: async () => {
-      const { data } = await supabase.from("topups").select("*").eq("user_id", user!.id).eq("status", "pending");
-      return data ?? [];
+      const { data } = await (supabase as any).from("topups").select("*").eq("user_id", user!.id).eq("status", "pending");
+      return (data as any[]) ?? [];
     },
     enabled: !!user,
   });
@@ -47,8 +47,8 @@ export function ClientDashboard() {
   const { data: recentTx } = useQuery({
     queryKey: ["client-recent-tx", user?.id],
     queryFn: async () => {
-      const { data } = await supabase.from("wallet_transactions").select("*").eq("user_id", user!.id).order("created_at", { ascending: false }).limit(5);
-      return data ?? [];
+      const { data } = await (supabase as any).from("wallet_transactions").select("*").eq("user_id", user!.id).order("created_at", { ascending: false }).limit(5);
+      return (data as any[]) ?? [];
     },
     enabled: !!user,
   });
@@ -59,7 +59,7 @@ export function ClientDashboard() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard title="Wallet Balance" value={`$${Number(wallet?.balance ?? 0).toLocaleString()}`} icon={Wallet} />
-        <MetricCard title="Ad Accounts" value={adAccounts?.filter(a => a.status === "active").length ?? 0} subtitle="Active accounts" icon={MonitorSmartphone} />
+        <MetricCard title="Ad Accounts" value={adAccounts?.filter((a: any) => a.status === "active").length ?? 0} subtitle="Active accounts" icon={MonitorSmartphone} />
         <MetricCard title="Pending Top-Ups" value={pendingTopUps?.length ?? 0} icon={ArrowUpCircle} />
         <MetricCard title="Transactions" value={recentTx?.length ?? 0} subtitle="Recent" icon={History} />
       </div>
@@ -82,7 +82,7 @@ export function ClientDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentTx?.map((tx) => (
+                {recentTx?.map((tx: any) => (
                   <TableRow key={tx.id}>
                     <TableCell className="capitalize font-medium">{tx.type.replace("_", " ")}</TableCell>
                     <TableCell className="font-semibold">${Number(tx.amount).toLocaleString()}</TableCell>

@@ -11,20 +11,19 @@ export function ClientAdAccounts() {
   const { data: accounts } = useQuery({
     queryKey: ["client-ad-accounts", user?.id],
     queryFn: async () => {
-      // Get assigned ad account IDs first
-      const { data: assignments } = await supabase
+      const { data: assignments } = await (supabase as any)
         .from("user_ad_accounts")
         .select("ad_account_id")
         .eq("user_id", user!.id);
       
       if (!assignments || assignments.length === 0) return [];
       
-      const accountIds = assignments.map((a) => a.ad_account_id);
+      const accountIds = assignments.map((a: any) => a.ad_account_id);
       const { data } = await supabase
         .from("ad_accounts")
         .select("*")
         .in("id", accountIds);
-      return data ?? [];
+      return (data as any[]) ?? [];
     },
     enabled: !!user,
   });
@@ -46,7 +45,7 @@ export function ClientAdAccounts() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {accounts?.map((a) => (
+              {accounts?.map((a: any) => (
                 <TableRow key={a.id}>
                   <TableCell className="font-medium">{a.account_name}</TableCell>
                   <TableCell className="font-mono text-sm">{a.account_id}</TableCell>
