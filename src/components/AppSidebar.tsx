@@ -38,6 +38,7 @@ const commonNavItems = [
 
 const adminOnlyItems = [
   { title: "Business Managers", url: "/business-managers", icon: Building2 },
+  { title: "Banks", url: "/banks", icon: Landmark },
 ];
 
 export function AppSidebar() {
