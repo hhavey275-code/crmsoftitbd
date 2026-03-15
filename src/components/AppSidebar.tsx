@@ -12,6 +12,7 @@ import {
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 import {
   Sidebar,
   SidebarContent,
@@ -44,21 +45,26 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
   const { signOut, profile, role } = useAuth();
+  const { logoUrl } = useSiteSettings();
 
   const navItems = role === "admin"
     ? [...commonNavItems.slice(0, 1), ...adminOnlyItems, ...commonNavItems.slice(1)]
     : commonNavItems;
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="px-4 py-3">
+          <SidebarGroupLabel className="px-4 py-4">
             {!collapsed && (
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary">
-                  <Zap className="h-4 w-4 text-sidebar-primary-foreground" />
-                </div>
+              <div className="flex items-center gap-3">
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Logo" className="h-8 w-8 rounded-lg object-contain" />
+                ) : (
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+                    <Zap className="h-4 w-4 text-primary-foreground" />
+                  </div>
+                )}
                 <div>
                   <p className="text-sm font-semibold text-sidebar-foreground">Meta Ad Top-Up</p>
                   <p className="text-xs text-sidebar-muted capitalize">{role ?? "—"}</p>
@@ -66,13 +72,19 @@ export function AppSidebar() {
               </div>
             )}
             {collapsed && (
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary">
-                <Zap className="h-4 w-4 text-sidebar-primary-foreground" />
-              </div>
+              <>
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Logo" className="h-8 w-8 rounded-lg object-contain" />
+                ) : (
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+                    <Zap className="h-4 w-4 text-primary-foreground" />
+                  </div>
+                )}
+              </>
             )}
           </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="space-y-1">
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
