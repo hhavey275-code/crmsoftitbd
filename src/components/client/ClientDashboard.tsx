@@ -79,9 +79,26 @@ export function ClientDashboard() {
 
   const totalRemaining = adAccounts?.reduce((sum: number, a: any) => sum + (Number(a.spend_cap) - Number(a.amount_spent)), 0) ?? 0;
 
+  const greeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
+  };
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Dashboard</h1>
+      {/* Welcome Banner */}
+      <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10">
+        <CardContent className="p-5">
+          <h1 className="text-xl font-bold text-foreground">
+            {greeting()}, {profile?.full_name || "there"}! 👋
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Welcome to your dashboard • {format(new Date(), "EEEE, MMMM d, yyyy")}
+          </p>
+        </CardContent>
+      </Card>
 
       {isInactive && (
         <Card className="border-destructive bg-destructive/10">

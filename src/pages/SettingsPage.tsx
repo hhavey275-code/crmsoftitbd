@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,21 +8,35 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Upload, Zap, DollarSign, Type } from "lucide-react";
+import { Upload, Zap, DollarSign, Type, Megaphone, Volume2, Lock } from "lucide-react";
 
 export default function SettingsPage() {
-  const { profile, user, role } = useAuth();
+  const { profile, user, role, isAdmin } = useAuth();
   const [fullName, setFullName] = useState(profile?.full_name ?? "");
   const [company, setCompany] = useState(profile?.company ?? "");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const { logoUrl, siteName: currentSiteName, refetch } = useSiteSettings();
+  const { logoUrl, siteName: currentSiteName, headerAnnouncement: currentAnnouncement, refetch } = useSiteSettings();
 
   // Site Name state
   const [siteNameInput, setSiteNameInput] = useState("");
   const [savingSiteName, setSavingSiteName] = useState(false);
+
+  // Header Announcement state
+  const [announcementInput, setAnnouncementInput] = useState("");
+  const [savingAnnouncement, setSavingAnnouncement] = useState(false);
+
+  // Password change state
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+
+  // Notification sound state
+  const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem("notification_sound") !== "false");
 
   // USD Rate state
   const { data: currentRate, refetch: refetchRate } = useQuery({
@@ -31,7 +45,7 @@ export default function SettingsPage() {
       const { data } = await supabase.from("site_settings").select("value").eq("key", "usd_rate").single();
       return data?.value ?? "";
     },
-    enabled: role === "admin",
+    enabled: isAdmin,
   });
   const [usdRate, setUsdRate] = useState("");
   const [savingRate, setSavingRate] = useState(false);
@@ -43,6 +57,10 @@ export default function SettingsPage() {
   // Sync site name input when data loads
   if (currentSiteName && !siteNameInput && !savingSiteName) {
     setSiteNameInput(currentSiteName);
+  }
+  // Sync announcement input when data loads
+  if (currentAnnouncement && !announcementInput && !savingAnnouncement) {
+    setAnnouncementInput(currentAnnouncement);
   }
 
   const handleSave = async () => {
@@ -71,6 +89,20 @@ export default function SettingsPage() {
       toast.error("Failed to save site name");
     } else {
       toast.success("Site name updated!");
+      refetch();
+    }
+  };
+
+  const handleSaveAnnouncement = async () => {
+    setSavingAnnouncement(true);
+    const { error } = await supabase
+      .from("site_settings")
+      .upsert({ key: "header_announcement", value: announcementInput.trim() }, { onConflict: "key" });
+    setSavingAnnouncement(false);
+    if (error) {
+      toast.error("Failed to save announcement");
+    } else {
+      toast.success("Header announcement updated!");
       refetch();
     }
   };
@@ -118,13 +150,68 @@ export default function SettingsPage() {
     }
   };
 
+  const handleChangePassword = async () => {
+    if (newPassword.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+    setChangingPassword(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setChangingPassword(false);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Password changed successfully!");
+      setNewPassword("");
+      setConfirmPassword("");
+    }
+  };
+
+  const handleSoundToggle = (checked: boolean) => {
+    setSoundEnabled(checked);
+    localStorage.setItem("notification_sound", checked ? "true" : "false");
+    toast.success(checked ? "Notification sound enabled" : "Notification sound disabled");
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <h1 className="text-2xl font-bold">Settings</h1>
 
+        {/* Header Announcement - Admin only */}
+        {isAdmin && (
+          <Card className="max-w-xl">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Megaphone className="h-5 w-5 text-amber-600" />
+                Header Announcement
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Set a scrolling announcement that appears in the header bar for all users.
+              </p>
+              <div className="space-y-3">
+                <Textarea
+                  value={announcementInput}
+                  onChange={(e) => setAnnouncementInput(e.target.value)}
+                  placeholder="e.g. 🎉 Welcome to our platform! New features coming soon..."
+                  rows={2}
+                />
+                <Button onClick={handleSaveAnnouncement} disabled={savingAnnouncement}>
+                  {savingAnnouncement ? "Saving..." : "Save Announcement"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Site Name - Admin only */}
-        {role === "admin" && (
+        {isAdmin && (
           <Card className="max-w-xl">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -154,7 +241,7 @@ export default function SettingsPage() {
         )}
 
         {/* USD Rate - Admin only */}
-        {role === "admin" && (
+        {isAdmin && (
           <Card className="max-w-xl">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -187,7 +274,7 @@ export default function SettingsPage() {
         )}
 
         {/* Logo Upload - Admin only */}
-        {role === "admin" && (
+        {isAdmin && (
           <Card className="max-w-xl">
             <CardHeader>
               <CardTitle>Brand Logo</CardTitle>
@@ -227,6 +314,25 @@ export default function SettingsPage() {
           </Card>
         )}
 
+        {/* Notification Sound */}
+        <Card className="max-w-xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Volume2 className="h-5 w-5 text-blue-600" />
+              Notification Sound
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Play sound on new notifications</p>
+                <p className="text-xs text-muted-foreground mt-0.5">A short beep will play when you receive a new notification</p>
+              </div>
+              <Switch checked={soundEnabled} onCheckedChange={handleSoundToggle} />
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Profile */}
         <Card className="max-w-xl">
           <CardHeader>
@@ -247,6 +353,29 @@ export default function SettingsPage() {
             </div>
             <Button onClick={handleSave} disabled={saving}>
               {saving ? "Saving..." : "Save Changes"}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Change Password */}
+        <Card className="max-w-xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5 text-orange-600" />
+              Change Password
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>New Password</Label>
+              <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="••••••••" minLength={6} />
+            </div>
+            <div className="space-y-2">
+              <Label>Confirm Password</Label>
+              <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••" minLength={6} />
+            </div>
+            <Button onClick={handleChangePassword} disabled={changingPassword || !newPassword || !confirmPassword}>
+              {changingPassword ? "Changing..." : "Change Password"}
             </Button>
           </CardContent>
         </Card>
