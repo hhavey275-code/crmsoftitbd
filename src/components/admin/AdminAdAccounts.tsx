@@ -381,10 +381,7 @@ export function AdminAdAccounts() {
                 <TableHead className="w-[90px]">
                   <span className="text-xs font-medium">Client</span>
                 </TableHead>
-                <TableHead className="w-[60px]">
-                  <span className="text-xs font-medium">Billing</span>
-                </TableHead>
-                <TableHead className="w-[80px]">
+                <TableHead className="w-[50px]">
                   <span className="text-xs font-medium">Actions</span>
                 </TableHead>
               </TableRow>
