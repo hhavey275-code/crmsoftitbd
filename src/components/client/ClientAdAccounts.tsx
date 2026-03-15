@@ -11,10 +11,19 @@ export function ClientAdAccounts() {
   const { data: accounts } = useQuery({
     queryKey: ["client-ad-accounts", user?.id],
     queryFn: async () => {
+      // Get assigned ad account IDs first
+      const { data: assignments } = await supabase
+        .from("user_ad_accounts")
+        .select("ad_account_id")
+        .eq("user_id", user!.id);
+      
+      if (!assignments || assignments.length === 0) return [];
+      
+      const accountIds = assignments.map((a) => a.ad_account_id);
       const { data } = await supabase
         .from("ad_accounts")
         .select("*")
-        .eq("assigned_user_id", user!.id);
+        .in("id", accountIds);
       return data ?? [];
     },
     enabled: !!user,
@@ -30,7 +39,7 @@ export function ClientAdAccounts() {
               <TableRow>
                 <TableHead>Account Name</TableHead>
                 <TableHead>Account ID</TableHead>
-                <TableHead>Platform</TableHead>
+                <TableHead>Business Name</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Spend Cap</TableHead>
                 <TableHead>Amount Spent</TableHead>
@@ -41,7 +50,7 @@ export function ClientAdAccounts() {
                 <TableRow key={a.id}>
                   <TableCell className="font-medium">{a.account_name}</TableCell>
                   <TableCell className="font-mono text-sm">{a.account_id}</TableCell>
-                  <TableCell>{a.platform}</TableCell>
+                  <TableCell>{a.business_name || "—"}</TableCell>
                   <TableCell><StatusBadge status={a.status} /></TableCell>
                   <TableCell>${Number(a.spend_cap).toLocaleString()}</TableCell>
                   <TableCell>${Number(a.amount_spent).toLocaleString()}</TableCell>

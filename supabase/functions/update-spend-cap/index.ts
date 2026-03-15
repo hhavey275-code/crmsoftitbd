@@ -43,7 +43,6 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Check admin
     const { data: roleData } = await supabase
       .from("user_roles")
       .select("role")
@@ -58,7 +57,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { ad_account_id, amount } = await req.json();
+    const { ad_account_id, amount, topup_id } = await req.json();
     if (!ad_account_id || !amount) {
       return new Response(
         JSON.stringify({ error: "ad_account_id and amount required" }),
@@ -66,7 +65,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get ad account with BM access token
     const { data: account, error: accErr } = await supabase
       .from("ad_accounts")
       .select("*, business_managers!inner(access_token, bm_id)")
@@ -81,22 +79,35 @@ Deno.serve(async (req) => {
     }
 
     const bm = (account as any).business_managers;
-    const newSpendCap = (Number(account.spend_cap) + amount) * 100; // Meta uses cents
+    const oldSpendCap = Number(account.spend_cap);
+    const newSpendCap = oldSpendCap + amount;
+    const newSpendCapCents = newSpendCap * 100;
 
-    // Update spend cap via Meta API
     const metaRes = await fetch(
       `https://graph.facebook.com/v21.0/${account.account_id}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
-          spend_cap: String(Math.round(newSpendCap)),
+          spend_cap: String(Math.round(newSpendCapCents)),
           access_token: bm.access_token,
         }),
       }
     );
 
     const metaData = await metaRes.json();
+
+    // Update topup record with meta response
+    if (topup_id) {
+      await supabase
+        .from("topups")
+        .update({
+          old_spend_cap: oldSpendCap,
+          new_spend_cap: newSpendCap,
+          meta_response: metaData,
+        })
+        .eq("id", topup_id);
+    }
 
     if (metaData.error) {
       return new Response(
@@ -108,16 +119,16 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Update local spend_cap
     await supabase
       .from("ad_accounts")
-      .update({ spend_cap: Number(account.spend_cap) + amount })
+      .update({ spend_cap: newSpendCap })
       .eq("id", ad_account_id);
 
     return new Response(
       JSON.stringify({
         success: true,
-        new_spend_cap: Number(account.spend_cap) + amount,
+        old_spend_cap: oldSpendCap,
+        new_spend_cap: newSpendCap,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

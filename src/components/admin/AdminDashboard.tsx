@@ -27,7 +27,7 @@ export function AdminDashboard() {
   const { data: pendingRequests } = useQuery({
     queryKey: ["admin-pending-topups"],
     queryFn: async () => {
-      const { data } = await supabase.from("top_up_requests").select("*").eq("status", "pending").order("created_at", { ascending: false });
+      const { data } = await supabase.from("topups").select("*").eq("status", "pending").order("created_at", { ascending: false });
       return data ?? [];
     },
   });
@@ -35,7 +35,7 @@ export function AdminDashboard() {
   const { data: recentTx } = useQuery({
     queryKey: ["admin-recent-tx"],
     queryFn: async () => {
-      const { data } = await supabase.from("transactions").select("*").order("created_at", { ascending: false }).limit(5);
+      const { data } = await supabase.from("wallet_transactions").select("*").order("created_at", { ascending: false }).limit(5);
       return data ?? [];
     },
   });
@@ -66,7 +66,6 @@ export function AdminDashboard() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Amount</TableHead>
-                    <TableHead>Method</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Date</TableHead>
                   </TableRow>
@@ -75,7 +74,6 @@ export function AdminDashboard() {
                   {pendingRequests?.slice(0, 5).map((r) => (
                     <TableRow key={r.id}>
                       <TableCell className="font-medium">${Number(r.amount).toLocaleString()}</TableCell>
-                      <TableCell className="capitalize">{r.payment_method.replace("_", " ")}</TableCell>
                       <TableCell><StatusBadge status={r.status} /></TableCell>
                       <TableCell className="text-muted-foreground">{format(new Date(r.created_at), "MMM d, yyyy")}</TableCell>
                     </TableRow>
