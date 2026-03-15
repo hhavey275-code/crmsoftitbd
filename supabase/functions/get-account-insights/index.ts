@@ -6,6 +6,30 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Helper to batch an array into chunks
+function chunk<T>(arr: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    chunks.push(arr.slice(i, i + size));
+  }
+  return chunks;
+}
+
+// Batch .in() queries to avoid URL length limits
+async function batchSelect(supabase: any, table: string, column: string, ids: string[], selectStr: string) {
+  const batches = chunk(ids, 30);
+  const results: any[] = [];
+  for (const batch of batches) {
+    const { data, error } = await supabase
+      .from(table)
+      .select(selectStr)
+      .in(column, batch);
+    if (error) throw error;
+    if (data) results.push(...data);
+  }
+  return results;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -26,15 +50,10 @@ Deno.serve(async (req) => {
 
     // If source is "cache", read from DB and return
     if (source === "cache") {
-      const { data: cached, error: cacheError } = await supabase
-        .from("ad_account_insights")
-        .select("*")
-        .in("ad_account_id", ad_account_ids);
-
-      if (cacheError) throw cacheError;
+      const cached = await batchSelect(supabase, "ad_account_insights", "ad_account_id", ad_account_ids, "*");
 
       const insights: Record<string, any> = {};
-      for (const row of (cached ?? [])) {
+      for (const row of cached) {
         insights[row.ad_account_id] = {
           today_spend: Number(row.today_spend),
           yesterday_spend: Number(row.yesterday_spend),
@@ -50,12 +69,10 @@ Deno.serve(async (req) => {
     }
 
     // source === "meta" — fetch from Meta API and upsert to DB
-    const { data: accounts, error } = await supabase
-      .from("ad_accounts")
-      .select("id, account_id, amount_spent, spend_cap, business_manager_id, business_managers(access_token)")
-      .in("id", ad_account_ids);
-
-    if (error) throw error;
+    const accounts = await batchSelect(
+      supabase, "ad_accounts", "id", ad_account_ids,
+      "id, account_id, amount_spent, spend_cap, business_manager_id, business_managers(access_token)"
+    );
 
     const insights: Record<string, any> = {};
 
@@ -129,7 +146,7 @@ Deno.serve(async (req) => {
 
     await Promise.all(promises);
 
-    // Upsert all insights into DB
+    // Upsert all insights into DB in batches
     const upsertRows = Object.entries(insights).map(([adAccountId, data]: [string, any]) => ({
       ad_account_id: adAccountId,
       today_spend: data.today_spend,
@@ -139,10 +156,11 @@ Deno.serve(async (req) => {
       updated_at: new Date().toISOString(),
     }));
 
-    if (upsertRows.length > 0) {
+    const upsertBatches = chunk(upsertRows, 30);
+    for (const batch of upsertBatches) {
       await supabase
         .from("ad_account_insights")
-        .upsert(upsertRows, { onConflict: "ad_account_id" });
+        .upsert(batch, { onConflict: "ad_account_id" });
     }
 
     // Add updated_at to response
