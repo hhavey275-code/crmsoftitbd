@@ -10,9 +10,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SpendProgressBar } from "@/components/SpendProgressBar";
+import { MetricCard } from "@/components/MetricCard";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Pencil, Check, X, ExternalLink, User } from "lucide-react";
+import { ArrowLeft, Pencil, Check, X, ExternalLink, User, RefreshCw, Megaphone, DollarSign, ShoppingCart, MessageSquare } from "lucide-react";
 
 export default function AdAccountDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -22,6 +23,7 @@ export default function AdAccountDetailPage() {
 
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState("");
+  const [updatingMeta, setUpdatingMeta] = useState(false);
 
   const { data: account, isLoading } = useQuery({
     queryKey: ["ad-account-detail", id],
@@ -33,6 +35,18 @@ export default function AdAccountDetailPage() {
         .single();
       if (error) throw error;
       return data as any;
+    },
+    enabled: !!id,
+  });
+
+  const { data: insights } = useQuery({
+    queryKey: ["ad-account-insights-detail", id],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("get-account-insights", {
+        body: { ad_account_ids: [id], source: "cache" },
+      });
+      if (error) throw error;
+      return data?.insights?.[id!] ?? null;
     },
     enabled: !!id,
   });
@@ -98,6 +112,22 @@ export default function AdAccountDetailPage() {
     onError: (err: any) => toast.error(err.message),
   });
 
+  const handleUpdateFromMeta = async () => {
+    setUpdatingMeta(true);
+    try {
+      const { error } = await supabase.functions.invoke("get-account-insights", {
+        body: { ad_account_ids: [id], source: "meta" },
+      });
+      if (error) throw error;
+      await queryClient.invalidateQueries({ queryKey: ["ad-account-insights-detail", id] });
+      toast.success("Data updated from Meta");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update");
+    } finally {
+      setUpdatingMeta(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <DashboardLayout>
@@ -123,11 +153,59 @@ export default function AdAccountDetailPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Back button */}
-        <Button variant="ghost" onClick={() => navigate("/ad-accounts")}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Ad Accounts
-        </Button>
+        {/* Back button & Update */}
+        <div className="flex items-center justify-between">
+          <Button variant="ghost" onClick={() => navigate("/ad-accounts")}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Ad Accounts
+          </Button>
+          <div className="flex items-center gap-3">
+            {insights?.updated_at && (
+              <span className="text-xs text-muted-foreground">
+                Updated: {new Date(insights.updated_at).toLocaleString()}
+              </span>
+            )}
+            <Button onClick={handleUpdateFromMeta} disabled={updatingMeta} size="sm">
+              <RefreshCw className={`h-4 w-4 mr-1 ${updatingMeta ? "animate-spin" : ""}`} />
+              Update from Meta
+            </Button>
+          </div>
+        </div>
+
+        {/* Performance Metric Cards */}
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+          <MetricCard
+            title="Running Campaigns"
+            value={insights?.active_campaigns ?? 0}
+            icon={Megaphone}
+            iconBg="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <MetricCard
+            title="Today's Spend"
+            value={`$${(insights?.today_spend ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            subtitle={`Yesterday: $${(insights?.yesterday_spend ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            icon={DollarSign}
+            iconBg="bg-green-500/10"
+            iconColor="text-green-500"
+          />
+          <MetricCard
+            title="Today's Orders"
+            value={insights?.today_orders ?? 0}
+            subtitle={`Yesterday: ${insights?.yesterday_orders ?? 0}`}
+            icon={ShoppingCart}
+            iconBg="bg-orange-500/10"
+            iconColor="text-orange-500"
+          />
+          <MetricCard
+            title="Today's Messages"
+            value={insights?.today_messages ?? 0}
+            subtitle={`Yesterday: ${insights?.yesterday_messages ?? 0}`}
+            icon={MessageSquare}
+            iconBg="bg-purple-500/10"
+            iconColor="text-purple-500"
+          />
+        </div>
 
         {/* Account Header */}
         <Card>
@@ -149,33 +227,17 @@ export default function AdAccountDetailPage() {
                         placeholder="New account name"
                         autoFocus
                       />
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8"
-                        onClick={() => renameMutation.mutate()}
-                        disabled={!newName.trim() || renameMutation.isPending}
-                      >
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => renameMutation.mutate()} disabled={!newName.trim() || renameMutation.isPending}>
                         <Check className="h-4 w-4" />
                       </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8"
-                        onClick={() => setIsRenaming(false)}
-                      >
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setIsRenaming(false)}>
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
                       <CardTitle className="text-xl">{account.account_name}</CardTitle>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7"
-                        onClick={() => { setNewName(account.account_name); setIsRenaming(true); }}
-                      >
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setNewName(account.account_name); setIsRenaming(true); }}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                     </div>
