@@ -4,10 +4,10 @@ import { AdminTopUp } from "@/components/admin/AdminTopUp";
 import { ClientTopUp } from "@/components/client/ClientTopUp";
 
 export default function TopUpPage() {
-  const { role } = useAuth();
+  const { isAdmin } = useAuth();
   return (
     <DashboardLayout>
-      {role === "admin" ? <AdminTopUp /> : <ClientTopUp />}
+      {isAdmin ? <AdminTopUp /> : <ClientTopUp />}
     </DashboardLayout>
   );
 }

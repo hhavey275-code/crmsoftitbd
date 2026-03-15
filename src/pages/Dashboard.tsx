@@ -4,10 +4,10 @@ import { ClientDashboard } from "@/components/client/ClientDashboard";
 import { DashboardLayout } from "@/components/DashboardLayout";
 
 export default function Dashboard() {
-  const { role } = useAuth();
+  const { isAdmin } = useAuth();
   return (
     <DashboardLayout>
-      {role === "admin" ? <AdminDashboard /> : <ClientDashboard />}
+      {isAdmin ? <AdminDashboard /> : <ClientDashboard />}
     </DashboardLayout>
   );
 }

@@ -4,10 +4,10 @@ import { AdminAdAccounts } from "@/components/admin/AdminAdAccounts";
 import { ClientAdAccounts } from "@/components/client/ClientAdAccounts";
 
 export default function AdAccountsPage() {
-  const { role } = useAuth();
+  const { isAdmin } = useAuth();
   return (
     <DashboardLayout>
-      {role === "admin" ? <AdminAdAccounts /> : <ClientAdAccounts />}
+      {isAdmin ? <AdminAdAccounts /> : <ClientAdAccounts />}
     </DashboardLayout>
   );
 }
