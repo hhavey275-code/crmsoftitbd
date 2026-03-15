@@ -41,6 +41,9 @@ export function AdminAdAccounts() {
   const [cardFilter, setCardFilter] = useState("all");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [showAssignDialog, setShowAssignDialog] = useState(false);
+  const [assignClientId, setAssignClientId] = useState("");
+  const [showUnassignConfirm, setShowUnassignConfirm] = useState(false);
 
   const { data: accounts } = useQuery({
     queryKey: ["admin-ad-accounts"],
