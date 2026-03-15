@@ -144,7 +144,11 @@ export function AdminBusinessManagers() {
     return assignments?.find((a: any) => a.ad_account_id === accountId)?.user_id ?? null;
   };
 
-  const bmAccounts = (bmId: string) => adAccounts?.filter((a: any) => a.business_manager_id === bmId) ?? [];
+  const bmAccounts = (bmId: string) => {
+    const accounts = adAccounts?.filter((a: any) => a.business_manager_id === bmId) ?? [];
+    const statusOrder: Record<string, number> = { active: 0, pending: 1, disabled: 2 };
+    return accounts.sort((a: any, b: any) => (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3));
+  };
 
   const syncAllMutation = useMutation({
     mutationFn: async () => {

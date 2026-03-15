@@ -95,27 +95,26 @@ Deno.serve(async (req) => {
     const fields = "id,name,account_id,account_status,spend_cap,amount_spent,business_name";
     const baseUrl = `https://graph.facebook.com/v24.0/${bm.bm_id}`;
 
-    // Fetch from BOTH endpoints: owned + client ad accounts
-    let ownedAccounts: any[] = [];
-    let clientAccounts: any[] = [];
-
-    try {
-      ownedAccounts = await fetchAllPages(
+    // Fetch owned + client ad accounts in parallel
+    const [ownedResult, clientResult] = await Promise.allSettled([
+      fetchAllPages(
         `${baseUrl}/owned_ad_accounts?fields=${fields}&access_token=${bm.access_token}&limit=100`
-      );
-    } catch (e) {
-      console.error("Error fetching owned_ad_accounts:", e.message);
-    }
-
-    try {
-      clientAccounts = await fetchAllPages(
+      ),
+      fetchAllPages(
         `${baseUrl}/client_ad_accounts?fields=${fields}&access_token=${bm.access_token}&limit=100`
-      );
-    } catch (e) {
-      console.error("Error fetching client_ad_accounts:", e.message);
+      ),
+    ]);
+
+    const ownedAccounts = ownedResult.status === "fulfilled" ? ownedResult.value : [];
+    const clientAccounts = clientResult.status === "fulfilled" ? clientResult.value : [];
+
+    if (ownedResult.status === "rejected") {
+      console.error("Error fetching owned_ad_accounts:", ownedResult.reason);
+    }
+    if (clientResult.status === "rejected") {
+      console.error("Error fetching client_ad_accounts:", clientResult.reason);
     }
 
-    // If both failed, log error and return
     if (ownedAccounts.length === 0 && clientAccounts.length === 0) {
       await supabase.from("sync_logs").insert({
         business_manager_id: bm.id,
@@ -141,47 +140,54 @@ Deno.serve(async (req) => {
     }
 
     const allAccounts = Array.from(accountMap.values());
-    let synced = 0;
 
-    for (const account of allAccounts) {
+    // Batch upsert all accounts at once instead of one-by-one
+    const rows = allAccounts.map((account) => {
       const accountId = account.account_id || account.id?.replace("act_", "");
-      const { error: upsertError } = await supabase
-        .from("ad_accounts")
-        .upsert(
-          {
-            account_id: `act_${accountId}`,
-            account_name: account.name || `Ad Account ${accountId}`,
-            business_manager_id: bm.id,
-            business_name: account.business_name || null,
-            user_id: userId,
-            status:
-              account.account_status === 1
-                ? "active"
-                : account.account_status === 2
-                ? "disabled"
-                : "pending",
-            spend_cap: Number(account.spend_cap ?? 0) / 100,
-            amount_spent: Number(account.amount_spent ?? 0) / 100,
-          },
-          { onConflict: "account_id" }
-        );
+      return {
+        account_id: `act_${accountId}`,
+        account_name: account.name || `Ad Account ${accountId}`,
+        business_manager_id: bm.id,
+        business_name: account.business_name || null,
+        user_id: userId,
+        status:
+          account.account_status === 1
+            ? "active"
+            : account.account_status === 2
+            ? "disabled"
+            : "pending",
+        spend_cap: Number(account.spend_cap ?? 0) / 100,
+        amount_spent: Number(account.amount_spent ?? 0) / 100,
+      };
+    });
 
-      if (!upsertError) synced++;
+    const { data: upsertData, error: upsertError } = await supabase
+      .from("ad_accounts")
+      .upsert(rows, { onConflict: "account_id" })
+      .select("id");
+
+    const synced = upsertError ? 0 : (upsertData?.length ?? rows.length);
+
+    if (upsertError) {
+      console.error("Batch upsert error:", upsertError.message);
     }
 
     const now = new Date().toISOString();
 
-    await supabase
-      .from("business_managers")
-      .update({ last_synced_at: now })
-      .eq("id", bm.id);
-
-    await supabase.from("sync_logs").insert({
-      business_manager_id: bm.id,
-      synced_count: synced,
-      total_count: allAccounts.length,
-      status: "success",
-    });
+    // Update BM last_synced_at and insert sync log in parallel
+    await Promise.all([
+      supabase
+        .from("business_managers")
+        .update({ last_synced_at: now })
+        .eq("id", bm.id),
+      supabase.from("sync_logs").insert({
+        business_manager_id: bm.id,
+        synced_count: synced,
+        total_count: allAccounts.length,
+        status: upsertError ? "error" : "success",
+        error_message: upsertError?.message || null,
+      }),
+    ]);
 
     return new Response(
       JSON.stringify({
