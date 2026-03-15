@@ -501,6 +501,7 @@ export default function ClientDetailPage() {
                     <TableHead>Budget</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Spent</TableHead>
+                    <TableHead>Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -514,6 +515,16 @@ export default function ClientDetailPage() {
                       <TableCell><StatusBadge status={acc.status} /></TableCell>
                       <TableCell>
                         <SpendProgressBar amountSpent={Number(acc.amount_spent)} spendCap={Number(acc.spend_cap)} />
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          className="bg-primary text-primary-foreground hover:bg-primary/90"
+                          onClick={() => { setSelectedAccountId(acc.id); setTopUpDialogOpen(true); setTopUpAmount(""); }}
+                        >
+                          <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
+                          Top Up
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
