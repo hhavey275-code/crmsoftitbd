@@ -17,9 +17,8 @@ import { ArrowLeft, Pencil, Check, X, ExternalLink, User } from "lucide-react";
 export default function AdAccountDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { role } = useAuth();
+  const { isAdmin } = useAuth();
   const queryClient = useQueryClient();
-  const isAdmin = role === "admin";
 
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState("");
