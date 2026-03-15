@@ -65,15 +65,18 @@ export function AdminAdAccounts() {
 
   const topUpMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("top_up_requests").insert({
-        user_id: (await supabase.auth.getUser()).data.user!.id,
-        amount: parseFloat(topUpAmount),
-        ad_account_id: topUpAccount.id,
+      const { data, error } = await supabase.functions.invoke("update-spend-cap", {
+        body: {
+          ad_account_id: topUpAccount.id,
+          amount: parseFloat(topUpAmount),
+        },
       });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
     },
-    onSuccess: () => {
-      toast.success("Top-up request created!");
+    onSuccess: (data) => {
+      toast.success(`Spend cap updated: $${Number(data.old_spend_cap).toLocaleString()} → $${Number(data.new_spend_cap).toLocaleString()}`);
       setTopUpAccount(null);
       setTopUpAmount("");
       queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
