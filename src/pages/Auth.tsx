@@ -128,15 +128,19 @@ export default function Auth() {
 
       <div className="relative z-10 flex flex-1 items-center justify-center p-4">
         <Card className="w-full max-w-lg bg-card/90 backdrop-blur-md shadow-2xl border-border/50 rounded-3xl">
-          <CardHeader className="text-center pb-2">
-            {logoUrl && (
-              <img src={logoUrl} alt="Logo" className="mx-auto mb-2 h-24 w-24 rounded-xl object-contain" />
-            )}
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-3 mb-3">
+              {logoUrl && (
+                <img src={logoUrl} alt="Logo" className="h-16 w-16 rounded-xl object-contain" />
+              )}
+              <CardTitle className="text-2xl">{welcomeTitle || "Welcome"}</CardTitle>
+            </div>
             <RobotMascot isCovering={isPasswordFocused} />
-            <CardTitle className="text-2xl">{welcomeTitle || "Welcome"}</CardTitle>
-            <CardDescription className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500 text-base drop-shadow-[0_0_10px_rgba(0,150,255,0.5)]">
-              {welcomeNote || (isLogin ? "Sign in to your account" : "Create a new account")}
-            </CardDescription>
+            <div className="mx-auto mt-2 rounded-lg bg-gradient-to-r from-emerald-500 via-cyan-500 to-blue-600 px-5 py-2 shadow-[0_0_20px_rgba(6,182,212,0.4)]">
+              <p className="text-sm font-bold text-white tracking-wide text-center">
+                {welcomeNote || (isLogin ? "Sign in to your account" : "Create a new account")}
+              </p>
+            </div>
           </CardHeader>
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4 px-8">
