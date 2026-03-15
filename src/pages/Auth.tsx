@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Zap } from "lucide-react";
 import { toast } from "sonner";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+
+const TechBackground = lazy(() => import("@/components/TechBackground"));
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -47,8 +49,13 @@ export default function Auth() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <header className="h-14 flex items-center gap-3 border-b bg-card px-6">
+    <div className="relative flex min-h-screen flex-col bg-background overflow-hidden">
+      {/* 3D Tech Background */}
+      <Suspense fallback={null}>
+        <TechBackground />
+      </Suspense>
+
+      <header className="relative z-10 h-14 flex items-center gap-3 border-b bg-card/80 backdrop-blur-sm px-6">
         {logoUrl ? (
           <img src={logoUrl} alt="Logo" className="h-8 w-8 rounded object-contain" />
         ) : (
@@ -58,14 +65,14 @@ export default function Auth() {
         )}
       </header>
 
-      <div className="flex flex-1 items-center justify-center p-4">
-        <Card className="w-full max-w-md">
+      <div className="relative z-10 flex flex-1 items-center justify-center p-4">
+        <Card className="w-full max-w-md bg-card/90 backdrop-blur-md shadow-2xl border-border/50">
           <CardHeader className="text-center">
             {logoUrl ? (
-              <img src={logoUrl} alt="Logo" className="mx-auto mb-4 h-12 w-12 rounded-xl object-contain" />
+              <img src={logoUrl} alt="Logo" className="mx-auto mb-4 h-24 w-24 rounded-xl object-contain" />
             ) : (
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-                <Zap className="h-6 w-6 text-primary-foreground" />
+              <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-xl bg-primary">
+                <Zap className="h-12 w-12 text-primary-foreground" />
               </div>
             )}
             <CardTitle className="text-2xl">{welcomeTitle || "Welcome"}</CardTitle>
