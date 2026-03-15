@@ -82,7 +82,7 @@ export default function ClientDetailPage() {
     enabled: !!userId,
   });
 
-  const { data: adAccounts } = useQuery({
+  const { data: adAccounts, refetch: refetchAdAccounts } = useQuery({
     queryKey: ["client-detail-ad-accounts", userId],
     queryFn: async () => {
       const { data: assignments } = await (supabase as any)
@@ -95,6 +95,16 @@ export default function ClientDetailPage() {
       return (data as any[]) ?? [];
     },
     enabled: !!userId,
+  });
+
+  // All ad accounts for assign dialog
+  const { data: allAdAccounts } = useQuery({
+    queryKey: ["all-ad-accounts-for-assign"],
+    queryFn: async () => {
+      const { data } = await supabase.from("ad_accounts").select("id, account_name, account_id");
+      return (data as any[]) ?? [];
+    },
+    enabled: showAssignDialog,
   });
 
   const [insightsLoading, setInsightsLoading] = useState(false);
