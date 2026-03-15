@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { ArrowUpCircle, Building2, Copy } from "lucide-react";
 
@@ -23,6 +24,20 @@ export function ClientTopUp() {
   const queryClient = useQueryClient();
   const [amount, setAmount] = useState("");
   const [reference, setReference] = useState("");
+  const [selectedAccount, setSelectedAccount] = useState("");
+
+  const { data: adAccounts } = useQuery({
+    queryKey: ["client-assigned-accounts", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("ad_accounts")
+        .select("*")
+        .eq("assigned_user_id", user!.id)
+        .eq("status", "active");
+      return data ?? [];
+    },
+    enabled: !!user,
+  });
 
   const submitMutation = useMutation({
     mutationFn: async () => {
@@ -31,6 +46,7 @@ export function ClientTopUp() {
         amount: parseFloat(amount),
         payment_method: "bank_transfer",
         payment_reference: reference || null,
+        ad_account_id: selectedAccount || null,
       });
       if (error) throw error;
     },
@@ -40,6 +56,7 @@ export function ClientTopUp() {
       queryClient.invalidateQueries({ queryKey: ["client-topup-history"] });
       setAmount("");
       setReference("");
+      setSelectedAccount("");
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -87,6 +104,24 @@ export function ClientTopUp() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
+              <Label>Ad Account</Label>
+              <Select value={selectedAccount} onValueChange={setSelectedAccount}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select an ad account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {adAccounts?.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.account_name} ({a.account_id})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {adAccounts?.length === 0 && (
+                <p className="text-xs text-muted-foreground">No ad accounts assigned. Contact your admin.</p>
+              )}
+            </div>
+            <div className="space-y-2">
               <Label>Amount (USD)</Label>
               <Input
                 type="number"
@@ -108,7 +143,7 @@ export function ClientTopUp() {
             <Button
               className="w-full"
               onClick={() => submitMutation.mutate()}
-              disabled={!amount || parseFloat(amount) <= 0 || submitMutation.isPending}
+              disabled={!amount || parseFloat(amount) <= 0 || !selectedAccount || submitMutation.isPending}
             >
               {submitMutation.isPending ? "Submitting..." : "Submit Request"}
             </Button>

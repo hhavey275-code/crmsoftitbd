@@ -7,6 +7,7 @@ import {
   Settings,
   LogOut,
   Zap,
+  Building2,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -25,7 +26,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 
-const navItems = [
+const commonNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Wallet", url: "/wallet", icon: Wallet },
   { title: "Ad Accounts", url: "/ad-accounts", icon: MonitorSmartphone },
@@ -34,11 +35,19 @@ const navItems = [
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
+const adminOnlyItems = [
+  { title: "Business Managers", url: "/business-managers", icon: Building2 },
+];
+
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
   const { signOut, profile, role } = useAuth();
+
+  const navItems = role === "admin"
+    ? [...commonNavItems.slice(0, 1), ...adminOnlyItems, ...commonNavItems.slice(1)]
+    : commonNavItems;
 
   return (
     <Sidebar collapsible="icon">

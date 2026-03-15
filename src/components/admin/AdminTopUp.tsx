@@ -16,19 +16,22 @@ import { Check, X } from "lucide-react";
 export function AdminTopUp() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [actionDialog, setActionDialog] = useState<{ id: string; action: "approved" | "rejected"; userId: string; amount: number } | null>(null);
+  const [actionDialog, setActionDialog] = useState<{ id: string; action: "approved" | "rejected"; userId: string; amount: number; adAccountId: string | null } | null>(null);
   const [note, setNote] = useState("");
 
   const { data: requests } = useQuery({
     queryKey: ["admin-topup-requests"],
     queryFn: async () => {
-      const { data } = await supabase.from("top_up_requests").select("*, profiles!inner(full_name, email)").order("created_at", { ascending: false });
+      const { data } = await supabase
+        .from("top_up_requests")
+        .select("*, profiles!inner(full_name, email), ad_accounts(account_name, account_id)")
+        .order("created_at", { ascending: false });
       return data ?? [];
     },
   });
 
   const processMutation = useMutation({
-    mutationFn: async ({ id, action, userId, amount }: { id: string; action: "approved" | "rejected"; userId: string; amount: number }) => {
+    mutationFn: async ({ id, action, userId, amount, adAccountId }: { id: string; action: "approved" | "rejected"; userId: string; amount: number; adAccountId: string | null }) => {
       // Update the request status
       const { error: updateError } = await supabase
         .from("top_up_requests")
@@ -39,22 +42,53 @@ export function AdminTopUp() {
       if (action === "approved") {
         // Get current wallet balance
         const { data: wallet } = await supabase.from("wallets").select("balance").eq("user_id", userId).single();
-        const newBalance = Number(wallet?.balance ?? 0) + amount;
+        const currentBalance = Number(wallet?.balance ?? 0);
 
-        // Update wallet
+        if (currentBalance < amount) {
+          throw new Error("Insufficient wallet balance");
+        }
+
+        const newBalance = currentBalance - amount;
+
+        // Deduct from wallet
         const { error: walletError } = await supabase.from("wallets").update({ balance: newBalance }).eq("user_id", userId);
         if (walletError) throw walletError;
 
         // Insert transaction
         const { error: txError } = await supabase.from("transactions").insert({
           user_id: userId,
-          type: "top_up",
+          type: "ad_spend",
           amount,
           balance_after: newBalance,
-          description: `Top-up approved`,
+          description: `Top-up approved for ad account`,
           reference_id: id,
         });
         if (txError) throw txError;
+
+        // Call update-spend-cap edge function if ad account is linked
+        if (adAccountId) {
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const res = await fetch(
+              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-spend-cap`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${session?.access_token}`,
+                },
+                body: JSON.stringify({ ad_account_id: adAccountId, amount }),
+              }
+            );
+            const result = await res.json();
+            if (!res.ok) {
+              console.error("Spend cap update failed:", result.error);
+              // Don't throw — wallet already deducted, log the failure
+            }
+          } catch (apiErr) {
+            console.error("Meta API call failed:", apiErr);
+          }
+        }
       }
     },
     onSuccess: (_, { action }) => {
@@ -79,6 +113,7 @@ export function AdminTopUp() {
             <TableHeader>
               <TableRow>
                 <TableHead>Client</TableHead>
+                <TableHead>Ad Account</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Method</TableHead>
                 <TableHead>Reference</TableHead>
@@ -91,6 +126,9 @@ export function AdminTopUp() {
               {requests?.map((r: any) => (
                 <TableRow key={r.id}>
                   <TableCell className="font-medium">{r.profiles?.full_name || r.profiles?.email}</TableCell>
+                  <TableCell className="text-sm">
+                    {r.ad_accounts ? `${r.ad_accounts.account_name} (${r.ad_accounts.account_id})` : "—"}
+                  </TableCell>
                   <TableCell className="font-semibold">${Number(r.amount).toLocaleString()}</TableCell>
                   <TableCell className="capitalize">{r.payment_method.replace("_", " ")}</TableCell>
                   <TableCell className="text-sm">{r.payment_reference || "—"}</TableCell>
@@ -99,10 +137,10 @@ export function AdminTopUp() {
                   <TableCell>
                     {r.status === "pending" && (
                       <div className="flex gap-1">
-                        <Button size="sm" variant="ghost" className="text-emerald-600 hover:text-emerald-700" onClick={() => setActionDialog({ id: r.id, action: "approved", userId: r.user_id, amount: r.amount })}>
+                        <Button size="sm" variant="ghost" className="text-emerald-600 hover:text-emerald-700" onClick={() => setActionDialog({ id: r.id, action: "approved", userId: r.user_id, amount: r.amount, adAccountId: r.ad_account_id })}>
                           <Check className="h-4 w-4" />
                         </Button>
-                        <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => setActionDialog({ id: r.id, action: "rejected", userId: r.user_id, amount: r.amount })}>
+                        <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => setActionDialog({ id: r.id, action: "rejected", userId: r.user_id, amount: r.amount, adAccountId: r.ad_account_id })}>
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
@@ -111,7 +149,7 @@ export function AdminTopUp() {
                 </TableRow>
               ))}
               {(!requests || requests.length === 0) && (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No requests</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">No requests</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -126,7 +164,7 @@ export function AdminTopUp() {
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
               {actionDialog?.action === "approved"
-                ? `This will credit $${actionDialog?.amount?.toLocaleString()} to the client's wallet.`
+                ? `This will deduct $${actionDialog?.amount?.toLocaleString()} from the client's wallet and update the ad account spend cap via Meta API.`
                 : "The client will be notified of the rejection."}
             </p>
             <div className="space-y-2">

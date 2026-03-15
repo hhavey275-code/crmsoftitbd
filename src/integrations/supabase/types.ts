@@ -18,9 +18,13 @@ export type Database = {
         Row: {
           account_id: string
           account_name: string
+          amount_spent: number
+          assigned_user_id: string | null
+          business_manager_id: string | null
           created_at: string
           id: string
           platform: string
+          spend_cap: number
           status: string
           updated_at: string
           user_id: string
@@ -28,9 +32,13 @@ export type Database = {
         Insert: {
           account_id: string
           account_name: string
+          amount_spent?: number
+          assigned_user_id?: string | null
+          business_manager_id?: string | null
           created_at?: string
           id?: string
           platform?: string
+          spend_cap?: number
           status?: string
           updated_at?: string
           user_id: string
@@ -38,12 +46,54 @@ export type Database = {
         Update: {
           account_id?: string
           account_name?: string
+          amount_spent?: number
+          assigned_user_id?: string | null
+          business_manager_id?: string | null
           created_at?: string
           id?: string
           platform?: string
+          spend_cap?: number
           status?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_accounts_business_manager_id_fkey"
+            columns: ["business_manager_id"]
+            isOneToOne: false
+            referencedRelation: "business_managers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      business_managers: {
+        Row: {
+          access_token: string
+          bm_id: string
+          created_at: string
+          id: string
+          name: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          access_token: string
+          bm_id: string
+          created_at?: string
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string
+          bm_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -79,6 +129,7 @@ export type Database = {
       }
       top_up_requests: {
         Row: {
+          ad_account_id: string | null
           admin_note: string | null
           amount: number
           created_at: string
@@ -92,6 +143,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          ad_account_id?: string | null
           admin_note?: string | null
           amount: number
           created_at?: string
@@ -105,6 +157,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          ad_account_id?: string | null
           admin_note?: string | null
           amount?: number
           created_at?: string
@@ -117,7 +170,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "top_up_requests_ad_account_id_fkey"
+            columns: ["ad_account_id"]
+            isOneToOne: false
+            referencedRelation: "ad_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       transactions: {
         Row: {
