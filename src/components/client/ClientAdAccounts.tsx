@@ -5,12 +5,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
+import { SpendProgressBar } from "@/components/SpendProgressBar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { ArrowUpCircle, ExternalLink } from "lucide-react";
+import { ArrowUpCircle, ExternalLink, Wallet } from "lucide-react";
 
 export function ClientAdAccounts() {
   const { user } = useAuth();
@@ -38,20 +39,43 @@ export function ClientAdAccounts() {
     enabled: !!user,
   });
 
+  const { data: wallet } = useQuery({
+    queryKey: ["client-wallet", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("wallets")
+        .select("balance")
+        .eq("user_id", user!.id)
+        .single();
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  const walletBalance = Number(wallet?.balance ?? 0);
+  const parsedAmount = parseFloat(topUpAmount) || 0;
+  const exceedsBalance = parsedAmount > walletBalance;
+
   const topUpMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("top_up_requests").insert({
-        user_id: user!.id,
-        amount: parseFloat(topUpAmount),
-        ad_account_id: topUpAccount.id,
+      const { data, error } = await supabase.functions.invoke("update-spend-cap", {
+        body: {
+          ad_account_id: topUpAccount.id,
+          amount: parsedAmount,
+          deduct_wallet: true,
+        },
       });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
     },
-    onSuccess: () => {
-      toast.success("Top-up request submitted! Pending admin approval.");
+    onSuccess: (data) => {
+      toast.success(`Spend cap updated: $${Number(data.old_spend_cap).toLocaleString()} → $${Number(data.new_spend_cap).toLocaleString()}`);
       setTopUpAccount(null);
       setTopUpAmount("");
       queryClient.invalidateQueries({ queryKey: ["client-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["client-wallet"] });
+      queryClient.invalidateQueries({ queryKey: ["client-transactions"] });
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -68,8 +92,7 @@ export function ClientAdAccounts() {
                 <TableHead>Account ID</TableHead>
                 <TableHead>Business Name</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Spend Cap</TableHead>
-                <TableHead>Amount Spent</TableHead>
+                <TableHead>Spend Cap / Spent</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -80,8 +103,9 @@ export function ClientAdAccounts() {
                   <TableCell className="font-mono text-sm">{a.account_id}</TableCell>
                   <TableCell>{a.business_name || "—"}</TableCell>
                   <TableCell><StatusBadge status={a.status} /></TableCell>
-                  <TableCell>${Number(a.spend_cap).toLocaleString()}</TableCell>
-                  <TableCell>${Number(a.amount_spent).toLocaleString()}</TableCell>
+                  <TableCell>
+                    <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} />
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Button
@@ -91,11 +115,7 @@ export function ClientAdAccounts() {
                         <ArrowUpCircle className="h-4 w-4 mr-1" />
                         Top Up
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        asChild
-                      >
+                      <Button variant="ghost" size="sm" asChild>
                         <a
                           href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${a.account_id.replace(/^act_/, '')}`}
                           target="_blank"
@@ -110,7 +130,7 @@ export function ClientAdAccounts() {
                 </TableRow>
               ))}
               {(!accounts || accounts.length === 0) && (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No ad accounts assigned to you yet</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No ad accounts assigned to you yet</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -122,10 +142,19 @@ export function ClientAdAccounts() {
           <DialogHeader>
             <DialogTitle>Increase Spend Limit</DialogTitle>
             <DialogDescription>
-              Submit a top-up request for <span className="font-semibold">{topUpAccount?.account_name}</span> ({topUpAccount?.account_id})
+              Top up <span className="font-semibold">{topUpAccount?.account_name}</span> ({topUpAccount?.account_id})
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-muted">
+              <span className="flex items-center gap-2">
+                <Wallet className="h-4 w-4" />
+                Wallet Balance
+              </span>
+              <span className={`font-semibold ${walletBalance < 0 ? 'text-destructive' : ''}`}>
+                ${walletBalance.toLocaleString()}
+              </span>
+            </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Current Spend Cap</span>
               <span className="font-medium">${Number(topUpAccount?.spend_cap ?? 0).toLocaleString()}</span>
@@ -136,16 +165,20 @@ export function ClientAdAccounts() {
                 type="number"
                 min="1"
                 step="0.01"
+                max={walletBalance}
                 value={topUpAmount}
                 onChange={(e) => setTopUpAmount(e.target.value)}
                 placeholder="500.00"
               />
+              {exceedsBalance && parsedAmount > 0 && (
+                <p className="text-sm text-destructive">Amount exceeds your wallet balance</p>
+              )}
             </div>
-            {topUpAmount && parseFloat(topUpAmount) > 0 && (
+            {parsedAmount > 0 && !exceedsBalance && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">New Spend Cap</span>
                 <span className="font-medium text-primary">
-                  ${(Number(topUpAccount?.spend_cap ?? 0) + parseFloat(topUpAmount)).toLocaleString()}
+                  ${(Number(topUpAccount?.spend_cap ?? 0) + parsedAmount).toLocaleString()}
                 </span>
               </div>
             )}
@@ -154,9 +187,9 @@ export function ClientAdAccounts() {
             <Button variant="outline" onClick={() => setTopUpAccount(null)}>Cancel</Button>
             <Button
               onClick={() => topUpMutation.mutate()}
-              disabled={!topUpAmount || parseFloat(topUpAmount) <= 0 || topUpMutation.isPending}
+              disabled={!topUpAmount || parsedAmount <= 0 || exceedsBalance || topUpMutation.isPending}
             >
-              {topUpMutation.isPending ? "Submitting..." : "Submit Request"}
+              {topUpMutation.isPending ? "Processing..." : "Top Up Now"}
             </Button>
           </DialogFooter>
         </DialogContent>

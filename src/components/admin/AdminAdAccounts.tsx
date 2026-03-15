@@ -4,13 +4,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
+import { SpendProgressBar } from "@/components/SpendProgressBar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { ArrowUpCircle, ExternalLink } from "lucide-react";
+import { ArrowUpCircle, ExternalLink, Wallet, AlertTriangle } from "lucide-react";
 
 export function AdminAdAccounts() {
   const queryClient = useQueryClient();
@@ -44,6 +45,14 @@ export function AdminAdAccounts() {
     },
   });
 
+  const { data: allWallets } = useQuery({
+    queryKey: ["admin-all-wallets"],
+    queryFn: async () => {
+      const { data } = await supabase.from("wallets").select("user_id, balance");
+      return (data as any[]) ?? [];
+    },
+  });
+
   const assignMutation = useMutation({
     mutationFn: async ({ accountId, userId }: { accountId: string; userId: string | null }) => {
       await (supabase as any).from("user_ad_accounts").delete().eq("ad_account_id", accountId);
@@ -63,12 +72,38 @@ export function AdminAdAccounts() {
     onError: (err: any) => toast.error(err.message),
   });
 
+  const getAssignedUserId = (accountId: string) => {
+    const assignment = assignments?.find((a: any) => a.ad_account_id === accountId);
+    return assignment?.user_id ?? null;
+  };
+
+  const getClientWallet = (userId: string | null) => {
+    if (!userId) return null;
+    return allWallets?.find((w: any) => w.user_id === userId);
+  };
+
+  const getClientName = (userId: string | null) => {
+    if (!userId) return null;
+    const client = clients?.find((c: any) => c.user_id === userId);
+    return client?.full_name || client?.email || userId;
+  };
+
+  // Computed values for top-up dialog
+  const assignedUserId = topUpAccount ? getAssignedUserId(topUpAccount.id) : null;
+  const assignedWallet = getClientWallet(assignedUserId);
+  const assignedClientName = getClientName(assignedUserId);
+  const clientBalance = Number(assignedWallet?.balance ?? 0);
+  const parsedAmount = parseFloat(topUpAmount) || 0;
+  const willGoNegative = parsedAmount > clientBalance;
+
   const topUpMutation = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke("update-spend-cap", {
         body: {
           ad_account_id: topUpAccount.id,
-          amount: parseFloat(topUpAmount),
+          amount: parsedAmount,
+          deduct_wallet: !!assignedUserId,
+          target_user_id: assignedUserId,
         },
       });
       if (error) throw error;
@@ -80,14 +115,10 @@ export function AdminAdAccounts() {
       setTopUpAccount(null);
       setTopUpAmount("");
       queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-all-wallets"] });
     },
     onError: (err: any) => toast.error(err.message),
   });
-
-  const getAssignedUserId = (accountId: string) => {
-    const assignment = assignments?.find((a: any) => a.ad_account_id === accountId);
-    return assignment?.user_id ?? null;
-  };
 
   return (
     <div className="space-y-6">
@@ -104,8 +135,7 @@ export function AdminAdAccounts() {
                 <TableHead>Account ID</TableHead>
                 <TableHead>Business Manager</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Spend Cap</TableHead>
-                <TableHead>Spent</TableHead>
+                <TableHead>Spend Cap / Spent</TableHead>
                 <TableHead>Assigned To</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -117,8 +147,9 @@ export function AdminAdAccounts() {
                   <TableCell className="font-mono text-sm">{a.account_id}</TableCell>
                   <TableCell>{a.business_managers?.name || "—"}</TableCell>
                   <TableCell><StatusBadge status={a.status} /></TableCell>
-                  <TableCell>${Number(a.spend_cap).toLocaleString()}</TableCell>
-                  <TableCell>${Number(a.amount_spent).toLocaleString()}</TableCell>
+                  <TableCell>
+                    <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} />
+                  </TableCell>
                   <TableCell>
                     <Select
                       value={getAssignedUserId(a.id) || "unassigned"}
@@ -146,11 +177,7 @@ export function AdminAdAccounts() {
                         <ArrowUpCircle className="h-4 w-4 mr-1" />
                         Top Up
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        asChild
-                      >
+                      <Button variant="ghost" size="sm" asChild>
                         <a
                           href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${a.account_id.replace(/^act_/, '')}`}
                           target="_blank"
@@ -165,7 +192,7 @@ export function AdminAdAccounts() {
                 </TableRow>
               ))}
               {(!accounts || accounts.length === 0) && (
-                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">No ad accounts</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No ad accounts</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -177,10 +204,31 @@ export function AdminAdAccounts() {
           <DialogHeader>
             <DialogTitle>Increase Spend Limit</DialogTitle>
             <DialogDescription>
-              Submit a top-up request for <span className="font-semibold">{topUpAccount?.account_name}</span> ({topUpAccount?.account_id})
+              Top up <span className="font-semibold">{topUpAccount?.account_name}</span> ({topUpAccount?.account_id})
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {assignedUserId ? (
+              <div className="p-3 rounded-lg bg-muted space-y-2">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Assigned Client</span>
+                  <span className="font-medium">{assignedClientName}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="flex items-center gap-2">
+                    <Wallet className="h-4 w-4" />
+                    Client Wallet Balance
+                  </span>
+                  <span className={`font-semibold ${clientBalance < 0 ? 'text-destructive' : ''}`}>
+                    ${clientBalance.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 rounded-lg bg-muted text-sm text-muted-foreground">
+                No client assigned — wallet will not be deducted
+              </div>
+            )}
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Current Spend Cap</span>
               <span className="font-medium">${Number(topUpAccount?.spend_cap ?? 0).toLocaleString()}</span>
@@ -195,12 +243,18 @@ export function AdminAdAccounts() {
                 onChange={(e) => setTopUpAmount(e.target.value)}
                 placeholder="500.00"
               />
+              {willGoNegative && parsedAmount > 0 && assignedUserId && (
+                <div className="flex items-center gap-2 text-sm text-yellow-600">
+                  <AlertTriangle className="h-4 w-4" />
+                  Client balance will go negative by ${(parsedAmount - clientBalance).toLocaleString()}
+                </div>
+              )}
             </div>
-            {topUpAmount && parseFloat(topUpAmount) > 0 && (
+            {parsedAmount > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">New Spend Cap</span>
                 <span className="font-medium text-primary">
-                  ${(Number(topUpAccount?.spend_cap ?? 0) + parseFloat(topUpAmount)).toLocaleString()}
+                  ${(Number(topUpAccount?.spend_cap ?? 0) + parsedAmount).toLocaleString()}
                 </span>
               </div>
             )}
@@ -209,7 +263,7 @@ export function AdminAdAccounts() {
             <Button variant="outline" onClick={() => setTopUpAccount(null)}>Cancel</Button>
             <Button
               onClick={() => topUpMutation.mutate()}
-              disabled={!topUpAmount || parseFloat(topUpAmount) <= 0 || topUpMutation.isPending}
+              disabled={!topUpAmount || parsedAmount <= 0 || topUpMutation.isPending}
             >
               {topUpMutation.isPending ? "Processing..." : "Top Up Now"}
             </Button>
