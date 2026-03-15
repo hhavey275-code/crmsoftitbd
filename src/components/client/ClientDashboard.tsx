@@ -139,8 +139,8 @@ export function ClientDashboard() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           title="Today's Spend"
-          value={`$${aggregatedTodaySpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          subtitle={`Yesterday: $${aggregatedYesterdaySpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          value={`$${aggregatedTodaySpend.toLocaleString()}`}
+          subtitle={`Yesterday: $${aggregatedYesterdaySpend.toLocaleString()}`}
           icon={DollarSign}
           iconBg="bg-emerald-50 dark:bg-emerald-900/30"
           iconColor="text-emerald-600"
