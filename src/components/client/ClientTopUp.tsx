@@ -166,9 +166,9 @@ export function ClientTopUp() {
           <Button
             className="w-full"
             onClick={() => submitMutation.mutate()}
-            disabled={!bdtAmount || parseFloat(bdtAmount) <= 0 || !selectedBank || submitMutation.isPending}
+            disabled={isInactive || !bdtAmount || parseFloat(bdtAmount) <= 0 || !selectedBank || submitMutation.isPending}
           >
-            {submitMutation.isPending ? "Submitting..." : "Submit Request"}
+            {submitMutation.isPending ? "Submitting..." : isInactive ? "Account Frozen" : "Submit Request"}
           </Button>
         </CardContent>
       </Card>
