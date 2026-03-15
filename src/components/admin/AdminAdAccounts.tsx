@@ -2,8 +2,9 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SpendProgressBar } from "@/components/SpendProgressBar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -28,7 +29,7 @@ export function AdminAdAccounts() {
   const [topUpAmount, setTopUpAmount] = useState("");
   const [sortField, setSortField] = useState<string>("account_name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const { data: accounts } = useQuery({
     queryKey: ["admin-ad-accounts"],
@@ -95,21 +96,23 @@ export function AdminAdAccounts() {
     onError: (err: any) => toast.error(err.message || "Failed to refresh"),
   });
 
-  const refreshSingle = async (accountId: string) => {
-    setRefreshingIds(prev => new Set(prev).add(accountId));
-    try {
-      const { error } = await supabase.functions.invoke("get-account-insights", {
-        body: { ad_account_ids: [accountId], source: "meta" },
+  const refreshSelectedMutation = useMutation({
+    mutationFn: async () => {
+      const ids = Array.from(selectedIds);
+      if (ids.length === 0) return;
+      const { data, error } = await supabase.functions.invoke("get-account-insights", {
+        body: { ad_account_ids: ids, source: "meta" },
       });
       if (error) throw error;
-      await refetchInsights();
-      toast.success("Account updated");
-    } catch {
-      toast.error("Failed to refresh");
-    } finally {
-      setRefreshingIds(prev => { const s = new Set(prev); s.delete(accountId); return s; });
-    }
-  };
+      return data;
+    },
+    onSuccess: () => {
+      toast.success(`${selectedIds.size} account(s) updated from Meta`);
+      refetchInsights();
+      setSelectedIds(new Set());
+    },
+    onError: (err: any) => toast.error(err.message || "Failed to refresh"),
+  });
 
   const getAssignedUserId = (accountId: string) => {
     const assignment = assignments?.find((a: any) => a.ad_account_id === accountId);
@@ -156,6 +159,26 @@ export function AdminAdAccounts() {
       return 0;
     });
   }, [accounts, insights, sortField, sortDir]);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (!sortedAccounts.length) return;
+    if (selectedIds.size === sortedAccounts.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(sortedAccounts.map((a: any) => a.id)));
+    }
+  };
+
+  const allSelected = sortedAccounts.length > 0 && selectedIds.size === sortedAccounts.length;
 
   const assignedUserId = topUpAccount ? getAssignedUserId(topUpAccount.id) : null;
   const assignedWallet = getClientWallet(assignedUserId);
@@ -205,6 +228,17 @@ export function AdminAdAccounts() {
               Last synced: {lastUpdated.toLocaleString()}
             </span>
           )}
+          {selectedIds.size > 0 && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => refreshSelectedMutation.mutate()}
+              disabled={refreshSelectedMutation.isPending}
+            >
+              <RefreshCw className={`h-4 w-4 mr-1 ${refreshSelectedMutation.isPending ? 'animate-spin' : ''}`} />
+              {refreshSelectedMutation.isPending ? "Updating..." : `Update ${selectedIds.size} Selected`}
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -221,6 +255,13 @@ export function AdminAdAccounts() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[40px]" onClick={(e) => e.stopPropagation()}>
+                  <Checkbox
+                    checked={allSelected}
+                    onCheckedChange={toggleSelectAll}
+                    aria-label="Select all"
+                  />
+                </TableHead>
                 <TableHead className="w-[200px]">
                   <button className="flex items-center text-xs font-medium" onClick={() => toggleSort("account_name")}>
                     Ad Account <SortIcon field="account_name" />
@@ -255,7 +296,10 @@ export function AdminAdAccounts() {
                 <TableHead className="w-[90px]">
                   <span className="text-xs font-medium">Client</span>
                 </TableHead>
-                <TableHead className="w-[100px]">
+                <TableHead className="w-[60px]">
+                  <span className="text-xs font-medium">Billing</span>
+                </TableHead>
+                <TableHead className="w-[80px]">
                   <span className="text-xs font-medium">Actions</span>
                 </TableHead>
               </TableRow>
@@ -268,7 +312,15 @@ export function AdminAdAccounts() {
                     key={a.id}
                     className="cursor-pointer hover:bg-muted/50"
                     onClick={() => navigate(`/ad-accounts/${a.id}`)}
+                    data-state={selectedIds.has(a.id) ? "selected" : undefined}
                   >
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedIds.has(a.id)}
+                        onCheckedChange={() => toggleSelect(a.id)}
+                        aria-label={`Select ${a.account_name}`}
+                      />
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
@@ -279,17 +331,8 @@ export function AdminAdAccounts() {
                           {a.business_managers?.name && (
                             <div className="text-xs text-muted-foreground">{a.business_managers.name}</div>
                           )}
-                          <div className="flex items-center gap-1 mt-0.5">
+                          <div className="mt-0.5">
                             <span className="text-xs text-muted-foreground font-mono">{a.account_id.replace(/^act_/, '')}</span>
-                            <a
-                              href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${a.account_id.replace(/^act_/, '')}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-primary hover:text-primary/80"
-                            >
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
                           </div>
                         </div>
                       </div>
@@ -325,32 +368,30 @@ export function AdminAdAccounts() {
                       <span className="text-sm">{getClientName(getAssignedUserId(a.id))}</span>
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
-                        >
-                          <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
-                          Top Up
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => refreshSingle(a.id)}
-                          disabled={refreshingIds.has(a.id)}
-                          title="Refresh from Meta"
-                        >
-                          <RefreshCw className={`h-3.5 w-3.5 ${refreshingIds.has(a.id) ? 'animate-spin' : ''}`} />
-                        </Button>
-                      </div>
+                      <a
+                        href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${a.account_id.replace(/^act_/, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:text-primary/80"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
+                    </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
+                      >
+                        <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
+                        Top Up
+                      </Button>
                     </TableCell>
                   </TableRow>
                 );
               })}
               {(!accounts || accounts.length === 0) && (
-                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">No ad accounts</TableCell></TableRow>
+                <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground">No ad accounts</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
