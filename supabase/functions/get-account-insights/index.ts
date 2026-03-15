@@ -93,10 +93,10 @@ Deno.serve(async (req) => {
       try {
         const [todayRes, yesterdayRes, accountRes] = await Promise.all([
           fetch(
-            `https://graph.facebook.com/v24.0/${actId}/insights?fields=spend&date_preset=today&access_token=${accessToken}`
+            `https://graph.facebook.com/v24.0/${actId}/insights?fields=spend,actions&date_preset=today&access_token=${accessToken}`
           ),
           fetch(
-            `https://graph.facebook.com/v24.0/${actId}/insights?fields=spend&date_preset=yesterday&access_token=${accessToken}`
+            `https://graph.facebook.com/v24.0/${actId}/insights?fields=spend,actions&date_preset=yesterday&access_token=${accessToken}`
           ),
           fetch(
             `https://graph.facebook.com/v24.0/${actId}?fields=balance,funding_source_details&access_token=${accessToken}`
@@ -113,6 +113,19 @@ Deno.serve(async (req) => {
         const yesterdaySpend = yesterdayData?.data?.[0]?.spend
           ? parseFloat(yesterdayData.data[0].spend)
           : 0;
+
+        // Extract purchase/order actions
+        const extractOrders = (data: any) => {
+          const actions = data?.data?.[0]?.actions;
+          if (!actions) return 0;
+          const purchaseAction = actions.find((a: any) => 
+            a.action_type === "purchase" || a.action_type === "offsite_conversion.fb_pixel_purchase"
+          );
+          return purchaseAction ? parseInt(purchaseAction.value, 10) : 0;
+        };
+
+        const todayOrders = extractOrders(todayData);
+        const yesterdayOrders = extractOrders(yesterdayData);
 
         const balance = accountData?.balance
           ? parseFloat(accountData.balance) / 100
@@ -131,6 +144,8 @@ Deno.serve(async (req) => {
         insights[account.id] = {
           today_spend: todaySpend,
           yesterday_spend: yesterdaySpend,
+          today_orders: todayOrders,
+          yesterday_orders: yesterdayOrders,
           balance,
           cards,
         };
@@ -138,6 +153,8 @@ Deno.serve(async (req) => {
         insights[account.id] = {
           today_spend: 0,
           yesterday_spend: 0,
+          today_orders: 0,
+          yesterday_orders: 0,
           balance: 0,
           cards: [],
         };
