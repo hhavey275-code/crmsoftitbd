@@ -7,8 +7,8 @@ const statusConfig: Record<string, { color: string; label: string }> = {
   hold: { color: "bg-orange-500", label: "On Hold" },
   rejected: { color: "bg-red-500", label: "Rejected" },
   failed: { color: "bg-red-500", label: "Failed" },
-  disabled: { color: "bg-muted-foreground", label: "Disabled" },
-  unsettled: { color: "bg-violet-500", label: "Unsettled" },
+  disabled: { color: "bg-red-500", label: "Disabled" },
+  unsettled: { color: "bg-amber-500", label: "Unsettled" },
   inactive: { color: "bg-muted-foreground", label: "Inactive" },
 };
 
