@@ -13,34 +13,51 @@ import { useSiteSettings } from "@/hooks/useSiteSettings";
 const TechBackground = lazy(() => import("@/components/TechBackground"));
 
 /* Cute animated mascot that covers eyes when typing password */
-function EyeMascot({ isCovering }: { isCovering: boolean }) {
+function RobotMascot({ isCovering }: { isCovering: boolean }) {
   return (
-    <div className="mx-auto mb-4 relative w-28 h-28">
-      {/* Face */}
-      <div className="w-28 h-28 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 shadow-lg flex items-center justify-center relative overflow-visible">
-        {/* Eyes */}
-        <div className="flex gap-4 relative z-10">
-          <div className={`w-5 h-5 rounded-full bg-white flex items-center justify-center transition-all duration-300 ${isCovering ? "scale-y-[0.1]" : ""}`}>
-            <div className={`w-2.5 h-2.5 rounded-full bg-gray-900 transition-all duration-300 ${isCovering ? "opacity-0" : ""}`} />
+    <div className="mx-auto mb-4 relative w-32 h-32 select-none">
+      {/* Antenna */}
+      <div className="absolute left-1/2 -translate-x-1/2 -top-3 w-1 h-5 bg-gradient-to-t from-slate-400 to-slate-300 rounded-full" />
+      <div className={`absolute left-1/2 -translate-x-1/2 -top-5 w-3 h-3 rounded-full transition-all duration-500 ${isCovering ? "bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.7)]" : "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.7)]"}`} />
+      
+      {/* Head */}
+      <div className="w-32 h-28 rounded-2xl bg-gradient-to-br from-slate-200 via-slate-100 to-slate-200 dark:from-slate-700 dark:via-slate-600 dark:to-slate-700 shadow-lg border border-slate-300 dark:border-slate-500 relative overflow-hidden">
+        {/* Screen face */}
+        <div className="absolute inset-2 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 flex flex-col items-center justify-center gap-2">
+          {/* Eyes row */}
+          <div className="flex gap-6 items-center">
+            {/* Left eye */}
+            <div className={`relative transition-all duration-400 ease-in-out ${isCovering ? "w-6 h-1" : "w-6 h-6"} rounded-sm bg-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.6)] flex items-center justify-center`}>
+              {!isCovering && <div className="w-2 h-2 rounded-full bg-slate-900" />}
+            </div>
+            {/* Right eye */}
+            <div className={`relative transition-all duration-400 ease-in-out ${isCovering ? "w-6 h-1" : "w-6 h-6"} rounded-sm bg-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.6)] flex items-center justify-center`}>
+              {!isCovering && <div className="w-2 h-2 rounded-full bg-slate-900" />}
+            </div>
           </div>
-          <div className={`w-5 h-5 rounded-full bg-white flex items-center justify-center transition-all duration-300 ${isCovering ? "scale-y-[0.1]" : ""}`}>
-            <div className={`w-2.5 h-2.5 rounded-full bg-gray-900 transition-all duration-300 ${isCovering ? "opacity-0" : ""}`} />
+          {/* Mouth */}
+          <div className={`flex gap-0.5 transition-all duration-300 ${isCovering ? "opacity-100" : "opacity-70"}`}>
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className={`w-2 h-1.5 rounded-sm transition-all duration-300 ${isCovering ? "bg-red-400/80 h-1" : "bg-cyan-400/60"}`} />
+            ))}
           </div>
+          {/* X eyes overlay when covering */}
+          {isCovering && (
+            <div className="absolute inset-0 flex items-center justify-center gap-6 pb-3">
+              <span className="text-red-400 text-lg font-bold drop-shadow-[0_0_6px_rgba(248,113,113,0.8)]">✕</span>
+              <span className="text-red-400 text-lg font-bold drop-shadow-[0_0_6px_rgba(248,113,113,0.8)]">✕</span>
+            </div>
+          )}
         </div>
-        {/* Hands covering eyes */}
-        <div
-          className={`absolute left-1 z-20 w-10 h-7 rounded-full bg-gradient-to-br from-blue-300 to-blue-500 shadow-md transition-all duration-500 ease-in-out ${
-            isCovering ? "top-[38%] opacity-100" : "top-[80%] opacity-0"
-          }`}
-        />
-        <div
-          className={`absolute right-1 z-20 w-10 h-7 rounded-full bg-gradient-to-br from-blue-300 to-blue-500 shadow-md transition-all duration-500 ease-in-out ${
-            isCovering ? "top-[38%] opacity-100" : "top-[80%] opacity-0"
-          }`}
-        />
-        {/* Mouth */}
-        <div className={`absolute bottom-5 w-6 h-3 rounded-b-full border-b-2 border-white/60 transition-all duration-300 ${isCovering ? "w-4 h-2 bottom-5" : ""}`} />
+        {/* Bolts */}
+        <div className="absolute top-1 left-0.5 w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500" />
+        <div className="absolute top-1 right-0.5 w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500" />
+        <div className="absolute bottom-1 left-0.5 w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500" />
+        <div className="absolute bottom-1 right-0.5 w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500" />
       </div>
+      {/* Ears */}
+      <div className="absolute left-[-6px] top-10 w-2.5 h-8 rounded-l-md bg-gradient-to-b from-slate-300 to-slate-400 dark:from-slate-600 dark:to-slate-700" />
+      <div className="absolute right-[-6px] top-10 w-2.5 h-8 rounded-r-md bg-gradient-to-b from-slate-300 to-slate-400 dark:from-slate-600 dark:to-slate-700" />
     </div>
   );
 }
@@ -115,7 +132,7 @@ export default function Auth() {
             {logoUrl && (
               <img src={logoUrl} alt="Logo" className="mx-auto mb-2 h-24 w-24 rounded-xl object-contain" />
             )}
-            <EyeMascot isCovering={isPasswordFocused} />
+            <RobotMascot isCovering={isPasswordFocused} />
             <CardTitle className="text-2xl">{welcomeTitle || "Welcome"}</CardTitle>
             <CardDescription className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500 text-base drop-shadow-[0_0_10px_rgba(0,150,255,0.5)]">
               {welcomeNote || (isLogin ? "Sign in to your account" : "Create a new account")}
