@@ -10,63 +10,66 @@ export default function TechBackground() {
     if (!ctx) return;
 
     let animationId: number;
-    let width = 0;
-    let height = 0;
+    const dpr = window.devicePixelRatio || 1;
 
     const particles: { x: number; y: number; vx: number; vy: number; size: number; opacity: number }[] = [];
-    const lines: { x: number; y: number; angle: number; length: number; speed: number; opacity: number }[] = [];
+    const circuitLines: { x: number; y: number; angle: number; length: number; speed: number; opacity: number }[] = [];
 
     const resize = () => {
-      width = canvas.width = canvas.offsetWidth * window.devicePixelRatio;
-      height = canvas.height = canvas.offsetHeight * window.devicePixelRatio;
-      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
 
     const init = () => {
       resize();
-      const w = canvas.offsetWidth;
-      const h = canvas.offsetHeight;
+      const rect = canvas.getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
 
-      // Create particles
-      for (let i = 0; i < 60; i++) {
+      particles.length = 0;
+      circuitLines.length = 0;
+
+      for (let i = 0; i < 70; i++) {
         particles.push({
           x: Math.random() * w,
           y: Math.random() * h,
-          vx: (Math.random() - 0.5) * 0.5,
-          vy: (Math.random() - 0.5) * 0.5,
+          vx: (Math.random() - 0.5) * 0.6,
+          vy: (Math.random() - 0.5) * 0.6,
           size: Math.random() * 2.5 + 1,
-          opacity: Math.random() * 0.4 + 0.1,
+          opacity: Math.random() * 0.5 + 0.15,
         });
       }
 
-      // Create circuit-like lines
-      for (let i = 0; i < 15; i++) {
-        lines.push({
+      for (let i = 0; i < 18; i++) {
+        circuitLines.push({
           x: Math.random() * w,
           y: Math.random() * h,
           angle: (Math.floor(Math.random() * 4) * Math.PI) / 2,
-          length: Math.random() * 100 + 50,
-          speed: Math.random() * 0.3 + 0.1,
-          opacity: Math.random() * 0.15 + 0.05,
+          length: Math.random() * 120 + 40,
+          speed: Math.random() * 0.4 + 0.1,
+          opacity: Math.random() * 0.18 + 0.05,
         });
       }
     };
 
     const draw = () => {
-      const w = canvas.offsetWidth;
-      const h = canvas.offsetHeight;
+      const rect = canvas.getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
       ctx.clearRect(0, 0, w, h);
 
-      // Draw connection lines between nearby particles
+      // Connection lines
       for (let i = 0; i < particles.length; i++) {
         for (let j = i + 1; j < particles.length; j++) {
           const dx = particles[i].x - particles[j].x;
           const dy = particles[i].y - particles[j].y;
           const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 150) {
+          if (dist < 160) {
             ctx.beginPath();
-            ctx.strokeStyle = `rgba(0, 100, 224, ${0.08 * (1 - dist / 150)})`;
-            ctx.lineWidth = 0.5;
+            ctx.strokeStyle = `rgba(0, 100, 224, ${0.1 * (1 - dist / 160)})`;
+            ctx.lineWidth = 0.6;
             ctx.moveTo(particles[i].x, particles[i].y);
             ctx.lineTo(particles[j].x, particles[j].y);
             ctx.stroke();
@@ -74,59 +77,52 @@ export default function TechBackground() {
         }
       }
 
-      // Draw & update particles
+      // Particles
       for (const p of particles) {
         p.x += p.vx;
         p.y += p.vy;
         if (p.x < 0 || p.x > w) p.vx *= -1;
         if (p.y < 0 || p.y > h) p.vy *= -1;
-
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(0, 100, 224, ${p.opacity})`;
         ctx.fill();
       }
 
-      // Draw circuit lines
-      for (const l of lines) {
+      // Circuit lines
+      for (const l of circuitLines) {
         const endX = l.x + Math.cos(l.angle) * l.length;
         const endY = l.y + Math.sin(l.angle) * l.length;
-
         ctx.beginPath();
         ctx.strokeStyle = `rgba(0, 100, 224, ${l.opacity})`;
         ctx.lineWidth = 1;
         ctx.moveTo(l.x, l.y);
         ctx.lineTo(endX, endY);
         ctx.stroke();
-
-        // Small node at end
         ctx.beginPath();
-        ctx.arc(endX, endY, 2, 0, Math.PI * 2);
+        ctx.arc(endX, endY, 2.5, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(0, 100, 224, ${l.opacity + 0.1})`;
         ctx.fill();
-
-        // Move line slowly
         l.x += Math.cos(l.angle) * l.speed;
         l.y += Math.sin(l.angle) * l.speed;
-        if (l.x < -100 || l.x > w + 100 || l.y < -100 || l.y > h + 100) {
+        if (l.x < -120 || l.x > w + 120 || l.y < -120 || l.y > h + 120) {
           l.x = Math.random() * w;
           l.y = Math.random() * h;
           l.angle = (Math.floor(Math.random() * 4) * Math.PI) / 2;
         }
       }
 
-      // Rotating hexagon grid overlay
+      // Rotating hex grid
       const time = Date.now() * 0.0003;
       const cx = w / 2;
       const cy = h / 2;
-      const hexSize = 40;
-      for (let row = -6; row <= 6; row++) {
-        for (let col = -8; col <= 8; col++) {
+      const hexSize = 45;
+      for (let row = -7; row <= 7; row++) {
+        for (let col = -10; col <= 10; col++) {
           const hx = cx + col * hexSize * 1.75 + (row % 2) * hexSize * 0.875;
           const hy = cy + row * hexSize * 1.5;
           const dist = Math.sqrt((hx - cx) ** 2 + (hy - cy) ** 2);
-          const pulse = Math.sin(time * 2 + dist * 0.01) * 0.5 + 0.5;
-          
+          const pulse = Math.sin(time * 2 + dist * 0.008) * 0.5 + 0.5;
           ctx.beginPath();
           for (let i = 0; i < 6; i++) {
             const angle = (Math.PI / 3) * i + time;
@@ -136,7 +132,7 @@ export default function TechBackground() {
             else ctx.lineTo(px, py);
           }
           ctx.closePath();
-          ctx.strokeStyle = `rgba(0, 100, 224, ${0.04 * pulse})`;
+          ctx.strokeStyle = `rgba(0, 100, 224, ${0.05 * pulse})`;
           ctx.lineWidth = 0.5;
           ctx.stroke();
         }
@@ -148,7 +144,7 @@ export default function TechBackground() {
     init();
     draw();
 
-    window.addEventListener("resize", resize);
+    window.addEventListener("resize", () => { resize(); });
     return () => {
       cancelAnimationFrame(animationId);
       window.removeEventListener("resize", resize);
@@ -158,8 +154,8 @@ export default function TechBackground() {
   return (
     <canvas
       ref={canvasRef}
-      className="absolute inset-0 w-full h-full -z-10"
-      style={{ pointerEvents: "none" }}
+      className="absolute inset-0 w-full h-full"
+      style={{ pointerEvents: "none", zIndex: 0 }}
     />
   );
 }
