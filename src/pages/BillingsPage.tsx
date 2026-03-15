@@ -1,22 +1,26 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
 import { CardBrandIcon } from "@/components/CardBrandIcon";
-import { ArrowUp, ArrowDown, AppWindow, ExternalLink } from "lucide-react";
+import { ArrowUp, ArrowDown, AppWindow, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 
 interface InsightsData {
   balance: number;
   cards: { id: string; display_string: string; type: number }[];
+  updated_at?: string;
 }
 
 export default function BillingsPage() {
   const { user } = useAuth();
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const queryClient = useQueryClient();
 
   const { data: accounts } = useQuery({
     queryKey: ["billings-accounts", user?.id],
@@ -40,6 +44,33 @@ export default function BillingsPage() {
     enabled: !!user && !!accounts && accounts.length > 0,
   });
 
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      if (!accounts || accounts.length === 0) return;
+      const ids = accounts.map((a: any) => a.id);
+      const { data, error } = await supabase.functions.invoke("get-account-insights", {
+        body: { ad_account_ids: ids, source: "meta" },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["billings-insights"] });
+      toast.success("Data updated from Meta");
+    },
+    onError: () => {
+      toast.error("Failed to update from Meta");
+    },
+  });
+
+  const lastUpdated = useMemo(() => {
+    const times = Object.values(insights as Record<string, InsightsData>)
+      .map((i) => i.updated_at)
+      .filter(Boolean);
+    if (times.length === 0) return null;
+    return new Date(times.sort().reverse()[0]!).toLocaleString();
+  }, [insights]);
+
   const sorted = useMemo(() => {
     if (!accounts) return [];
     return [...accounts].sort((a, b) => {
@@ -51,10 +82,26 @@ export default function BillingsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Billings</h1>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Billings</h1>
+            {lastUpdated && (
+              <p className="text-xs text-muted-foreground mt-0.5">Last synced: {lastUpdated}</p>
+            )}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => syncMutation.mutate()}
+            disabled={syncMutation.isPending || !accounts?.length}
+          >
+            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${syncMutation.isPending ? "animate-spin" : ""}`} />
+            Update from Meta
+          </Button>
+        </div>
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-4 px-3">
             {sorted.length === 0 ? (
               <p className="text-sm text-muted-foreground py-8 text-center">No ad accounts found</p>
             ) : (
@@ -62,18 +109,18 @@ export default function BillingsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Account</TableHead>
-                    <TableHead className="w-[100px]">Status</TableHead>
-                    <TableHead className="w-[160px]">How you'll pay</TableHead>
-                    <TableHead className="w-[120px] text-right">
+                    <TableHead className="text-right">
                       <button
                         className="flex items-center text-xs font-medium ml-auto"
                         onClick={() => setSortDir(d => d === "asc" ? "desc" : "asc")}
                       >
-                        Current balance
+                        Balance
                         {sortDir === "asc" ? <ArrowUp className="h-3 w-3 ml-1" /> : <ArrowDown className="h-3 w-3 ml-1" />}
                       </button>
                     </TableHead>
-                    <TableHead className="w-[50px]"></TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Payment</TableHead>
+                    <TableHead className="w-[80px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -82,46 +129,44 @@ export default function BillingsPage() {
                     const balance = Number(ins?.balance ?? 0);
                     return (
                       <TableRow key={acc.id}>
-                        <TableCell className="py-3">
-                          <div className="flex items-center gap-2.5">
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
-                              <AppWindow className="h-3.5 w-3.5 text-muted-foreground" />
+                        <TableCell className="py-2.5">
+                          <div className="flex items-center gap-2">
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted">
+                              <AppWindow className="h-3 w-3 text-muted-foreground" />
                             </div>
                             <div>
-                              <div className="text-sm text-primary leading-tight">{acc.account_name}</div>
-                              <div className="text-xs text-muted-foreground font-mono">ID: {acc.account_id.replace(/^act_/, '')}</div>
+                              <div className="text-sm leading-tight">{acc.account_name}</div>
+                              <div className="text-[11px] text-muted-foreground font-mono">ID: {acc.account_id.replace(/^act_/, '')}</div>
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="py-3">
-                          <StatusBadge status={acc.status} />
-                        </TableCell>
-                        <TableCell className="py-3">
-                          <div className="text-sm">
-                            {ins?.cards && ins.cards.length > 0 ? (
-                              ins.cards.map((card: any, i: number) => (
-                                <div key={i} className="flex items-center gap-1.5">
-                                  <CardBrandIcon displayString={card.display_string} size="xs" />
-                                  <span className="text-xs">{card.display_string}</span>
-                                </div>
-                              ))
-                            ) : (
-                              <span className="text-xs text-muted-foreground">No payment method</span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-3 text-right font-semibold text-sm">
+                        <TableCell className="py-2.5 text-right font-semibold text-sm">
                           ${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </TableCell>
-                        <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
+                        <TableCell className="py-2.5">
+                          <StatusBadge status={acc.status} />
+                        </TableCell>
+                        <TableCell className="py-2.5">
+                          {ins?.cards && ins.cards.length > 0 ? (
+                            ins.cards.map((card: any, i: number) => (
+                              <div key={i} className="flex items-center gap-1">
+                                <CardBrandIcon displayString={card.display_string} size="xs" />
+                                <span className="text-xs">{card.display_string}</span>
+                              </div>
+                            ))
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="py-2.5" onClick={(e) => e.stopPropagation()}>
                           <a
                             href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${acc.account_id.replace(/^act_/, '')}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-primary hover:text-primary/80"
-                            title="Go to Billing"
                           >
-                            <ExternalLink className="h-4 w-4" />
+                            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">
+                              Billing
+                            </Button>
                           </a>
                         </TableCell>
                       </TableRow>
