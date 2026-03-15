@@ -9,6 +9,7 @@ import { Zap } from "lucide-react";
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { logoUrl, headerAnnouncement } = useSiteSettings();
+  const { isAdmin } = useAuth();
 
   return (
     <SidebarProvider>
