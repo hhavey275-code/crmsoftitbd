@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
     const oldSpendCap = Number(account.spend_cap);
     const newSpendCap = oldSpendCap + amount;
     // Meta API accepts spend_cap in cents (smallest currency unit)
-    const newSpendCapCents = newSpendCap * 100;
+    
 
     // Meta API requires act_ prefix for the account ID
     const actId = account.account_id.startsWith("act_")
