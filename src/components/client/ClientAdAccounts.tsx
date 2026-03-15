@@ -234,40 +234,46 @@ export function ClientAdAccounts() {
                     onClick={() => navigate(`/ad-accounts/${a.id}`)}
                   >
                     <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                          <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
-                            <path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.879V14.89h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.989C18.343 21.129 22 16.99 22 12c0-5.523-4.477-10-10-10z"/>
-                          </svg>
-                        </div>
+                      <div className="flex items-center gap-2">
                         <div>
-                          <div className="font-semibold text-sm text-primary">{a.account_name}</div>
-                          <div className="text-[11px] text-muted-foreground font-mono">ID: {a.account_id.replace(/^act_/, '')}</div>
+                          <div className="text-sm font-semibold text-foreground">{a.account_name}</div>
                           {a.business_managers?.name && (
-                            <div className="text-[11px] text-muted-foreground">{a.business_managers.name}</div>
+                            <div className="text-xs text-muted-foreground">{a.business_managers.name}</div>
                           )}
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <span className="text-xs text-muted-foreground font-mono">{a.account_id.replace(/^act_/, '')}</span>
+                            <a
+                              href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${a.account_id.replace(/^act_/, '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-primary hover:text-primary/80"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </div>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="hidden sm:table-cell"><StatusBadge status={a.status} /></TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} />
                     </TableCell>
+                    <TableCell className="hidden sm:table-cell"><StatusBadge status={a.status} /></TableCell>
                     <TableCell className="whitespace-nowrap">
-                      <span className="text-sm font-medium">${ins?.today_spend?.toLocaleString() ?? '—'}</span>
+                      <span className="text-sm">${ins?.balance?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</span>
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
-                      <span className="text-sm font-medium">${ins?.yesterday_spend?.toLocaleString() ?? '—'}</span>
+                      <span className="text-sm">$ {ins?.today_spend?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</span>
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
-                      <span className="text-sm font-semibold">${ins?.balance?.toLocaleString() ?? '—'}</span>
+                      <span className="text-sm">$ {ins?.yesterday_spend?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</span>
                     </TableCell>
                     <TableCell>
-                      <div className="text-xs space-y-0.5">
+                      <div className="text-sm whitespace-nowrap">
                         {ins?.cards && ins.cards.length > 0 ? (
                           ins.cards.map((card: any, i: number) => (
-                            <div key={i} className="flex items-center gap-1">
-                              <CreditCard className="h-3 w-3 text-muted-foreground" />
+                            <div key={i} className="flex items-center gap-1.5">
+                              <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
                               <span>{card.display_string}</span>
                             </div>
                           ))
@@ -280,9 +286,10 @@ export function ClientAdAccounts() {
                       <div className="flex items-center gap-1">
                         <Button
                           size="sm"
+                          variant="outline"
                           onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
                         >
-                          <ArrowUpCircle className="h-4 w-4 mr-1" />
+                          <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
                           <span className="hidden sm:inline">Top Up</span>
                         </Button>
                         <Button
@@ -294,15 +301,6 @@ export function ClientAdAccounts() {
                           title="Refresh from Meta"
                         >
                           <RefreshCw className={`h-3.5 w-3.5 ${refreshingIds.has(a.id) ? 'animate-spin' : ''}`} />
-                        </Button>
-                        <Button variant="ghost" size="sm" asChild className="hidden sm:inline-flex">
-                          <a
-                            href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${a.account_id.replace(/^act_/, '')}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
                         </Button>
                       </div>
                     </TableCell>
