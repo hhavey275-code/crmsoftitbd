@@ -266,7 +266,7 @@ export function ClientTopUp() {
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <ImageIcon className="h-6 w-6 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Click to attach payment screenshot</span>
+                  <span className="text-sm text-muted-foreground">Click to attach or Ctrl+V to paste screenshot</span>
                 </Button>
               ) : (
                 <div className="relative inline-block">
