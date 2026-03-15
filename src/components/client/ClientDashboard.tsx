@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { MetricCard } from "@/components/MetricCard";
 import { Wallet, MonitorSmartphone, TrendingUp, CalendarIcon } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -58,6 +59,20 @@ export function ClientDashboard() {
       }
       const { data } = await query;
       return (data as any[])?.reduce((sum: number, r: any) => sum + Number(r.amount), 0) ?? 0;
+    },
+    enabled: !!user,
+  });
+
+  const { data: transactions } = useQuery({
+    queryKey: ["client-dashboard-transactions", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("user_id", user!.id)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      return (data as any[]) ?? [];
     },
     enabled: !!user,
   });
@@ -140,6 +155,42 @@ export function ClientDashboard() {
           gradientClass="bg-gradient-to-br from-indigo-50 to-violet-100/50 dark:from-indigo-950/40 dark:to-violet-900/20 border-indigo-200 dark:border-indigo-800"
         />
       </div>
+
+      {/* Transaction History */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Recent Transactions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Balance After</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {transactions?.map((tx: any) => (
+                <TableRow key={tx.id}>
+                  <TableCell className="text-muted-foreground whitespace-nowrap">{format(new Date(tx.created_at), "MMM d, yyyy HH:mm")}</TableCell>
+                  <TableCell className="capitalize font-medium">{tx.type.replace(/_/g, " ")}</TableCell>
+                  <TableCell className="text-sm">{tx.description || "—"}</TableCell>
+                  <TableCell className={cn("font-semibold", Number(tx.amount) >= 0 ? "text-green-600" : "text-red-600")}>
+                    {Number(tx.amount) >= 0 ? "+" : ""}${Math.abs(Number(tx.amount)).toLocaleString()}
+                  </TableCell>
+                  <TableCell className="font-medium">${Number(tx.balance_after ?? 0).toLocaleString()}</TableCell>
+                </TableRow>
+              ))}
+              {(!transactions || transactions.length === 0) && (
+                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No transactions yet</TableCell></TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -3,8 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { StatusBadge } from "@/components/StatusBadge";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 export function ClientTransactions() {
   const { user } = useAuth();
@@ -12,7 +12,11 @@ export function ClientTransactions() {
   const { data: transactions } = useQuery({
     queryKey: ["client-transactions", user?.id],
     queryFn: async () => {
-      const { data } = await (supabase as any).from("wallet_transactions").select("*").eq("user_id", user!.id).order("created_at", { ascending: false });
+      const { data } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("user_id", user!.id)
+        .order("created_at", { ascending: false });
       return (data as any[]) ?? [];
     },
     enabled: !!user,
@@ -29,23 +33,27 @@ export function ClientTransactions() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Type</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Balance After</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {transactions?.map((tx: any) => (
                 <TableRow key={tx.id}>
-                  <TableCell className="capitalize font-medium">{tx.type.replace("_", " ")}</TableCell>
-                  <TableCell className="font-semibold">${Number(tx.amount).toLocaleString()}</TableCell>
-                  <TableCell><StatusBadge status={tx.status} /></TableCell>
-                  <TableCell className="text-muted-foreground">{format(new Date(tx.created_at), "MMM d, yyyy HH:mm")}</TableCell>
+                  <TableCell className="text-muted-foreground whitespace-nowrap">{format(new Date(tx.created_at), "MMM d, yyyy HH:mm")}</TableCell>
+                  <TableCell className="capitalize font-medium">{tx.type.replace(/_/g, " ")}</TableCell>
+                  <TableCell className="text-sm">{tx.description || "—"}</TableCell>
+                  <TableCell className={cn("font-semibold", Number(tx.amount) >= 0 ? "text-green-600" : "text-red-600")}>
+                    {Number(tx.amount) >= 0 ? "+" : ""}${Math.abs(Number(tx.amount)).toLocaleString()}
+                  </TableCell>
+                  <TableCell className="font-medium">${Number(tx.balance_after ?? 0).toLocaleString()}</TableCell>
                 </TableRow>
               ))}
               {(!transactions || transactions.length === 0) && (
-                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No transactions yet</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No transactions yet</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
