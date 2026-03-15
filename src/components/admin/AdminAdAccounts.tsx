@@ -152,7 +152,7 @@ export function AdminAdAccounts() {
                         asChild
                       >
                         <a
-                          href={`https://business.facebook.com/ads/manager/account_settings/account_billing/?act=${a.account_id}`}
+                          href={`https://business.facebook.com/ads/manager/account_settings/account_billing/?act=${a.account_id.replace(/^act_/, '')}`}
                           target="_blank"
                           rel="noopener noreferrer"
                         >
