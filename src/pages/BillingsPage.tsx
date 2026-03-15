@@ -108,7 +108,7 @@ export default function BillingsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Account</TableHead>
+                    <TableHead className="w-[40%]">Account</TableHead>
                     <TableHead className="text-right w-[110px]">
                       <button
                         className="flex items-center text-xs font-medium ml-auto"
