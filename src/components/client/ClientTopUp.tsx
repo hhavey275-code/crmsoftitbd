@@ -89,6 +89,22 @@ export function ClientTopUp() {
 
   const submitMutation = useMutation({
     mutationFn: async () => {
+      let proofUrl: string | null = null;
+
+      // Upload payment proof if provided
+      if (proofFile) {
+        const ext = proofFile.name.split(".").pop();
+        const filePath = `${user!.id}/${Date.now()}.${ext}`;
+        const { error: uploadError } = await supabase.storage
+          .from("payment-proofs")
+          .upload(filePath, proofFile);
+        if (uploadError) throw uploadError;
+        const { data: urlData } = supabase.storage
+          .from("payment-proofs")
+          .getPublicUrl(filePath);
+        proofUrl = urlData.publicUrl;
+      }
+
       const { error } = await supabase.from("top_up_requests").insert({
         user_id: user!.id,
         amount: parseFloat(usdEquivalent),
@@ -97,6 +113,7 @@ export function ClientTopUp() {
         bank_account_id: selectedBank,
         payment_reference: paymentRef || null,
         payment_method: "bank_transfer",
+        proof_url: proofUrl,
       } as any);
       if (error) throw error;
     },
@@ -107,6 +124,7 @@ export function ClientTopUp() {
       setBdtAmount("");
       setSelectedBank("");
       setPaymentRef("");
+      clearFile();
     },
     onError: (err: any) => toast.error(err.message),
   });
