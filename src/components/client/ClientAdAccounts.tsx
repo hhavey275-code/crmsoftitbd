@@ -306,7 +306,7 @@ export function ClientAdAccounts() {
                         {ins?.cards && ins.cards.length > 0 ? (
                           ins.cards.map((card: any, i: number) => (
                             <div key={i} className="flex items-center gap-1.5">
-                              <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
+                              <CardBrandIcon displayString={card.display_string} size="xs" />
                               <span>{card.display_string}</span>
                             </div>
                           ))
