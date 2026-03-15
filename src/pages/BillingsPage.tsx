@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
 import { CardBrandIcon } from "@/components/CardBrandIcon";
-import { ArrowUp, ArrowDown, AppWindow, RefreshCw, Search } from "lucide-react";
+import { ArrowUp, ArrowDown, AppWindow, RefreshCw, Search, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 
 interface InsightsData {
@@ -19,12 +19,15 @@ interface InsightsData {
   updated_at?: string;
 }
 
+const PAGE_SIZE = 20;
+
 export default function BillingsPage() {
   const { user } = useAuth();
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [cardFilter, setCardFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
   const queryClient = useQueryClient();
 
   const { data: accounts } = useQuery({
@@ -106,6 +109,13 @@ export default function BillingsPage() {
       });
   }, [accounts, insights, sortDir, search, statusFilter, cardFilter]);
 
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginated = sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  // Reset page when filters change
+  const resetPage = () => setCurrentPage(1);
+
   return (
     <DashboardLayout>
       <div className="space-y-4">
@@ -132,11 +142,11 @@ export default function BillingsPage() {
             <Input
               placeholder="Search by name or ID..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); resetPage(); }}
               className="pl-9 h-9"
             />
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); resetPage(); }}>
             <SelectTrigger className="w-[140px] h-9">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
@@ -147,7 +157,7 @@ export default function BillingsPage() {
               <SelectItem value="unsettled">Unsettled</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={cardFilter} onValueChange={setCardFilter}>
+          <Select value={cardFilter} onValueChange={(v) => { setCardFilter(v); resetPage(); }}>
             <SelectTrigger className="w-[160px] h-9">
               <SelectValue placeholder="Card" />
             </SelectTrigger>
@@ -164,75 +174,121 @@ export default function BillingsPage() {
             {sorted.length === 0 ? (
               <p className="text-sm text-muted-foreground py-8 text-center">No ad accounts found</p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[40%]">Account</TableHead>
-                    <TableHead className="text-right w-[110px]">
-                      <button
-                        className="flex items-center text-xs font-medium ml-auto"
-                        onClick={() => setSortDir(d => d === "asc" ? "desc" : "asc")}
-                      >
-                        Balance
-                        {sortDir === "asc" ? <ArrowUp className="h-3 w-3 ml-1" /> : <ArrowDown className="h-3 w-3 ml-1" />}
-                      </button>
-                    </TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Payment</TableHead>
-                    <TableHead className="w-[80px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sorted.map((acc: any) => {
-                    const ins = (insights as any)[acc.id] as InsightsData | undefined;
-                    const balance = Number(ins?.balance ?? 0);
-                    return (
-                      <TableRow key={acc.id}>
-                        <TableCell className="py-2.5">
-                          <div className="flex items-center gap-2">
-                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted">
-                              <AppWindow className="h-3 w-3 text-muted-foreground" />
-                            </div>
-                            <div>
-                              <div className="text-sm leading-tight">{acc.account_name}</div>
-                              <div className="text-[11px] text-muted-foreground font-mono">ID: {acc.account_id.replace(/^act_/, '')}</div>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-2.5 text-right font-semibold text-sm">
-                          ${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </TableCell>
-                        <TableCell className="py-2.5">
-                          <StatusBadge status={acc.status} />
-                        </TableCell>
-                        <TableCell className="py-2.5">
-                          {ins?.cards && ins.cards.length > 0 ? (
-                            ins.cards.map((card: any, i: number) => (
-                              <div key={i} className="flex items-center gap-1">
-                                <CardBrandIcon displayString={card.display_string} size="xs" />
-                                <span className="text-xs">{card.display_string}</span>
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[40%]">Account</TableHead>
+                      <TableHead className="text-right w-[110px]">
+                        <button
+                          className="flex items-center text-xs font-medium ml-auto"
+                          onClick={() => setSortDir(d => d === "asc" ? "desc" : "asc")}
+                        >
+                          Balance
+                          {sortDir === "asc" ? <ArrowUp className="h-3 w-3 ml-1" /> : <ArrowDown className="h-3 w-3 ml-1" />}
+                        </button>
+                      </TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Payment</TableHead>
+                      <TableHead className="w-[80px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginated.map((acc: any) => {
+                      const ins = (insights as any)[acc.id] as InsightsData | undefined;
+                      const balance = Number(ins?.balance ?? 0);
+                      return (
+                        <TableRow key={acc.id}>
+                          <TableCell className="py-2.5">
+                            <div className="flex items-center gap-2">
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted">
+                                <AppWindow className="h-3 w-3 text-muted-foreground" />
                               </div>
-                            ))
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="py-2.5" onClick={(e) => e.stopPropagation()}>
-                          <a
-                            href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${acc.account_id.replace(/^act_/, '')}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <Button variant="default" size="sm" className="h-7 px-3 text-xs">
-                              Billing
-                            </Button>
-                          </a>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+                              <div>
+                                <div className="text-sm leading-tight">{acc.account_name}</div>
+                                <div className="text-[11px] text-muted-foreground font-mono">ID: {acc.account_id.replace(/^act_/, '')}</div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-2.5 text-right font-semibold text-sm">
+                            ${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </TableCell>
+                          <TableCell className="py-2.5">
+                            <StatusBadge status={acc.status} />
+                          </TableCell>
+                          <TableCell className="py-2.5">
+                            {ins?.cards && ins.cards.length > 0 ? (
+                              ins.cards.map((card: any, i: number) => (
+                                <div key={i} className="flex items-center gap-1">
+                                  <CardBrandIcon displayString={card.display_string} size="xs" />
+                                  <span className="text-xs">{card.display_string}</span>
+                                </div>
+                              ))
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="py-2.5" onClick={(e) => e.stopPropagation()}>
+                            <a
+                              href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${acc.account_id.replace(/^act_/, '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <Button
+                                size="sm"
+                                className="h-7 px-3 text-xs rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-md shadow-blue-500/25 transition-all hover:shadow-lg hover:shadow-blue-500/30"
+                              >
+                                <ExternalLink className="h-3 w-3 mr-1" />
+                                Billing
+                              </Button>
+                            </a>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between pt-4 px-2">
+                    <p className="text-xs text-muted-foreground">
+                      Showing {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, sorted.length)} of {sorted.length}
+                    </p>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        disabled={safePage <= 1}
+                        onClick={() => setCurrentPage(p => p - 1)}
+                      >
+                        <ChevronLeft className="h-3.5 w-3.5" />
+                      </Button>
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                        <Button
+                          key={p}
+                          variant={p === safePage ? "default" : "outline"}
+                          size="sm"
+                          className="h-7 w-7 p-0 text-xs"
+                          onClick={() => setCurrentPage(p)}
+                        >
+                          {p}
+                        </Button>
+                      ))}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        disabled={safePage >= totalPages}
+                        onClick={() => setCurrentPage(p => p + 1)}
+                      >
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
