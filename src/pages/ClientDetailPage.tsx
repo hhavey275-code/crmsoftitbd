@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,11 +8,27 @@ import { MetricCard } from "@/components/MetricCard";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SpendProgressBar } from "@/components/SpendProgressBar";
-import { User, Building2, Phone, CalendarDays, Wallet, MonitorSmartphone, ArrowUpCircle, History } from "lucide-react";
-import { format } from "date-fns";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import {
+  User, Building2, Phone, CalendarDays, Wallet, MonitorSmartphone,
+  CheckCircle, XCircle, TrendingUp, TrendingDown, DollarSign, CalendarIcon, Save
+} from "lucide-react";
+import { format, startOfMonth, endOfMonth } from "date-fns";
 
 export default function ClientDetailPage() {
   const { userId } = useParams<{ userId: string }>();
+  const queryClient = useQueryClient();
+
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfMonth(new Date()));
+  const [dateTo, setDateTo] = useState<Date | undefined>(endOfMonth(new Date()));
+  const [editingRate, setEditingRate] = useState(false);
+  const [rateInput, setRateInput] = useState("");
 
   const { data: profile } = useQuery({
     queryKey: ["client-detail-profile", userId],
@@ -20,6 +37,14 @@ export default function ClientDetailPage() {
       return data as any;
     },
     enabled: !!userId,
+  });
+
+  const { data: globalRate } = useQuery({
+    queryKey: ["usd-rate"],
+    queryFn: async () => {
+      const { data } = await supabase.from("site_settings").select("value").eq("key", "usd_rate").single();
+      return data?.value ?? "120";
+    },
   });
 
   const { data: wallet } = useQuery({
@@ -46,26 +71,49 @@ export default function ClientDetailPage() {
     enabled: !!userId,
   });
 
-  const { data: pendingTopUps } = useQuery({
-    queryKey: ["client-detail-pending-topups", userId],
+  const { data: topUpTotal } = useQuery({
+    queryKey: ["client-detail-topup-total", userId, dateFrom?.toISOString(), dateTo?.toISOString()],
     queryFn: async () => {
-      const { data } = await supabase.from("top_up_requests").select("*").eq("user_id", userId!).eq("status", "pending");
-      return (data as any[]) ?? [];
+      let query = supabase
+        .from("top_up_requests")
+        .select("amount")
+        .eq("user_id", userId!)
+        .eq("status", "approved");
+      if (dateFrom) query = query.gte("created_at", dateFrom.toISOString());
+      if (dateTo) {
+        const end = new Date(dateTo);
+        end.setHours(23, 59, 59, 999);
+        query = query.lte("created_at", end.toISOString());
+      }
+      const { data } = await query;
+      return (data as any[])?.reduce((sum: number, r: any) => sum + Number(r.amount), 0) ?? 0;
     },
     enabled: !!userId,
   });
 
-  const { data: recentTx } = useQuery({
-    queryKey: ["client-detail-tx", userId],
-    queryFn: async () => {
-      const { data } = await supabase.from("transactions").select("*").eq("user_id", userId!).order("created_at", { ascending: false }).limit(10);
-      return (data as any[]) ?? [];
+  const saveRateMutation = useMutation({
+    mutationFn: async () => {
+      const value = rateInput.trim() === "" ? null : parseFloat(rateInput);
+      const { error } = await supabase
+        .from("profiles")
+        .update({ usd_rate: value } as any)
+        .eq("user_id", userId!);
+      if (error) throw error;
     },
-    enabled: !!userId,
+    onSuccess: () => {
+      toast.success("USD rate updated!");
+      queryClient.invalidateQueries({ queryKey: ["client-detail-profile", userId] });
+      setEditingRate(false);
+    },
+    onError: (err: any) => toast.error(err.message),
   });
 
   const activeAccounts = adAccounts?.filter((a: any) => a.status === "active") ?? [];
+  const disabledAccounts = adAccounts?.filter((a: any) => a.status !== "active") ?? [];
+  const totalRemaining = adAccounts?.reduce((sum: number, a: any) => sum + (Number(a.spend_cap) - Number(a.amount_spent)), 0) ?? 0;
+  const totalSpending = adAccounts?.reduce((sum: number, a: any) => sum + Number(a.amount_spent), 0) ?? 0;
   const isActive = (profile?.status ?? "active") === "active";
+  const clientRate = (profile as any)?.usd_rate;
 
   return (
     <DashboardLayout>
@@ -116,6 +164,44 @@ export default function ClientDetailPage() {
                 </div>
               </div>
             </div>
+
+            {/* USD Rate Section */}
+            <div className="mt-4 flex items-center gap-3 rounded-lg border border-cyan-200 bg-cyan-50/50 dark:bg-cyan-950/20 dark:border-cyan-800 p-4">
+              <DollarSign className="h-5 w-5 text-cyan-600" />
+              <div className="flex-1">
+                <p className="text-xs text-muted-foreground">Client USD Rate</p>
+                {editingRate ? (
+                  <div className="flex items-center gap-2 mt-1">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      className="w-32 h-8"
+                      value={rateInput}
+                      onChange={(e) => setRateInput(e.target.value)}
+                      placeholder="e.g. 125"
+                    />
+                    <Button size="sm" onClick={() => saveRateMutation.mutate()} disabled={saveRateMutation.isPending}>
+                      <Save className="h-3 w-3 mr-1" /> Save
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setEditingRate(false)}>Cancel</Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-cyan-700 dark:text-cyan-400">
+                      {clientRate ? `৳${clientRate}` : `Using global rate (৳${globalRate})`}
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => { setRateInput(clientRate?.toString() ?? ""); setEditingRate(true); }}
+                    >
+                      Edit
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {!isActive && (
               <div className="mt-4 rounded-md bg-destructive/10 border border-destructive/30 p-3 text-sm text-destructive font-medium">
                 ⚠️ This account is currently frozen/inactive.
@@ -123,6 +209,34 @@ export default function ClientDetailPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Date Range for Total Top-Up */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-muted-foreground">Top-Up Period:</span>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className={cn("w-[140px] justify-start text-left font-normal", !dateFrom && "text-muted-foreground")}>
+                <CalendarIcon className="mr-1 h-3 w-3" />
+                {dateFrom ? format(dateFrom, "MMM d, yyyy") : "From"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className="p-3 pointer-events-auto" />
+            </PopoverContent>
+          </Popover>
+          <span className="text-muted-foreground">—</span>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className={cn("w-[140px] justify-start text-left font-normal", !dateTo && "text-muted-foreground")}>
+                <CalendarIcon className="mr-1 h-3 w-3" />
+                {dateTo ? format(dateTo, "MMM d, yyyy") : "To"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className="p-3 pointer-events-auto" />
+            </PopoverContent>
+          </Popover>
+        </div>
 
         {/* Metric Cards */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -135,27 +249,52 @@ export default function ClientDetailPage() {
             gradientClass="bg-gradient-to-br from-green-50 to-emerald-100/50 dark:from-green-950/40 dark:to-emerald-900/20 border-green-200 dark:border-green-800"
           />
           <MetricCard
-            title="Ad Accounts"
-            value={activeAccounts.length}
-            subtitle="Active accounts"
+            title="Total Ad Accounts"
+            value={adAccounts?.length ?? 0}
             icon={MonitorSmartphone}
             iconBg="bg-blue-100 dark:bg-blue-900/50"
             iconColor="text-blue-600"
             gradientClass="bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/40 dark:to-blue-900/20 border-blue-200 dark:border-blue-800"
           />
           <MetricCard
-            title="Pending Top-Ups"
-            value={pendingTopUps?.length ?? 0}
-            icon={ArrowUpCircle}
+            title="Active Ad Accounts"
+            value={activeAccounts.length}
+            icon={CheckCircle}
+            iconBg="bg-emerald-100 dark:bg-emerald-900/50"
+            iconColor="text-emerald-600"
+            gradientClass="bg-gradient-to-br from-emerald-50 to-green-100/50 dark:from-emerald-950/40 dark:to-green-900/20 border-emerald-200 dark:border-emerald-800"
+          />
+          <MetricCard
+            title="Disabled Ad Accounts"
+            value={disabledAccounts.length}
+            icon={XCircle}
+            iconBg="bg-red-100 dark:bg-red-900/50"
+            iconColor="text-red-600"
+            gradientClass="bg-gradient-to-br from-red-50 to-rose-100/50 dark:from-red-950/40 dark:to-rose-900/20 border-red-200 dark:border-red-800"
+          />
+          <MetricCard
+            title="Total Top-Up"
+            value={`$${Number(topUpTotal ?? 0).toLocaleString()}`}
+            subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"}
+            icon={TrendingUp}
             iconBg="bg-orange-100 dark:bg-orange-900/50"
             iconColor="text-orange-600"
             gradientClass="bg-gradient-to-br from-orange-50 to-amber-100/50 dark:from-orange-950/40 dark:to-amber-900/20 border-orange-200 dark:border-orange-800"
           />
           <MetricCard
-            title="Transactions"
-            value={recentTx?.length ?? 0}
-            subtitle="Recent"
-            icon={History}
+            title="Total Remaining Balance"
+            value={`$${totalRemaining.toLocaleString()}`}
+            subtitle="Across all ad accounts"
+            icon={Wallet}
+            iconBg="bg-indigo-100 dark:bg-indigo-900/50"
+            iconColor="text-indigo-600"
+            gradientClass="bg-gradient-to-br from-indigo-50 to-violet-100/50 dark:from-indigo-950/40 dark:to-violet-900/20 border-indigo-200 dark:border-indigo-800"
+          />
+          <MetricCard
+            title="Total Spending"
+            value={`$${totalSpending.toLocaleString()}`}
+            subtitle="Across all ad accounts"
+            icon={TrendingDown}
             iconBg="bg-purple-100 dark:bg-purple-900/50"
             iconColor="text-purple-600"
             gradientClass="bg-gradient-to-br from-purple-50 to-violet-100/50 dark:from-purple-950/40 dark:to-violet-900/20 border-purple-200 dark:border-purple-800"
@@ -191,39 +330,6 @@ export default function ClientDetailPage() {
                       <TableCell><StatusBadge status={acc.status} /></TableCell>
                       <TableCell>
                         <SpendProgressBar amountSpent={Number(acc.amount_spent)} spendCap={Number(acc.spend_cap)} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Recent Transactions */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Recent Transactions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {recentTx?.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">No transactions yet</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Date</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recentTx?.map((tx: any) => (
-                    <TableRow key={tx.id}>
-                      <TableCell className="capitalize font-medium">{tx.type.replace("_", " ")}</TableCell>
-                      <TableCell className="font-semibold">${Number(tx.amount).toLocaleString()}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {format(new Date(tx.created_at), "MMM d, yyyy")}
                       </TableCell>
                     </TableRow>
                   ))}

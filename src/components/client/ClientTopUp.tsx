@@ -19,13 +19,18 @@ export function ClientTopUp() {
   const [selectedBank, setSelectedBank] = useState("");
   const [paymentRef, setPaymentRef] = useState("");
 
-  // Get USD rate
+  // Get USD rate — per-client rate with global fallback
   const { data: usdRate } = useQuery({
-    queryKey: ["usd-rate"],
+    queryKey: ["usd-rate", user?.id],
     queryFn: async () => {
+      // Check per-client rate first
+      const clientRate = (profile as any)?.usd_rate;
+      if (clientRate) return Number(clientRate);
+      // Fallback to global rate
       const { data } = await supabase.from("site_settings").select("value").eq("key", "usd_rate").single();
       return Number(data?.value ?? 120);
     },
+    enabled: !!user,
   });
 
   // Get assigned banks
