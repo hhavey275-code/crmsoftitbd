@@ -1,15 +1,18 @@
-import { useEffect, useMemo } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MetricCard } from "@/components/MetricCard";
-import { Users, Wallet, Clock, Activity, Ban, TrendingUp, Trophy, Crown, Medal, DollarSign } from "lucide-react";
+import { Users, Wallet, Clock, Activity, Ban, TrendingUp, Trophy, Crown, Medal, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
+import { toast } from "sonner";
 
 const CHART_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#14b8a6"];
 
 export function AdminDashboard() {
   const queryClient = useQueryClient();
+  const [metaLoading, setMetaLoading] = useState(false);
 
   const { data: profiles } = useQuery({
     queryKey: ["admin-profiles"],
@@ -30,7 +33,8 @@ export function AdminDashboard() {
   const { data: pendingRequests } = useQuery({
     queryKey: ["admin-pending-topups"],
     queryFn: async () => {
-      const { data } = await supabase.from("top_up_requests").select("*").eq("status", "pending");
+      const { data, error } = await supabase.from("top_up_requests").select("id").eq("status", "pending");
+      if (error) console.error("Pending top-ups error:", error);
       return (data as any[]) ?? [];
     },
   });
@@ -43,11 +47,12 @@ export function AdminDashboard() {
     },
   });
 
-  const { data: usdRate } = useQuery({
-    queryKey: ["usd-rate"],
+  // Fetch user_ad_accounts junction to properly map accounts to users
+  const { data: userAdAccounts } = useQuery({
+    queryKey: ["admin-user-ad-accounts"],
     queryFn: async () => {
-      const { data } = await supabase.from("site_settings").select("value").eq("key", "usd_rate").single();
-      return data?.value ?? "120";
+      const { data } = await (supabase as any).from("user_ad_accounts").select("user_id, ad_account_id");
+      return (data as any[]) ?? [];
     },
   });
 
@@ -56,6 +61,9 @@ export function AdminDashboard() {
       .channel("admin-dashboard-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "ad_accounts" }, () => {
         queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "top_up_requests" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["admin-pending-topups"] });
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -66,16 +74,26 @@ export function AdminDashboard() {
   const disabledAccounts = adAccounts?.filter((a: any) => a.status !== "active") ?? [];
   const remainingLimit = adAccounts?.reduce((sum: number, a: any) => sum + Math.max(0, Number(a.spend_cap) - Number(a.amount_spent)), 0) ?? 0;
 
+  // Build spend by user using user_ad_accounts junction table
   const { spenderChart, topThree } = useMemo(() => {
-    if (!adAccounts?.length || !profiles?.length) return { spenderChart: [], topThree: [] };
-    const spendByUser: Record<string, number> = {};
+    if (!adAccounts?.length || !profiles?.length || !userAdAccounts?.length) return { spenderChart: [], topThree: [] };
+    
+    // Map ad_account_id -> amount_spent
+    const accountSpendMap: Record<string, number> = {};
     adAccounts.forEach((a: any) => {
-      if (a.user_id) {
-        spendByUser[a.user_id] = (spendByUser[a.user_id] || 0) + Number(a.amount_spent);
-      }
+      accountSpendMap[a.id] = Number(a.amount_spent) || 0;
     });
+
+    // Aggregate spend per user via junction table
+    const spendByUser: Record<string, number> = {};
+    userAdAccounts.forEach((ua: any) => {
+      const spent = accountSpendMap[ua.ad_account_id] || 0;
+      spendByUser[ua.user_id] = (spendByUser[ua.user_id] || 0) + spent;
+    });
+
     const profileMap: Record<string, any> = {};
     profiles.forEach((p: any) => { profileMap[p.user_id] = p; });
+
     const sorted = Object.entries(spendByUser)
       .map(([userId, spent]) => ({
         userId,
@@ -83,8 +101,29 @@ export function AdminDashboard() {
         value: spent,
       }))
       .sort((a, b) => b.value - a.value);
+
     return { spenderChart: sorted.slice(0, 8), topThree: sorted.slice(0, 3) };
-  }, [adAccounts, profiles]);
+  }, [adAccounts, profiles, userAdAccounts]);
+
+  // Update from Meta: fetch fresh insights for all ad accounts
+  const handleUpdateFromMeta = async () => {
+    if (!adAccounts?.length) return;
+    setMetaLoading(true);
+    try {
+      const ids = adAccounts.map((a: any) => a.id);
+      const { data, error } = await supabase.functions.invoke("get-account-insights", {
+        body: { ad_account_ids: ids, source: "meta" },
+      });
+      if (error) throw error;
+      // Refresh ad accounts data after meta sync
+      await queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
+      toast.success("Meta data updated successfully");
+    } catch (err: any) {
+      toast.error("Failed to update from Meta: " + (err.message || "Unknown error"));
+    } finally {
+      setMetaLoading(false);
+    }
+  };
 
   const rankIcons = [Crown, Trophy, Medal];
   const rankColors = ["text-yellow-500", "text-blue-500", "text-orange-500"];
@@ -93,7 +132,7 @@ export function AdminDashboard() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Admin Dashboard</h1>
 
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-3">
         <MetricCard
           title="Total Clients"
           value={profiles?.length ?? 0}
@@ -117,15 +156,6 @@ export function AdminDashboard() {
           iconBg="bg-orange-100 dark:bg-orange-900/50"
           iconColor="text-orange-600"
           gradientClass="bg-gradient-to-br from-orange-50 to-amber-100/50 dark:from-orange-950/40 dark:to-amber-900/20 border-orange-200 dark:border-orange-800"
-        />
-        <MetricCard
-          title="USD Rate"
-          value={`৳${usdRate}`}
-          subtitle="per $1 USD"
-          icon={DollarSign}
-          iconBg="bg-cyan-100 dark:bg-cyan-900/50"
-          iconColor="text-cyan-600"
-          gradientClass="bg-gradient-to-br from-cyan-50 to-sky-100/50 dark:from-cyan-950/40 dark:to-sky-900/20 border-cyan-200 dark:border-cyan-800"
         />
         <MetricCard
           title="Active Ad Accounts"
@@ -184,7 +214,18 @@ export function AdminDashboard() {
             <CardTitle className="text-lg flex items-center gap-2">
               <Trophy className="h-5 w-5 text-yellow-500" />
               Top High Spenders
-              <span className="ml-auto text-xs font-normal text-muted-foreground">● Live</span>
+              <span className="ml-auto flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleUpdateFromMeta}
+                  disabled={metaLoading}
+                  className="text-xs"
+                >
+                  <RefreshCw className={`h-3 w-3 mr-1 ${metaLoading ? "animate-spin" : ""}`} />
+                  {metaLoading ? "Updating..." : "Update from Meta"}
+                </Button>
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent>
