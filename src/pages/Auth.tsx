@@ -72,7 +72,7 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
   const navigate = useNavigate();
-  const { logoUrl, welcomeTitle, welcomeNote } = useSiteSettings();
+  const { logoUrl, siteName } = useSiteSettings();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
