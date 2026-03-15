@@ -207,6 +207,39 @@ export function ClientTopUp() {
             <Input value={paymentRef} onChange={(e) => setPaymentRef(e.target.value)} placeholder="e.g. TXN123456" />
           </div>
 
+          <div className="space-y-2">
+            <Label>Payment Screenshot</Label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            {!proofPreview ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-dashed h-20 flex flex-col gap-1"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Click to attach payment screenshot</span>
+              </Button>
+            ) : (
+              <div className="relative inline-block">
+                <img src={proofPreview} alt="Payment proof" className="max-h-40 rounded-md border" />
+                <button
+                  type="button"
+                  onClick={clearFile}
+                  className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-0.5"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
+
           <Button
             className="w-full"
             onClick={() => submitMutation.mutate()}
