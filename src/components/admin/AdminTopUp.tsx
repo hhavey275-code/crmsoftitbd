@@ -242,6 +242,14 @@ export function AdminTopUp() {
               ? "The client will be notified of the rejection."
               : "The request will be put on hold."}
           </p>
+          {actionDialog?.proofUrl && (
+            <div className="space-y-1">
+              <Label className="text-xs">Payment Proof</Label>
+              <a href={actionDialog.proofUrl} target="_blank" rel="noopener noreferrer">
+                <img src={actionDialog.proofUrl} alt="Payment proof" className="max-h-48 rounded-md border cursor-pointer hover:opacity-80 transition-opacity" />
+              </a>
+            </div>
+          )}
           {(actionDialog?.action === "rejected" || actionDialog?.action === "hold") && (
             <div className="space-y-2">
               <Label>{actionDialog.action === "rejected" ? "Rejection Reason" : "Note"}</Label>
