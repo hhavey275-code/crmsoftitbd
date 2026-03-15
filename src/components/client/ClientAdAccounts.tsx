@@ -235,8 +235,34 @@ export function ClientAdAccounts() {
     return new Date(Math.min(...times.map((t: string) => new Date(t).getTime())));
   }, [insights]);
 
+  // Aggregate insights across all accounts
+  const aggregatedTodaySpend = Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.today_spend ?? 0), 0);
+  const aggregatedYesterdaySpend = Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.yesterday_spend ?? 0), 0);
+  const aggregatedTodayOrders = Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.today_orders ?? 0), 0);
+  const aggregatedYesterdayOrders = Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.yesterday_orders ?? 0), 0);
+
   return (
     <div className="space-y-6">
+      {/* Today's Performance Summary */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <MetricCard
+          title="Today's Spend"
+          value={`$${aggregatedTodaySpend.toLocaleString()}`}
+          subtitle={`Yesterday: $${aggregatedYesterdaySpend.toLocaleString()}`}
+          icon={DollarSign}
+          iconBg="bg-emerald-50 dark:bg-emerald-900/30"
+          iconColor="text-emerald-600"
+        />
+        <MetricCard
+          title="Today's Orders"
+          value={aggregatedTodayOrders.toLocaleString()}
+          subtitle={`Yesterday: ${aggregatedYesterdayOrders.toLocaleString()}`}
+          icon={ShoppingCart}
+          iconBg="bg-blue-50 dark:bg-blue-900/30"
+          iconColor="text-blue-600"
+        />
+      </div>
+
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Ad Accounts</h1>
         <div className="flex items-center gap-3">
