@@ -118,14 +118,23 @@ Deno.serve(async (req) => {
           ? parseFloat(yesterdayData.data[0].spend)
           : 0;
 
-        // Extract purchase/order actions
+        // Extract purchase/order actions (website purchases = "results" in Meta Ads Manager)
         const extractOrders = (data: any) => {
           const actions = data?.data?.[0]?.actions;
           if (!actions) return 0;
-          const purchaseAction = actions.find((a: any) => 
-            a.action_type === "purchase" || a.action_type === "offsite_conversion.fb_pixel_purchase"
-          );
-          return purchaseAction ? parseInt(purchaseAction.value, 10) : 0;
+          const purchaseTypes = [
+            "purchase",
+            "offsite_conversion.fb_pixel_purchase",
+            "omni_purchase",
+            "onsite_web_purchase",
+          ];
+          let total = 0;
+          for (const a of actions) {
+            if (purchaseTypes.includes(a.action_type)) {
+              total += parseInt(a.value, 10) || 0;
+            }
+          }
+          return total;
         };
 
         const todayOrders = extractOrders(todayData);
