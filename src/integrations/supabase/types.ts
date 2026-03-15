@@ -14,6 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      ad_account_insights: {
+        Row: {
+          ad_account_id: string
+          balance: number | null
+          cards: Json | null
+          id: string
+          today_spend: number | null
+          updated_at: string | null
+          yesterday_spend: number | null
+        }
+        Insert: {
+          ad_account_id: string
+          balance?: number | null
+          cards?: Json | null
+          id?: string
+          today_spend?: number | null
+          updated_at?: string | null
+          yesterday_spend?: number | null
+        }
+        Update: {
+          ad_account_id?: string
+          balance?: number | null
+          cards?: Json | null
+          id?: string
+          today_spend?: number | null
+          updated_at?: string | null
+          yesterday_spend?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_account_insights_ad_account_id_fkey"
+            columns: ["ad_account_id"]
+            isOneToOne: true
+            referencedRelation: "ad_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ad_accounts: {
         Row: {
           account_id: string

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,13 +11,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { ArrowUpCircle, ExternalLink, Wallet, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, CreditCard } from "lucide-react";
+import { ArrowUpCircle, ExternalLink, Wallet, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, CreditCard, RefreshCw } from "lucide-react";
 
 interface InsightsData {
   today_spend: number;
   yesterday_spend: number;
   balance: number;
   cards: { id: string; display_string: string; type: number }[];
+  updated_at?: string;
 }
 
 export function AdminAdAccounts() {
@@ -25,9 +26,9 @@ export function AdminAdAccounts() {
   const navigate = useNavigate();
   const [topUpAccount, setTopUpAccount] = useState<any>(null);
   const [topUpAmount, setTopUpAmount] = useState("");
-  const [insights, setInsights] = useState<Record<string, InsightsData>>({});
   const [sortField, setSortField] = useState<string>("account_name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set());
 
   const { data: accounts } = useQuery({
     queryKey: ["admin-ad-accounts"],
@@ -38,6 +39,19 @@ export function AdminAdAccounts() {
         .order("created_at", { ascending: false });
       return (data as any[]) ?? [];
     },
+  });
+
+  const { data: insights = {}, refetch: refetchInsights } = useQuery({
+    queryKey: ["admin-insights-cache"],
+    queryFn: async () => {
+      if (!accounts || accounts.length === 0) return {};
+      const ids = accounts.map((a: any) => a.id);
+      const { data } = await supabase.functions.invoke("get-account-insights", {
+        body: { ad_account_ids: ids, source: "cache" },
+      });
+      return (data?.insights as Record<string, InsightsData>) ?? {};
+    },
+    enabled: !!accounts && accounts.length > 0,
   });
 
   const { data: assignments } = useQuery({
@@ -64,16 +78,38 @@ export function AdminAdAccounts() {
     },
   });
 
-  useEffect(() => {
-    if (accounts && accounts.length > 0) {
+  const refreshAllMutation = useMutation({
+    mutationFn: async () => {
+      if (!accounts || accounts.length === 0) return;
       const ids = accounts.map((a: any) => a.id);
-      supabase.functions.invoke("get-account-insights", {
-        body: { ad_account_ids: ids },
-      }).then(({ data }) => {
-        if (data?.insights) setInsights(data.insights);
-      }).catch(() => {});
+      const { data, error } = await supabase.functions.invoke("get-account-insights", {
+        body: { ad_account_ids: ids, source: "meta" },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("All accounts updated from Meta");
+      refetchInsights();
+    },
+    onError: (err: any) => toast.error(err.message || "Failed to refresh"),
+  });
+
+  const refreshSingle = async (accountId: string) => {
+    setRefreshingIds(prev => new Set(prev).add(accountId));
+    try {
+      const { error } = await supabase.functions.invoke("get-account-insights", {
+        body: { ad_account_ids: [accountId], source: "meta" },
+      });
+      if (error) throw error;
+      await refetchInsights();
+      toast.success("Account updated");
+    } catch {
+      toast.error("Failed to refresh");
+    } finally {
+      setRefreshingIds(prev => { const s = new Set(prev); s.delete(accountId); return s; });
     }
-  }, [accounts]);
+  };
 
   const getAssignedUserId = (accountId: string) => {
     const assignment = assignments?.find((a: any) => a.ad_account_id === accountId);
@@ -92,12 +128,8 @@ export function AdminAdAccounts() {
   };
 
   const toggleSort = (field: string) => {
-    if (sortField === field) {
-      setSortDir(d => d === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDir("asc");
-    }
+    if (sortField === field) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortField(field); setSortDir("asc"); }
   };
 
   const SortIcon = ({ field }: { field: string }) => {
@@ -111,7 +143,6 @@ export function AdminAdAccounts() {
       let valA: any, valB: any;
       const insA = insights[a.id];
       const insB = insights[b.id];
-
       switch (sortField) {
         case "account_name": valA = a.account_name?.toLowerCase(); valB = b.account_name?.toLowerCase(); break;
         case "today_spend": valA = insA?.today_spend ?? 0; valB = insB?.today_spend ?? 0; break;
@@ -120,7 +151,6 @@ export function AdminAdAccounts() {
         case "spend_cap": valA = Number(a.spend_cap); valB = Number(b.spend_cap); break;
         default: valA = a.account_name?.toLowerCase(); valB = b.account_name?.toLowerCase();
       }
-
       if (valA < valB) return sortDir === "asc" ? -1 : 1;
       if (valA > valB) return sortDir === "asc" ? 1 : -1;
       return 0;
@@ -158,46 +188,68 @@ export function AdminAdAccounts() {
     onError: (err: any) => toast.error(err.message),
   });
 
+  // Find the oldest updated_at across all insights
+  const lastUpdated = useMemo(() => {
+    const times = Object.values(insights).map((i: any) => i.updated_at).filter(Boolean);
+    if (times.length === 0) return null;
+    return new Date(Math.min(...times.map((t: string) => new Date(t).getTime())));
+  }, [insights]);
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">All Ad Accounts</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">All Ad Accounts</h1>
+        <div className="flex items-center gap-3">
+          {lastUpdated && (
+            <span className="text-xs text-muted-foreground">
+              Last synced: {lastUpdated.toLocaleString()}
+            </span>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refreshAllMutation.mutate()}
+            disabled={refreshAllMutation.isPending}
+          >
+            <RefreshCw className={`h-4 w-4 mr-1 ${refreshAllMutation.isPending ? 'animate-spin' : ''}`} />
+            {refreshAllMutation.isPending ? "Updating..." : "Update All from Meta"}
+          </Button>
+        </div>
+      </div>
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Ad Accounts</CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>
+                <TableHead className="w-[220px]">
                   <button className="flex items-center font-medium" onClick={() => toggleSort("account_name")}>
                     Account <SortIcon field="account_name" />
                   </button>
                 </TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>
+                <TableHead className="w-[80px]">Status</TableHead>
+                <TableHead className="w-[150px]">
                   <button className="flex items-center font-medium" onClick={() => toggleSort("spend_cap")}>
                     Spend Cap / Spent <SortIcon field="spend_cap" />
                   </button>
                 </TableHead>
-                <TableHead>
+                <TableHead className="w-[90px]">
                   <button className="flex items-center font-medium" onClick={() => toggleSort("today_spend")}>
                     Today <SortIcon field="today_spend" />
                   </button>
                 </TableHead>
-                <TableHead>
+                <TableHead className="w-[90px]">
                   <button className="flex items-center font-medium" onClick={() => toggleSort("yesterday_spend")}>
                     Yesterday <SortIcon field="yesterday_spend" />
                   </button>
                 </TableHead>
-                <TableHead>
+                <TableHead className="w-[90px]">
                   <button className="flex items-center font-medium" onClick={() => toggleSort("balance")}>
                     Balance <SortIcon field="balance" />
                   </button>
                 </TableHead>
-                <TableHead>Cards</TableHead>
-                <TableHead>Assigned To</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead className="w-[130px]">Cards</TableHead>
+                <TableHead className="w-[120px]">Assigned To</TableHead>
+                <TableHead className="w-[160px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -217,8 +269,8 @@ export function AdminAdAccounts() {
                           </svg>
                         </div>
                         <div>
-                          <div className="font-semibold text-primary">{a.account_name}</div>
-                          <div className="text-xs text-muted-foreground font-mono">ID: {a.account_id.replace(/^act_/, '')}</div>
+                          <div className="font-semibold text-sm text-primary">{a.account_name}</div>
+                          <div className="text-[11px] text-muted-foreground font-mono">ID: {a.account_id.replace(/^act_/, '')}</div>
                           {a.business_managers?.name && (
                             <div className="text-[11px] text-muted-foreground">{a.business_managers.name}</div>
                           )}
@@ -229,13 +281,13 @@ export function AdminAdAccounts() {
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="whitespace-nowrap">
                       <span className="text-sm font-medium">${ins?.today_spend?.toLocaleString() ?? '—'}</span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="whitespace-nowrap">
                       <span className="text-sm font-medium">${ins?.yesterday_spend?.toLocaleString() ?? '—'}</span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="whitespace-nowrap">
                       <span className="text-sm font-semibold">${ins?.balance?.toLocaleString() ?? '—'}</span>
                     </TableCell>
                     <TableCell>
@@ -256,7 +308,7 @@ export function AdminAdAccounts() {
                       <span className="text-sm">{getClientName(getAssignedUserId(a.id))}</span>
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
                         <Button
                           size="sm"
                           onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
@@ -264,14 +316,23 @@ export function AdminAdAccounts() {
                           <ArrowUpCircle className="h-4 w-4 mr-1" />
                           Top Up
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => refreshSingle(a.id)}
+                          disabled={refreshingIds.has(a.id)}
+                          title="Refresh from Meta"
+                        >
+                          <RefreshCw className={`h-3.5 w-3.5 ${refreshingIds.has(a.id) ? 'animate-spin' : ''}`} />
+                        </Button>
                         <Button variant="ghost" size="sm" asChild>
                           <a
                             href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${a.account_id.replace(/^act_/, '')}`}
                             target="_blank"
                             rel="noopener noreferrer"
                           >
-                            <ExternalLink className="h-4 w-4 mr-1" />
-                            Billing
+                            <ExternalLink className="h-4 w-4" />
                           </a>
                         </Button>
                       </div>
