@@ -92,7 +92,21 @@ export default function ClientDetailPage() {
     enabled: !!userId,
   });
 
-  const { data: topUpTotal } = useQuery({
+  const [insightsLoading, setInsightsLoading] = useState(false);
+
+  const { data: insights, refetch: refetchInsights } = useQuery({
+    queryKey: ["client-detail-insights", userId, adAccounts?.map((a: any) => a.id)],
+    queryFn: async () => {
+      if (!adAccounts || adAccounts.length === 0) return {};
+      const ids = adAccounts.map((a: any) => a.id);
+      const { data } = await supabase.functions.invoke("get-account-insights", {
+        body: { ad_account_ids: ids, source: "cache" },
+      });
+      return data?.insights ?? {};
+    },
+    enabled: !!adAccounts && adAccounts.length > 0,
+  });
+
     queryKey: ["client-detail-topup-total", userId, dateFrom?.toISOString(), dateTo?.toISOString()],
     queryFn: async () => {
       let query = supabase
