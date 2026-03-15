@@ -148,107 +148,117 @@ export function ClientTopUp() {
         </CardContent>
       </Card>
 
-      <Card className="max-w-lg">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ArrowUpCircle className="h-5 w-5 text-primary" />
-            Submit Top-Up Request
-          </CardTitle>
-          <CardDescription>Select a bank, enter BDT amount, and submit your payment details</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Payment Bank</Label>
-            <Select value={selectedBank} onValueChange={setSelectedBank}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a bank" />
-              </SelectTrigger>
-              <SelectContent>
-                {assignedBanks?.map((cb: any) => (
-                  <SelectItem key={cb.bank_account_id} value={cb.bank_account_id}>
-                    {cb.bank_accounts?.bank_name} — {cb.bank_accounts?.account_number}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {assignedBanks?.length === 0 && (
-              <p className="text-xs text-muted-foreground">No banks assigned. Contact your admin.</p>
-            )}
-          </div>
-
-          {selectedBankDetails && (
-            <Card className="bg-muted/50">
-              <CardContent className="p-3 space-y-1">
-                <p className="text-xs font-semibold text-muted-foreground">Payment Details</p>
-                <p className="text-sm"><Banknote className="inline h-3 w-3 mr-1" />{selectedBankDetails.bank_name}</p>
-                <p className="text-sm">A/C Name: <span className="font-medium">{selectedBankDetails.account_name}</span></p>
-                <p className="text-sm">A/C No: <span className="font-medium">{selectedBankDetails.account_number}</span></p>
-                {selectedBankDetails.branch && <p className="text-sm">Branch: {selectedBankDetails.branch}</p>}
-                {selectedBankDetails.routing_number && <p className="text-sm">Routing: {selectedBankDetails.routing_number}</p>}
-              </CardContent>
-            </Card>
-          )}
-
-          <div className="space-y-2">
-            <Label>Amount (BDT)</Label>
-            <Input type="number" min="1" step="1" value={bdtAmount} onChange={(e) => setBdtAmount(e.target.value)} placeholder="10000" />
-          </div>
-
-          {bdtAmount && parseFloat(bdtAmount) > 0 && (
-            <div className="rounded-md bg-primary/10 p-3 text-center">
-              <p className="text-sm text-muted-foreground">USD Equivalent</p>
-              <p className="text-2xl font-bold text-primary">${usdEquivalent}</p>
-              <p className="text-xs text-muted-foreground">@ ৳{usdRate}/USD</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ArrowUpCircle className="h-5 w-5 text-primary" />
+              Submit Top-Up Request
+            </CardTitle>
+            <CardDescription>Select a bank, enter BDT amount, and submit your payment details</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Payment Bank</Label>
+              <Select value={selectedBank} onValueChange={setSelectedBank}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a bank" />
+                </SelectTrigger>
+                <SelectContent>
+                  {assignedBanks?.map((cb: any) => (
+                    <SelectItem key={cb.bank_account_id} value={cb.bank_account_id}>
+                      {cb.bank_accounts?.bank_name} — {cb.bank_accounts?.account_number}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {assignedBanks?.length === 0 && (
+                <p className="text-xs text-muted-foreground">No banks assigned. Contact your admin.</p>
+              )}
             </div>
-          )}
 
-          <div className="space-y-2">
-            <Label>Payment Reference / Transaction ID</Label>
-            <Input value={paymentRef} onChange={(e) => setPaymentRef(e.target.value)} placeholder="e.g. TXN123456" />
-          </div>
+            {selectedBankDetails && (
+              <Card className="bg-muted/50">
+                <CardContent className="p-3 space-y-1">
+                  <p className="text-xs font-semibold text-muted-foreground">Payment Details</p>
+                  <p className="text-sm"><Banknote className="inline h-3 w-3 mr-1" />{selectedBankDetails.bank_name}</p>
+                  <p className="text-sm">A/C Name: <span className="font-medium">{selectedBankDetails.account_name}</span></p>
+                  <p className="text-sm">A/C No: <span className="font-medium">{selectedBankDetails.account_number}</span></p>
+                  {selectedBankDetails.branch && <p className="text-sm">Branch: {selectedBankDetails.branch}</p>}
+                  {selectedBankDetails.routing_number && <p className="text-sm">Routing: {selectedBankDetails.routing_number}</p>}
+                </CardContent>
+              </Card>
+            )}
 
-          <div className="space-y-2">
-            <Label>Payment Screenshot</Label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-            {!proofPreview ? (
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full border-dashed h-20 flex flex-col gap-1"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Click to attach payment screenshot</span>
-              </Button>
-            ) : (
-              <div className="relative inline-block">
-                <img src={proofPreview} alt="Payment proof" className="max-h-40 rounded-md border" />
-                <button
-                  type="button"
-                  onClick={clearFile}
-                  className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-0.5"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
+            <div className="space-y-2">
+              <Label>Amount (BDT)</Label>
+              <Input type="number" min="1" step="1" value={bdtAmount} onChange={(e) => setBdtAmount(e.target.value)} placeholder="10000" />
+            </div>
+
+            {bdtAmount && parseFloat(bdtAmount) > 0 && (
+              <div className="rounded-md bg-primary/10 p-3 text-center">
+                <p className="text-sm text-muted-foreground">USD Equivalent</p>
+                <p className="text-2xl font-bold text-primary">${usdEquivalent}</p>
+                <p className="text-xs text-muted-foreground">@ ৳{usdRate}/USD</p>
               </div>
             )}
-          </div>
 
-          <Button
-            className="w-full"
-            onClick={() => submitMutation.mutate()}
-            disabled={isInactive || !bdtAmount || parseFloat(bdtAmount) <= 0 || !selectedBank || submitMutation.isPending}
-          >
-            {submitMutation.isPending ? "Submitting..." : isInactive ? "Account Frozen" : "Submit Request"}
-          </Button>
-        </CardContent>
-      </Card>
+            <Button
+              className="w-full"
+              onClick={() => submitMutation.mutate()}
+              disabled={isInactive || !bdtAmount || parseFloat(bdtAmount) <= 0 || !selectedBank || submitMutation.isPending}
+            >
+              {submitMutation.isPending ? "Submitting..." : isInactive ? "Account Frozen" : "Submit Request"}
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Payment Proof</CardTitle>
+            <CardDescription>Attach your payment reference and screenshot</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Payment Reference / Transaction ID</Label>
+              <Input value={paymentRef} onChange={(e) => setPaymentRef(e.target.value)} placeholder="e.g. TXN123456" />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Payment Screenshot</Label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              {!proofPreview ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full border-dashed h-32 flex flex-col gap-1"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Click to attach payment screenshot</span>
+                </Button>
+              ) : (
+                <div className="relative inline-block">
+                  <img src={proofPreview} alt="Payment proof" className="max-h-48 rounded-md border" />
+                  <button
+                    type="button"
+                    onClick={clearFile}
+                    className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-0.5"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* My Requests History */}
       <Card>

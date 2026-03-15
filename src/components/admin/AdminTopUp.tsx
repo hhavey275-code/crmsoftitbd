@@ -62,6 +62,27 @@ export function AdminTopUp() {
     mutationFn: async ({ id, action, userId, amount }: {
       id: string; action: ActionType; userId: string; amount: number;
     }) => {
+      // Duplicate payment reference check on approve
+      if (action === "approved") {
+        const { data: reqData } = await supabase
+          .from("top_up_requests")
+          .select("payment_reference")
+          .eq("id", id)
+          .single();
+        const ref = reqData?.payment_reference;
+        if (ref) {
+          const { data: existing } = await supabase
+            .from("top_up_requests")
+            .select("id")
+            .eq("payment_reference", ref)
+            .eq("status", "approved")
+            .neq("id", id);
+          if (existing && existing.length > 0) {
+            throw new Error("This payment reference has already been used in an approved request!");
+          }
+        }
+      }
+
       const updateData: any = { status: action, reviewed_by: user!.id };
       if (action === "rejected" && adminNote) {
         updateData.admin_note = adminNote;

@@ -302,6 +302,43 @@ export default function SettingsPage() {
           </Card>
         )}
 
+        {/* Welcome Title & Note - Admin only */}
+        {isAdmin && (
+          <Card className="max-w-xl">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Hand className="h-5 w-5 text-violet-600" />
+                Auth Page Welcome
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Customize the welcome title and note shown on the login/signup page.
+              </p>
+              <div className="space-y-2">
+                <Label>Welcome Title</Label>
+                <Input
+                  value={welcomeTitleInput}
+                  onChange={(e) => setWelcomeTitleInput(e.target.value)}
+                  placeholder="Welcome"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Welcome Note</Label>
+                <Textarea
+                  value={welcomeNoteInput}
+                  onChange={(e) => setWelcomeNoteInput(e.target.value)}
+                  placeholder="Sign in to your account to manage your ad campaigns"
+                  rows={2}
+                />
+              </div>
+              <Button onClick={handleSaveWelcome} disabled={savingWelcome}>
+                {savingWelcome ? "Saving..." : "Save Welcome Settings"}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Logo Upload - Admin only */}
         {isAdmin && (
           <Card className="max-w-xl">
