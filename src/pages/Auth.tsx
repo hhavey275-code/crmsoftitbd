@@ -16,7 +16,7 @@ export default function Auth() {
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { logoUrl } = useSiteSettings();
+  const { logoUrl, welcomeTitle, welcomeNote } = useSiteSettings();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
