@@ -37,6 +37,7 @@ export function AdminAdAccounts() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [cardFilter, setCardFilter] = useState("all");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const { data: accounts } = useQuery({
     queryKey: ["admin-ad-accounts"],
