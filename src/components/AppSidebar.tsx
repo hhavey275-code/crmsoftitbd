@@ -1,6 +1,5 @@
 import {
   LayoutDashboard,
-  Wallet,
   MonitorSmartphone,
   ArrowUpCircle,
   History,
@@ -11,7 +10,6 @@ import {
   Landmark,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import {
@@ -28,58 +26,60 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 
-const commonNavItems = [
+const adminNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Wallet", url: "/wallet", icon: Wallet },
   { title: "Ad Accounts", url: "/ad-accounts", icon: MonitorSmartphone },
-  { title: "Top-Up", url: "/top-up", icon: ArrowUpCircle },
+  { title: "Business Managers", url: "/business-managers", icon: Building2 },
+  { title: "Top-Up Request", url: "/top-up", icon: ArrowUpCircle },
   { title: "Transactions", url: "/transactions", icon: History },
+  { title: "Banks", url: "/banks", icon: Landmark },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
-const adminOnlyItems = [
-  { title: "Business Managers", url: "/business-managers", icon: Building2 },
-  { title: "Banks", url: "/banks", icon: Landmark },
+const clientNavItems = [
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Ad Accounts", url: "/ad-accounts", icon: MonitorSmartphone },
+  { title: "Top-Up Request", url: "/top-up", icon: ArrowUpCircle },
+  { title: "Transactions", url: "/transactions", icon: History },
+  { title: "Settings", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const location = useLocation();
   const { signOut, profile, role } = useAuth();
-  const { logoUrl } = useSiteSettings();
+  const { logoUrl, siteName } = useSiteSettings();
 
-  const navItems = role === "admin"
-    ? [...commonNavItems.slice(0, 1), ...adminOnlyItems, ...commonNavItems.slice(1)]
-    : commonNavItems;
+  const navItems = role === "admin" ? adminNavItems : clientNavItems;
+  const displayName = siteName || "Meta Ad Top-Up";
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="px-4 py-4 mt-4">
+          <SidebarGroupLabel className="px-4 py-6 mt-4 h-auto">
             {!collapsed && (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-4">
                 {logoUrl ? (
-                  <img src={logoUrl} alt="Logo" className="h-8 w-8 rounded-lg object-contain" />
+                  <img src={logoUrl} alt="Logo" className="h-12 w-12 rounded-lg object-contain" />
                 ) : (
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                    <Zap className="h-4 w-4 text-primary-foreground" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary">
+                    <Zap className="h-6 w-6 text-primary-foreground" />
                   </div>
                 )}
                 <div>
-                  <p className="text-sm font-semibold text-sidebar-foreground">Meta Ad Top-Up</p>
-                  <p className="text-xs text-sidebar-muted capitalize">{role ?? "—"}</p>
+                  <p className="text-base font-semibold text-sidebar-foreground leading-tight">{displayName}</p>
+                  <p className="text-xs text-sidebar-muted capitalize mt-1">{role ?? "—"}</p>
                 </div>
               </div>
             )}
             {collapsed && (
               <>
                 {logoUrl ? (
-                  <img src={logoUrl} alt="Logo" className="h-8 w-8 rounded-lg object-contain" />
+                  <img src={logoUrl} alt="Logo" className="h-10 w-10 rounded-lg object-contain" />
                 ) : (
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                    <Zap className="h-4 w-4 text-primary-foreground" />
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
+                    <Zap className="h-5 w-5 text-primary-foreground" />
                   </div>
                 )}
               </>

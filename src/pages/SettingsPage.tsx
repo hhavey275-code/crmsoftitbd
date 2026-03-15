@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Upload, Zap, DollarSign } from "lucide-react";
+import { Upload, Zap, DollarSign, Type } from "lucide-react";
 
 export default function SettingsPage() {
   const { profile, user, role } = useAuth();
@@ -18,7 +18,11 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const { logoUrl, refetch } = useSiteSettings();
+  const { logoUrl, siteName: currentSiteName, refetch } = useSiteSettings();
+
+  // Site Name state
+  const [siteNameInput, setSiteNameInput] = useState("");
+  const [savingSiteName, setSavingSiteName] = useState(false);
 
   // USD Rate state
   const { data: currentRate, refetch: refetchRate } = useQuery({
@@ -36,6 +40,10 @@ export default function SettingsPage() {
   if (currentRate && !usdRate && !savingRate) {
     setUsdRate(currentRate);
   }
+  // Sync site name input when data loads
+  if (currentSiteName && !siteNameInput && !savingSiteName) {
+    setSiteNameInput(currentSiteName);
+  }
 
   const handleSave = async () => {
     if (!user) return;
@@ -49,6 +57,21 @@ export default function SettingsPage() {
       toast.error("Failed to update profile");
     } else {
       toast.success("Profile updated");
+    }
+  };
+
+  const handleSaveSiteName = async () => {
+    if (!siteNameInput.trim()) return;
+    setSavingSiteName(true);
+    const { error } = await supabase
+      .from("site_settings")
+      .upsert({ key: "site_name", value: siteNameInput.trim() }, { onConflict: "key" });
+    setSavingSiteName(false);
+    if (error) {
+      toast.error("Failed to save site name");
+    } else {
+      toast.success("Site name updated!");
+      refetch();
     }
   };
 
@@ -99,6 +122,36 @@ export default function SettingsPage() {
     <DashboardLayout>
       <div className="space-y-6">
         <h1 className="text-2xl font-bold">Settings</h1>
+
+        {/* Site Name - Admin only */}
+        {role === "admin" && (
+          <Card className="max-w-xl">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Type className="h-5 w-5 text-primary" />
+                Site Name
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Change the platform name displayed in the sidebar and across the app.
+              </p>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 space-y-2">
+                  <Label>Platform Name</Label>
+                  <Input
+                    value={siteNameInput}
+                    onChange={(e) => setSiteNameInput(e.target.value)}
+                    placeholder="Meta Ad Top-Up"
+                  />
+                </div>
+                <Button onClick={handleSaveSiteName} disabled={savingSiteName} className="mt-6">
+                  {savingSiteName ? "Saving..." : "Save Name"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* USD Rate - Admin only */}
         {role === "admin" && (

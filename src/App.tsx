@@ -7,7 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
-import WalletPage from "./pages/WalletPage";
+
 import AdAccountsPage from "./pages/AdAccountsPage";
 import AdAccountDetailPage from "./pages/AdAccountDetailPage";
 import TopUpPage from "./pages/TopUpPage";
@@ -30,7 +30,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/wallet" element={<ProtectedRoute><WalletPage /></ProtectedRoute>} />
+            
             <Route path="/ad-accounts" element={<ProtectedRoute><AdAccountsPage /></ProtectedRoute>} />
             <Route path="/ad-accounts/:id" element={<ProtectedRoute><AdAccountDetailPage /></ProtectedRoute>} />
             <Route path="/top-up" element={<ProtectedRoute><TopUpPage /></ProtectedRoute>} />

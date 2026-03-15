@@ -3,21 +3,26 @@ import { supabase } from "@/integrations/supabase/client";
 
 export function useSiteSettings() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [siteName, setSiteName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchLogo = async () => {
+  const fetchSettings = async () => {
     const { data } = await supabase
       .from("site_settings")
-      .select("value")
-      .eq("key", "logo_url")
-      .maybeSingle();
-    setLogoUrl(data?.value ?? null);
+      .select("key, value")
+      .in("key", ["logo_url", "site_name"]);
+    if (data) {
+      for (const row of data) {
+        if (row.key === "logo_url") setLogoUrl(row.value);
+        if (row.key === "site_name") setSiteName(row.value);
+      }
+    }
     setLoading(false);
   };
 
   useEffect(() => {
-    fetchLogo();
+    fetchSettings();
   }, []);
 
-  return { logoUrl, loading, refetch: fetchLogo };
+  return { logoUrl, siteName, loading, refetch: fetchSettings };
 }
