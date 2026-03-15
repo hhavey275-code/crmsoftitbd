@@ -328,10 +328,7 @@ export function ClientAdAccounts() {
                 <TableHead className="w-[110px]">
                   <span className="text-xs font-medium">Card Name</span>
                 </TableHead>
-                <TableHead className="w-[60px]">
-                  <span className="text-xs font-medium">Billing</span>
-                </TableHead>
-                <TableHead className="w-[80px]">
+                <TableHead className="w-[50px]">
                   <span className="text-xs font-medium">Actions</span>
                 </TableHead>
               </TableRow>
