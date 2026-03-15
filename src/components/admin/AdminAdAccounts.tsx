@@ -32,6 +32,10 @@ export function AdminAdAccounts() {
   const [sortField, setSortField] = useState<string>("account_name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showSelect, setShowSelect] = useState(false);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [cardFilter, setCardFilter] = useState("all");
 
   const { data: accounts } = useQuery({
     queryKey: ["admin-ad-accounts"],
