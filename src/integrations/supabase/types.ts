@@ -67,6 +67,7 @@ export type Database = {
           bm_id: string
           created_at: string
           id: string
+          last_synced_at: string | null
           name: string
           status: string
           updated_at: string
@@ -76,6 +77,7 @@ export type Database = {
           bm_id: string
           created_at?: string
           id?: string
+          last_synced_at?: string | null
           name: string
           status?: string
           updated_at?: string
@@ -85,6 +87,7 @@ export type Database = {
           bm_id?: string
           created_at?: string
           id?: string
+          last_synced_at?: string | null
           name?: string
           status?: string
           updated_at?: string
@@ -120,6 +123,44 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      sync_logs: {
+        Row: {
+          business_manager_id: string
+          created_at: string
+          error_message: string | null
+          id: string
+          status: string
+          synced_count: number
+          total_count: number
+        }
+        Insert: {
+          business_manager_id: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          status?: string
+          synced_count?: number
+          total_count?: number
+        }
+        Update: {
+          business_manager_id?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          status?: string
+          synced_count?: number
+          total_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_logs_business_manager_id_fkey"
+            columns: ["business_manager_id"]
+            isOneToOne: false
+            referencedRelation: "business_managers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       top_up_requests: {
         Row: {

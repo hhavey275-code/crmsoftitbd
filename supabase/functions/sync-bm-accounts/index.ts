@@ -79,24 +79,40 @@ Deno.serve(async (req) => {
       );
     }
 
-    const metaUrl = `https://graph.facebook.com/v21.0/${bm.bm_id}/owned_ad_accounts?fields=id,name,account_id,account_status,spend_cap,amount_spent,business_name&access_token=${bm.access_token}&limit=100`;
+    // Use Meta API v24.0
+    let allAccounts: any[] = [];
+    let nextUrl: string | null = `https://graph.facebook.com/v24.0/${bm.bm_id}/owned_ad_accounts?fields=id,name,account_id,account_status,spend_cap,amount_spent,business_name&access_token=${bm.access_token}&limit=100`;
 
-    const metaRes = await fetch(metaUrl);
-    const metaData = await metaRes.json();
+    // Paginate through all results
+    while (nextUrl) {
+      const metaRes = await fetch(nextUrl);
+      const metaData = await metaRes.json();
 
-    if (metaData.error) {
-      return new Response(
-        JSON.stringify({
-          error: `Meta API error: ${metaData.error.message}`,
-        }),
-        { status: 400, headers: corsHeaders }
-      );
+      if (metaData.error) {
+        // Log the failed sync
+        await supabase.from("sync_logs").insert({
+          business_manager_id: bm.id,
+          synced_count: 0,
+          total_count: 0,
+          status: "error",
+          error_message: metaData.error.message,
+        });
+
+        return new Response(
+          JSON.stringify({
+            error: `Meta API error: ${metaData.error.message}`,
+          }),
+          { status: 400, headers: corsHeaders }
+        );
+      }
+
+      allAccounts = allAccounts.concat(metaData.data ?? []);
+      nextUrl = metaData.paging?.next ?? null;
     }
 
-    const accounts = metaData.data ?? [];
     let synced = 0;
 
-    for (const account of accounts) {
+    for (const account of allAccounts) {
       const accountId = account.account_id || account.id?.replace("act_", "");
       const { error: upsertError } = await supabase
         .from("ad_accounts")
@@ -122,11 +138,28 @@ Deno.serve(async (req) => {
       if (!upsertError) synced++;
     }
 
+    const now = new Date().toISOString();
+
+    // Update last_synced_at on the BM
+    await supabase
+      .from("business_managers")
+      .update({ last_synced_at: now })
+      .eq("id", bm.id);
+
+    // Insert sync log
+    await supabase.from("sync_logs").insert({
+      business_manager_id: bm.id,
+      synced_count: synced,
+      total_count: allAccounts.length,
+      status: "success",
+    });
+
     return new Response(
       JSON.stringify({
         success: true,
         synced,
-        total: accounts.length,
+        total: allAccounts.length,
+        last_synced_at: now,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

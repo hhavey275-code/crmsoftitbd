@@ -9,8 +9,9 @@ import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, RefreshCw, Building2, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, RefreshCw, Building2, ChevronDown, ChevronRight, Clock, AlertCircle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { format, formatDistanceToNow } from "date-fns";
 
 export function AdminBusinessManagers() {
   const queryClient = useQueryClient();
@@ -19,6 +20,7 @@ export function AdminBusinessManagers() {
   const [bmName, setBmName] = useState("");
   const [accessToken, setAccessToken] = useState("");
   const [expandedBm, setExpandedBm] = useState<string | null>(null);
+  const [showLogs, setShowLogs] = useState<string | null>(null);
 
   const { data: bms } = useQuery({
     queryKey: ["admin-business-managers"],
@@ -50,6 +52,21 @@ export function AdminBusinessManagers() {
       const { data } = await supabase.from("profiles").select("user_id, full_name, email");
       return (data as any[]) ?? [];
     },
+  });
+
+  const { data: syncLogs } = useQuery({
+    queryKey: ["admin-sync-logs", showLogs],
+    queryFn: async () => {
+      if (!showLogs) return [];
+      const { data } = await (supabase as any)
+        .from("sync_logs")
+        .select("*")
+        .eq("business_manager_id", showLogs)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      return (data as any[]) ?? [];
+    },
+    enabled: !!showLogs,
   });
 
   const addBmMutation = useMutation({
@@ -93,6 +110,8 @@ export function AdminBusinessManagers() {
     onSuccess: (result) => {
       toast.success(`Synced ${result.synced} of ${result.total} accounts`);
       queryClient.invalidateQueries({ queryKey: ["admin-bm-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-business-managers"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-sync-logs"] });
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -166,11 +185,33 @@ export function AdminBusinessManagers() {
                 <Building2 className="h-5 w-5 text-primary" />
                 <div>
                   <CardTitle className="text-lg">{bm.name}</CardTitle>
-                  <p className="text-xs text-muted-foreground font-mono mt-0.5">ID: {bm.bm_id}</p>
+                  <div className="flex items-center gap-3 mt-0.5">
+                    <p className="text-xs text-muted-foreground font-mono">ID: {bm.bm_id}</p>
+                    {bm.last_synced_at && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        Synced {formatDistanceToNow(new Date(bm.last_synced_at), { addSuffix: true })}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      {bmAccounts(bm.id).length} account{bmAccounts(bm.id).length !== 1 ? "s" : ""}
+                    </p>
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <StatusBadge status={bm.status} />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowLogs(showLogs === bm.id ? null : bm.id);
+                  }}
+                >
+                  <Clock className="mr-1 h-3 w-3" />
+                  Logs
+                </Button>
                 <Button
                   size="sm"
                   variant="outline"
@@ -183,6 +224,40 @@ export function AdminBusinessManagers() {
               </div>
             </div>
           </CardHeader>
+
+          {/* Sync Logs Panel */}
+          {showLogs === bm.id && (
+            <CardContent className="border-t bg-muted/30">
+              <h3 className="text-sm font-semibold mb-3">Sync History</h3>
+              {syncLogs && syncLogs.length > 0 ? (
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {syncLogs.map((log: any) => (
+                    <div key={log.id} className="flex items-center justify-between text-sm rounded-md border p-2 bg-background">
+                      <div className="flex items-center gap-2">
+                        {log.status === "success" ? (
+                          <CheckCircle2 className="h-4 w-4 text-primary" />
+                        ) : (
+                          <AlertCircle className="h-4 w-4 text-destructive" />
+                        )}
+                        <span>
+                          {log.status === "success"
+                            ? `Synced ${log.synced_count}/${log.total_count} accounts`
+                            : log.error_message || "Sync failed"}
+                        </span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {format(new Date(log.created_at), "MMM d, yyyy HH:mm")}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No sync logs yet.</p>
+              )}
+            </CardContent>
+          )}
+
+          {/* Ad Accounts Table */}
           {expandedBm === bm.id && (
             <CardContent>
               <Table>
