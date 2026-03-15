@@ -20,7 +20,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const { logoUrl, siteName: currentSiteName, headerAnnouncement: currentAnnouncement, refetch } = useSiteSettings();
+  const { logoUrl, siteName: currentSiteName, headerAnnouncement: currentAnnouncement, welcomeTitle: currentWelcomeTitle, welcomeNote: currentWelcomeNote, refetch } = useSiteSettings();
 
   // Site Name state
   const [siteNameInput, setSiteNameInput] = useState("");
