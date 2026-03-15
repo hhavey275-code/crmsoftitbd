@@ -6,17 +6,24 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { useState } from "react";
-import { Check, X } from "lucide-react";
+import { Check, X, Pause } from "lucide-react";
+
+type ActionType = "approved" | "rejected" | "hold";
 
 export function AdminTopUp() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [adminNote, setAdminNote] = useState("");
   const [actionDialog, setActionDialog] = useState<{
     id: string;
-    action: "approved" | "rejected";
+    action: ActionType;
     userId: string;
     amount: number;
     bdtAmount: number | null;
@@ -30,33 +37,46 @@ export function AdminTopUp() {
         .from("top_up_requests")
         .select("*")
         .order("created_at", { ascending: false });
-      
-      // Fetch profiles separately for display
+
       const userIds = [...new Set((data ?? []).map((r: any) => r.user_id))];
-      const { data: profiles } = await supabase.from("profiles").select("user_id, full_name, email").in("user_id", userIds);
+      const reviewerIds = [...new Set((data ?? []).filter((r: any) => r.reviewed_by).map((r: any) => r.reviewed_by))];
+      const allIds = [...new Set([...userIds, ...reviewerIds])];
+
+      const { data: profiles } = await supabase.from("profiles").select("user_id, full_name, email").in("user_id", allIds);
       const profileMap: Record<string, any> = {};
       profiles?.forEach((p: any) => { profileMap[p.user_id] = p; });
 
       return (data ?? []).map((r: any) => ({
         ...r,
         profile: profileMap[r.user_id] || null,
+        reviewerProfile: r.reviewed_by ? profileMap[r.reviewed_by] || null : null,
       }));
     },
   });
 
+  const filtered = requests?.filter((r: any) =>
+    statusFilter === "all" ? true : r.status === statusFilter
+  );
+
   const processMutation = useMutation({
     mutationFn: async ({ id, action, userId, amount }: {
-      id: string; action: "approved" | "rejected"; userId: string; amount: number;
+      id: string; action: ActionType; userId: string; amount: number;
     }) => {
-      // Update request status
+      const updateData: any = { status: action, reviewed_by: user!.id };
+      if (action === "rejected" && adminNote) {
+        updateData.admin_note = adminNote;
+      }
+      if (action === "hold" && adminNote) {
+        updateData.admin_note = adminNote;
+      }
+
       const { error: updateError } = await supabase
         .from("top_up_requests")
-        .update({ status: action, reviewed_by: user!.id } as any)
+        .update(updateData)
         .eq("id", id);
       if (updateError) throw updateError;
 
       if (action === "approved") {
-        // Add USD amount to wallet
         const { data: wallet } = await supabase.from("wallets").select("balance").eq("user_id", userId).single();
         const currentBalance = Number(wallet?.balance ?? 0);
         const newBalance = currentBalance + amount;
@@ -64,7 +84,6 @@ export function AdminTopUp() {
         const { error: walletError } = await supabase.from("wallets").update({ balance: newBalance }).eq("user_id", userId);
         if (walletError) throw walletError;
 
-        // Create transaction record
         const { error: txError } = await supabase.from("transactions").insert({
           user_id: userId,
           type: "top_up",
@@ -75,22 +94,58 @@ export function AdminTopUp() {
         });
         if (txError) throw txError;
       }
+
+      // Create notification for the client
+      await supabase.from("notifications").insert({
+        user_id: userId,
+        type: "top_up_update",
+        title: action === "approved" ? "Top-Up Approved" : action === "rejected" ? "Top-Up Rejected" : "Top-Up On Hold",
+        message: action === "approved"
+          ? `Your top-up of $${amount} has been approved.`
+          : action === "rejected"
+          ? `Your top-up of $${amount} was rejected.${adminNote ? " Reason: " + adminNote : ""}`
+          : `Your top-up of $${amount} is on hold.${adminNote ? " Note: " + adminNote : ""}`,
+        reference_id: id,
+      } as any);
     },
     onSuccess: (_, { action }) => {
-      toast.success(`Request ${action}`);
+      toast.success(`Request ${action === "hold" ? "put on hold" : action}`);
       queryClient.invalidateQueries({ queryKey: ["admin-topup-requests"] });
       queryClient.invalidateQueries({ queryKey: ["admin-wallets"] });
       setActionDialog(null);
+      setAdminNote("");
     },
     onError: (err: any) => toast.error(err.message),
   });
 
+  const openAction = (r: any, action: ActionType) => {
+    setAdminNote("");
+    setActionDialog({
+      id: r.id, action, userId: r.user_id, amount: r.amount,
+      bdtAmount: r.bdt_amount, usdRate: r.usd_rate,
+    });
+  };
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Top-Up Requests</h1>
+
+      <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+        <TabsList>
+          <TabsTrigger value="all">All</TabsTrigger>
+          <TabsTrigger value="pending">Pending</TabsTrigger>
+          <TabsTrigger value="approved">Approved</TabsTrigger>
+          <TabsTrigger value="rejected">Rejected</TabsTrigger>
+          <TabsTrigger value="hold">On Hold</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">All Requests</CardTitle>
+          <CardTitle className="text-lg">
+            {statusFilter === "all" ? "All" : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)} Requests
+            {filtered && ` (${filtered.length})`}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -102,12 +157,13 @@ export function AdminTopUp() {
                 <TableHead>USD Amount</TableHead>
                 <TableHead>Reference</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Reviewed By</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {requests?.map((r: any) => (
+              {filtered?.map((r: any) => (
                 <TableRow key={r.id}>
                   <TableCell className="font-medium">{r.profile?.full_name || r.profile?.email || "Unknown"}</TableCell>
                   <TableCell>{r.bdt_amount ? `৳${Number(r.bdt_amount).toLocaleString()}` : "—"}</TableCell>
@@ -115,20 +171,25 @@ export function AdminTopUp() {
                   <TableCell className="font-semibold">${Number(r.amount).toLocaleString()}</TableCell>
                   <TableCell className="text-sm">{r.payment_reference || "—"}</TableCell>
                   <TableCell><StatusBadge status={r.status} /></TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {r.reviewerProfile ? r.reviewerProfile.full_name || r.reviewerProfile.email : "—"}
+                  </TableCell>
                   <TableCell className="text-muted-foreground">{format(new Date(r.created_at), "MMM d, yyyy")}</TableCell>
                   <TableCell>
-                    {r.status === "pending" && (
+                    {(r.status === "pending" || r.status === "hold") && (
                       <div className="flex gap-1">
-                        <Button size="sm" variant="ghost" className="hover:text-primary" onClick={() => setActionDialog({
-                          id: r.id, action: "approved", userId: r.user_id, amount: r.amount,
-                          bdtAmount: r.bdt_amount, usdRate: r.usd_rate,
-                        })}>
+                        <Button size="sm" variant="ghost" className="hover:text-primary" title="Approve"
+                          onClick={() => openAction(r, "approved")}>
                           <Check className="h-4 w-4" />
                         </Button>
-                        <Button size="sm" variant="ghost" className="hover:text-destructive" onClick={() => setActionDialog({
-                          id: r.id, action: "rejected", userId: r.user_id, amount: r.amount,
-                          bdtAmount: r.bdt_amount, usdRate: r.usd_rate,
-                        })}>
+                        {r.status !== "hold" && (
+                          <Button size="sm" variant="ghost" className="hover:text-orange-500" title="Hold"
+                            onClick={() => openAction(r, "hold")}>
+                            <Pause className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button size="sm" variant="ghost" className="hover:text-destructive" title="Reject"
+                          onClick={() => openAction(r, "rejected")}>
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
@@ -136,32 +197,46 @@ export function AdminTopUp() {
                   </TableCell>
                 </TableRow>
               ))}
-              {(!requests || requests.length === 0) && (
-                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">No requests</TableCell></TableRow>
+              {(!filtered || filtered.length === 0) && (
+                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">No requests</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
 
-      <Dialog open={!!actionDialog} onOpenChange={() => setActionDialog(null)}>
+      <Dialog open={!!actionDialog} onOpenChange={() => { setActionDialog(null); setAdminNote(""); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{actionDialog?.action === "approved" ? "Approve" : "Reject"} Top-Up Request</DialogTitle>
+            <DialogTitle>
+              {actionDialog?.action === "approved" ? "Approve" : actionDialog?.action === "rejected" ? "Reject" : "Hold"} Top-Up Request
+            </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
             {actionDialog?.action === "approved"
               ? `This will add $${actionDialog?.amount?.toLocaleString()} USD to the client's wallet${actionDialog?.bdtAmount ? ` (৳${Number(actionDialog.bdtAmount).toLocaleString()} BDT @ ৳${actionDialog.usdRate}/USD)` : ""}.`
-              : "The client will be notified of the rejection."}
+              : actionDialog?.action === "rejected"
+              ? "The client will be notified of the rejection."
+              : "The request will be put on hold."}
           </p>
+          {(actionDialog?.action === "rejected" || actionDialog?.action === "hold") && (
+            <div className="space-y-2">
+              <Label>{actionDialog.action === "rejected" ? "Rejection Reason" : "Note"}</Label>
+              <Textarea
+                value={adminNote}
+                onChange={(e) => setAdminNote(e.target.value)}
+                placeholder={actionDialog.action === "rejected" ? "Explain why this request was rejected..." : "Add a note (optional)..."}
+              />
+            </div>
+          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setActionDialog(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setActionDialog(null); setAdminNote(""); }}>Cancel</Button>
             <Button
-              variant={actionDialog?.action === "approved" ? "default" : "destructive"}
+              variant={actionDialog?.action === "approved" ? "default" : actionDialog?.action === "rejected" ? "destructive" : "outline"}
               onClick={() => actionDialog && processMutation.mutate(actionDialog)}
-              disabled={processMutation.isPending}
+              disabled={processMutation.isPending || (actionDialog?.action === "rejected" && !adminNote)}
             >
-              {processMutation.isPending ? "Processing..." : actionDialog?.action === "approved" ? "Approve" : "Reject"}
+              {processMutation.isPending ? "Processing..." : actionDialog?.action === "approved" ? "Approve" : actionDialog?.action === "rejected" ? "Reject" : "Hold"}
             </Button>
           </DialogFooter>
         </DialogContent>
