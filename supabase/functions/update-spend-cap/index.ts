@@ -81,7 +81,8 @@ Deno.serve(async (req) => {
     const bm = (account as any).business_managers;
     const oldSpendCap = Number(account.spend_cap);
     const newSpendCap = oldSpendCap + amount;
-    const newSpendCapCents = newSpendCap * 100;
+    // Meta API accepts spend_cap in cents (smallest currency unit)
+    
 
     // Meta API requires act_ prefix for the account ID
     const actId = account.account_id.startsWith("act_")
@@ -94,7 +95,7 @@ Deno.serve(async (req) => {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
-          spend_cap: String(Math.round(newSpendCapCents)),
+          spend_cap: String(Math.round(newSpendCap)),
           access_token: bm.access_token,
         }),
       }
