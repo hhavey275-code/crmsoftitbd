@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Upload, Zap, DollarSign } from "lucide-react";
+import { Upload, Zap, DollarSign, Type } from "lucide-react";
 
 export default function SettingsPage() {
   const { profile, user, role } = useAuth();

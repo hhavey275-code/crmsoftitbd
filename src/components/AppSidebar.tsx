@@ -1,6 +1,5 @@
 import {
   LayoutDashboard,
-  Wallet,
   MonitorSmartphone,
   ArrowUpCircle,
   History,
@@ -11,7 +10,6 @@ import {
   Landmark,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import {
@@ -46,33 +44,42 @@ const clientNavItems = [
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
+export function AppSidebar() {
+  const { state } = useSidebar();
+  const collapsed = state === "collapsed";
+  const { signOut, profile, role } = useAuth();
+  const { logoUrl, siteName } = useSiteSettings();
+
+  const navItems = role === "admin" ? adminNavItems : clientNavItems;
+  const displayName = siteName || "Meta Ad Top-Up";
+
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="px-4 py-4 mt-4">
+          <SidebarGroupLabel className="px-4 py-6 mt-4 h-auto">
             {!collapsed && (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-4">
                 {logoUrl ? (
-                  <img src={logoUrl} alt="Logo" className="h-8 w-8 rounded-lg object-contain" />
+                  <img src={logoUrl} alt="Logo" className="h-12 w-12 rounded-lg object-contain" />
                 ) : (
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                    <Zap className="h-4 w-4 text-primary-foreground" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary">
+                    <Zap className="h-6 w-6 text-primary-foreground" />
                   </div>
                 )}
                 <div>
-                  <p className="text-sm font-semibold text-sidebar-foreground">Meta Ad Top-Up</p>
-                  <p className="text-xs text-sidebar-muted capitalize">{role ?? "—"}</p>
+                  <p className="text-base font-semibold text-sidebar-foreground leading-tight">{displayName}</p>
+                  <p className="text-xs text-sidebar-muted capitalize mt-1">{role ?? "—"}</p>
                 </div>
               </div>
             )}
             {collapsed && (
               <>
                 {logoUrl ? (
-                  <img src={logoUrl} alt="Logo" className="h-8 w-8 rounded-lg object-contain" />
+                  <img src={logoUrl} alt="Logo" className="h-10 w-10 rounded-lg object-contain" />
                 ) : (
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                    <Zap className="h-4 w-4 text-primary-foreground" />
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
+                    <Zap className="h-5 w-5 text-primary-foreground" />
                   </div>
                 )}
               </>
