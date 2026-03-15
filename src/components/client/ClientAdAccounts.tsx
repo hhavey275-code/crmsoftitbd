@@ -14,8 +14,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowUpCircle, ExternalLink, Wallet, CreditCard, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, AppWindow, Search, ListChecks } from "lucide-react";
+import { ArrowUpCircle, ExternalLink, Wallet, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, AppWindow, Search, ListChecks, ChevronLeft, ChevronRight } from "lucide-react";
 import { CardBrandIcon } from "@/components/CardBrandIcon";
+
+const PAGE_SIZE = 20;
 
 interface InsightsData {
   today_spend: number;
@@ -38,6 +40,7 @@ export function ClientAdAccounts() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [cardFilter, setCardFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const isInactive = (profile as any)?.status === "inactive";
   const dueLimit = Number((profile as any)?.due_limit ?? 0);
@@ -120,8 +123,8 @@ export function ClientAdAccounts() {
   };
 
   const SortIcon = ({ field }: { field: string }) => {
-    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40" />;
-    return sortDir === "asc" ? <ArrowUp className="h-3 w-3 ml-1" /> : <ArrowDown className="h-3 w-3 ml-1" />;
+    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-30" />;
+    return sortDir === "asc" ? <ArrowUp className="h-3 w-3 ml-1 text-primary" /> : <ArrowDown className="h-3 w-3 ml-1 text-primary" />;
   };
 
   const uniqueCards = useMemo(() => {
@@ -159,6 +162,13 @@ export function ClientAdAccounts() {
       });
   }, [accounts, insights, sortField, sortDir, search, statusFilter, cardFilter]);
 
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(sortedAccounts.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedAccounts = sortedAccounts.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  useMemo(() => { setCurrentPage(1); }, [search, statusFilter, cardFilter]);
+
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -169,15 +179,25 @@ export function ClientAdAccounts() {
   };
 
   const toggleSelectAll = () => {
-    if (!sortedAccounts.length) return;
-    if (selectedIds.size === sortedAccounts.length) {
-      setSelectedIds(new Set());
+    if (!paginatedAccounts.length) return;
+    const pageIds = paginatedAccounts.map((a: any) => a.id);
+    const allPageSelected = pageIds.every(id => selectedIds.has(id));
+    if (allPageSelected) {
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        pageIds.forEach(id => next.delete(id));
+        return next;
+      });
     } else {
-      setSelectedIds(new Set(sortedAccounts.map((a: any) => a.id)));
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        pageIds.forEach(id => next.add(id));
+        return next;
+      });
     }
   };
 
-  const allSelected = sortedAccounts.length > 0 && selectedIds.size === sortedAccounts.length;
+  const allPageSelected = paginatedAccounts.length > 0 && paginatedAccounts.every((a: any) => selectedIds.has(a.id));
 
   const walletBalance = Number(wallet?.balance ?? 0);
   const effectiveBalance = walletBalance + dueLimit;
@@ -213,49 +233,60 @@ export function ClientAdAccounts() {
   }, [insights]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Ad Accounts</h1>
-        <div className="flex items-center gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Ad Accounts</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {sortedAccounts.length} account{sortedAccounts.length !== 1 ? 's' : ''}
+            {search || statusFilter !== "all" || cardFilter !== "all" ? " (filtered)" : ""}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
           {lastUpdated && (
-            <span className="text-xs text-muted-foreground">
-              Last synced: {lastUpdated.toLocaleString()}
+            <span className="text-[11px] text-muted-foreground hidden lg:block">
+              Synced {lastUpdated.toLocaleString()}
             </span>
           )}
           {showSelect && selectedIds.size > 0 && (
             <Button
               variant="default"
               size="sm"
+              className="h-8 text-xs"
               onClick={() => refreshSelectedMutation.mutate()}
               disabled={refreshSelectedMutation.isPending}
             >
-              <RefreshCw className={`h-4 w-4 mr-1 ${refreshSelectedMutation.isPending ? 'animate-spin' : ''}`} />
-              {refreshSelectedMutation.isPending ? "Updating..." : `Update ${selectedIds.size} Selected`}
+              <RefreshCw className={`h-3.5 w-3.5 mr-1 ${refreshSelectedMutation.isPending ? 'animate-spin' : ''}`} />
+              {refreshSelectedMutation.isPending ? "Syncing..." : `Sync ${selectedIds.size}`}
             </Button>
           )}
           <Button
             variant="outline"
             size="sm"
+            className="h-8 text-xs"
             onClick={() => refreshAllMutation.mutate()}
             disabled={refreshAllMutation.isPending}
           >
-            <RefreshCw className={`h-4 w-4 mr-1 ${refreshAllMutation.isPending ? 'animate-spin' : ''}`} />
-            {refreshAllMutation.isPending ? "Updating..." : "Update All from Meta"}
+            <RefreshCw className={`h-3.5 w-3.5 mr-1 ${refreshAllMutation.isPending ? 'animate-spin' : ''}`} />
+            {refreshAllMutation.isPending ? "Syncing..." : "Sync All"}
           </Button>
         </div>
       </div>
+
+      {/* Filters */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by name or ID..."
+            placeholder="Search accounts..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 h-9"
+            className="pl-9 h-9 bg-card"
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[140px] h-9">
+          <SelectTrigger className="w-[130px] h-9 bg-card">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -266,7 +297,7 @@ export function ClientAdAccounts() {
           </SelectContent>
         </Select>
         <Select value={cardFilter} onValueChange={setCardFilter}>
-          <SelectTrigger className="w-[160px] h-9">
+          <SelectTrigger className="w-[150px] h-9 bg-card">
             <SelectValue placeholder="Card" />
           </SelectTrigger>
           <SelectContent>
@@ -291,133 +322,184 @@ export function ClientAdAccounts() {
       </div>
 
       {isInactive && (
-        <Card className="border-destructive bg-destructive/10">
+        <Card className="border-destructive bg-destructive/5">
           <CardContent className="p-4 flex items-center gap-3">
-            <span className="text-destructive font-semibold">⚠️ Your account has been frozen by admin. You cannot top up ad accounts.</span>
+            <span className="text-destructive font-semibold text-sm">⚠️ Your account has been frozen by admin. You cannot top up ad accounts.</span>
           </CardContent>
         </Card>
       )}
 
-      <Card>
-        <CardContent className="pt-6">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {showSelect && (
-                  <TableHead className="w-[40px]" onClick={(e) => e.stopPropagation()}>
-                    <Checkbox
-                      checked={allSelected}
-                      onCheckedChange={toggleSelectAll}
-                      aria-label="Select all"
-                    />
+      {/* Table */}
+      <Card className="shadow-sm border-border/60">
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  {showSelect && (
+                    <TableHead className="w-[40px] pl-4" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={allPageSelected}
+                        onCheckedChange={toggleSelectAll}
+                        aria-label="Select all"
+                      />
+                    </TableHead>
+                  )}
+                  <TableHead className="min-w-[180px]">
+                    <button className="flex items-center text-xs font-semibold uppercase tracking-wider text-muted-foreground" onClick={() => toggleSort("account_name")}>
+                      Account <SortIcon field="account_name" />
+                    </button>
                   </TableHead>
-                )}
-                <TableHead className="w-[200px]">
-                  <button className="flex items-center text-xs font-medium" onClick={() => toggleSort("account_name")}>
-                    Ad Account <SortIcon field="account_name" />
-                  </button>
-                </TableHead>
-                <TableHead className="w-[100px]">
-                  <button className="flex items-center text-xs font-medium" onClick={() => toggleSort("spend_cap")}>
-                    Budget <SortIcon field="spend_cap" />
-                  </button>
-                </TableHead>
-                <TableHead className="w-[90px] hidden sm:table-cell">
-                  <span className="text-xs font-medium">Status</span>
-                </TableHead>
-                <TableHead className="w-[110px]">
-                  <span className="text-xs font-medium">Card Name</span>
-                </TableHead>
-                <TableHead className="w-[50px]">
-                  <span className="text-xs font-medium">Actions</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedAccounts.map((a: any) => {
-                const ins = insights[a.id];
-                return (
-                  <TableRow
-                    key={a.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => navigate(`/ad-accounts/${a.id}`)}
-                    data-state={selectedIds.has(a.id) ? "selected" : undefined}
-                  >
-                    {showSelect && (
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={selectedIds.has(a.id)}
-                          onCheckedChange={() => toggleSelect(a.id)}
-                          aria-label={`Select ${a.account_name}`}
-                        />
-                      </TableCell>
-                    )}
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
-                          <AppWindow className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                        <div>
-                          <div className="text-sm text-primary">{a.account_name}</div>
-                          {a.business_managers?.name && (
-                            <div className="text-xs text-muted-foreground">{a.business_managers.name}</div>
-                          )}
-                        <div className="mt-0.5 flex items-center gap-1.5">
-                            <span className="text-xs text-muted-foreground font-mono">{a.account_id.replace(/^act_/, '')}</span>
-                            <a
-                              href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${a.account_id.replace(/^act_/, '')}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-muted-foreground hover:text-primary"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
+                  <TableHead className="w-[120px]">
+                    <button className="flex items-center text-xs font-semibold uppercase tracking-wider text-muted-foreground" onClick={() => toggleSort("spend_cap")}>
+                      Budget <SortIcon field="spend_cap" />
+                    </button>
+                  </TableHead>
+                  <TableHead className="w-[100px] hidden sm:table-cell">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</span>
+                  </TableHead>
+                  <TableHead className="w-[100px]">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Card</span>
+                  </TableHead>
+                  <TableHead className="w-[48px]" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedAccounts.map((a: any) => {
+                  const ins = insights[a.id];
+                  return (
+                    <TableRow
+                      key={a.id}
+                      className="cursor-pointer group transition-colors hover:bg-muted/30"
+                      onClick={() => navigate(`/ad-accounts/${a.id}`)}
+                      data-state={selectedIds.has(a.id) ? "selected" : undefined}
+                    >
+                      {showSelect && (
+                        <TableCell className="pl-4" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.has(a.id)}
+                            onCheckedChange={() => toggleSelect(a.id)}
+                            aria-label={`Select ${a.account_name}`}
+                          />
+                        </TableCell>
+                      )}
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                            <AppWindow className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium truncate max-w-[180px]">{a.account_name}</div>
+                            {a.business_managers?.name && (
+                              <div className="text-[11px] text-muted-foreground truncate">{a.business_managers.name}</div>
+                            )}
+                            <div className="mt-0.5 flex items-center gap-1">
+                              <span className="text-[11px] text-muted-foreground font-mono">{a.account_id.replace(/^act_/, '')}</span>
+                              <a
+                                href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${a.account_id.replace(/^act_/, '')}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-muted-foreground/50 hover:text-primary transition-colors"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} />
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell"><StatusBadge status={a.status} /></TableCell>
-                    <TableCell>
-                      <div className="text-sm whitespace-nowrap">
-                        {ins?.cards && ins.cards.length > 0 ? (
-                          ins.cards.map((card: any, i: number) => (
-                            <div key={i} className="flex items-center gap-1.5">
-                              <CardBrandIcon displayString={card.display_string} size="xs" />
-                              <span>{card.display_string}</span>
-                            </div>
-                          ))
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} />
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell"><StatusBadge status={a.status} /></TableCell>
+                      <TableCell>
+                        <div className="text-xs whitespace-nowrap">
+                          {ins?.cards && ins.cards.length > 0 ? (
+                            ins.cards.map((card: any, i: number) => (
+                              <div key={i} className="flex items-center gap-1.5">
+                                <CardBrandIcon displayString={card.display_string} size="xs" />
+                                <span className="text-muted-foreground">{card.display_string}</span>
+                              </div>
+                            ))
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          size="icon"
+                          variant="default"
+                          className="h-7 w-7 rounded-lg shadow-sm"
+                          disabled={isInactive}
+                          onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
+                          title="Top Up"
+                        >
+                          <ArrowUpCircle className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {(!accounts || accounts.length === 0) && (
+                  <TableRow><TableCell colSpan={6} className="text-center py-12 text-muted-foreground">No ad accounts assigned to you yet</TableCell></TableRow>
+                )}
+                {accounts && accounts.length > 0 && paginatedAccounts.length === 0 && (
+                  <TableRow><TableCell colSpan={6} className="text-center py-12 text-muted-foreground">No accounts match your filters</TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-border/60">
+              <span className="text-xs text-muted-foreground">
+                Showing {((safePage - 1) * PAGE_SIZE) + 1}–{Math.min(safePage * PAGE_SIZE, sortedAccounts.length)} of {sortedAccounts.length}
+              </span>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  disabled={safePage <= 1}
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+                  .map((p, idx, arr) => (
+                    <span key={p} className="flex items-center">
+                      {idx > 0 && arr[idx - 1] !== p - 1 && (
+                        <span className="px-1 text-xs text-muted-foreground">…</span>
+                      )}
                       <Button
+                        variant={p === safePage ? "default" : "ghost"}
                         size="icon"
-                        variant="default"
-                        className="h-8 w-8"
-                        disabled={isInactive}
-                        onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
-                        title="Top Up"
+                        className="h-8 w-8 text-xs"
+                        onClick={() => setCurrentPage(p)}
                       >
-                        <ArrowUpCircle className="h-4 w-4" />
+                        {p}
                       </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-              {(!accounts || accounts.length === 0) && (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No ad accounts assigned to you yet</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
+                    </span>
+                  ))}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  disabled={safePage >= totalPages}
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
+      {/* Top Up Dialog */}
       <Dialog open={!!topUpAccount} onOpenChange={(open) => !open && setTopUpAccount(null)}>
         <DialogContent>
           <DialogHeader>
@@ -437,9 +519,9 @@ export function ClientAdAccounts() {
               </span>
             </div>
             {dueLimit > 0 && (
-              <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
-                <span className="text-amber-700 dark:text-amber-400">Due Limit</span>
-                <span className="font-semibold text-amber-700 dark:text-amber-400">${dueLimit.toLocaleString()}</span>
+              <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-warning/10 border border-warning/20">
+                <span className="text-warning">Due Limit</span>
+                <span className="font-semibold text-warning">${dueLimit.toLocaleString()}</span>
               </div>
             )}
             <div className="flex justify-between text-sm">
@@ -460,7 +542,7 @@ export function ClientAdAccounts() {
                 <p className="text-sm text-destructive">Amount exceeds your wallet balance{dueLimit > 0 ? " + due limit" : ""}</p>
               )}
               {usingDueLimit && parsedAmount > 0 && (
-                <p className="text-sm text-amber-600">⚠️ Using ${(parsedAmount - walletBalance).toLocaleString()} from due limit</p>
+                <p className="text-sm text-warning">⚠️ Using ${(parsedAmount - walletBalance).toLocaleString()} from due limit</p>
               )}
             </div>
             {parsedAmount > 0 && !exceedsBalance && (
