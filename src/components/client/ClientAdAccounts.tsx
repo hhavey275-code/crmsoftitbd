@@ -375,9 +375,6 @@ export function ClientAdAccounts() {
                 <TableHead className="w-[90px] hidden sm:table-cell">
                   <span className="text-xs font-medium">Status</span>
                 </TableHead>
-                <TableHead className="w-[110px]">
-                  <span className="text-xs font-medium">Card Name</span>
-                </TableHead>
                 <TableHead className="w-[50px]">
                   <span className="text-xs font-medium">Actions</span>
                 </TableHead>
