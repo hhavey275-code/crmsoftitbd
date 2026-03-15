@@ -51,6 +51,11 @@ export default function ClientDetailPage() {
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [topUpAmount, setTopUpAmount] = useState("");
 
+  // Bulk assign/unassign
+  const [showAssignDialog, setShowAssignDialog] = useState(false);
+  const [assignSelectedIds, setAssignSelectedIds] = useState<Set<string>>(new Set());
+  const [unassignSelectedIds, setUnassignSelectedIds] = useState<Set<string>>(new Set());
+
   const { data: profile } = useQuery({
     queryKey: ["client-detail-profile", userId],
     queryFn: async () => {
