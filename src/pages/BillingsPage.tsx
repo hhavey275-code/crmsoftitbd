@@ -166,7 +166,7 @@ export default function BillingsPage() {
                             target="_blank"
                             rel="noopener noreferrer"
                           >
-                            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">
+                            <Button variant="default" size="sm" className="h-7 px-3 text-xs">
                               Billing
                             </Button>
                           </a>
