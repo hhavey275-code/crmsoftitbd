@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,12 +12,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { ArrowUpCircle, ExternalLink, Wallet } from "lucide-react";
+import { ArrowUpCircle, ExternalLink, Wallet, CreditCard, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 
 interface InsightsData {
   today_spend: number;
   yesterday_spend: number;
-  current_balance: number;
+  balance: number;
+  cards: { id: string; display_string: string; type: number }[];
 }
 
 export function ClientAdAccounts() {
@@ -27,6 +28,8 @@ export function ClientAdAccounts() {
   const [topUpAccount, setTopUpAccount] = useState<any>(null);
   const [topUpAmount, setTopUpAmount] = useState("");
   const [insights, setInsights] = useState<Record<string, InsightsData>>({});
+  const [sortField, setSortField] = useState<string>("account_name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   const { data: accounts } = useQuery({
     queryKey: ["client-ad-accounts", user?.id],
@@ -63,6 +66,42 @@ export function ClientAdAccounts() {
     }
   }, [accounts]);
 
+  const toggleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDir(d => d === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+  };
+
+  const SortIcon = ({ field }: { field: string }) => {
+    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40" />;
+    return sortDir === "asc" ? <ArrowUp className="h-3 w-3 ml-1" /> : <ArrowDown className="h-3 w-3 ml-1" />;
+  };
+
+  const sortedAccounts = useMemo(() => {
+    if (!accounts) return [];
+    return [...accounts].sort((a, b) => {
+      let valA: any, valB: any;
+      const insA = insights[a.id];
+      const insB = insights[b.id];
+
+      switch (sortField) {
+        case "account_name": valA = a.account_name?.toLowerCase(); valB = b.account_name?.toLowerCase(); break;
+        case "today_spend": valA = insA?.today_spend ?? 0; valB = insB?.today_spend ?? 0; break;
+        case "yesterday_spend": valA = insA?.yesterday_spend ?? 0; valB = insB?.yesterday_spend ?? 0; break;
+        case "balance": valA = insA?.balance ?? 0; valB = insB?.balance ?? 0; break;
+        case "spend_cap": valA = Number(a.spend_cap); valB = Number(b.spend_cap); break;
+        default: valA = a.account_name?.toLowerCase(); valB = b.account_name?.toLowerCase();
+      }
+
+      if (valA < valB) return sortDir === "asc" ? -1 : 1;
+      if (valA > valB) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [accounts, insights, sortField, sortDir]);
+
   const walletBalance = Number(wallet?.balance ?? 0);
   const parsedAmount = parseFloat(topUpAmount) || 0;
   const exceedsBalance = parsedAmount > walletBalance;
@@ -95,16 +134,38 @@ export function ClientAdAccounts() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Account</TableHead>
+                <TableHead>
+                  <button className="flex items-center font-medium" onClick={() => toggleSort("account_name")}>
+                    Account <SortIcon field="account_name" />
+                  </button>
+                </TableHead>
                 <TableHead className="hidden sm:table-cell">Status</TableHead>
-                <TableHead>Spend Cap / Spent</TableHead>
-                <TableHead>Today / Yesterday</TableHead>
-                <TableHead>Balance</TableHead>
+                <TableHead>
+                  <button className="flex items-center font-medium" onClick={() => toggleSort("spend_cap")}>
+                    Spend Cap / Spent <SortIcon field="spend_cap" />
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button className="flex items-center font-medium" onClick={() => toggleSort("today_spend")}>
+                    Today <SortIcon field="today_spend" />
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button className="flex items-center font-medium" onClick={() => toggleSort("yesterday_spend")}>
+                    Yesterday <SortIcon field="yesterday_spend" />
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button className="flex items-center font-medium" onClick={() => toggleSort("balance")}>
+                    Balance <SortIcon field="balance" />
+                  </button>
+                </TableHead>
+                <TableHead>Cards</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {accounts?.map((a: any) => {
+              {sortedAccounts.map((a: any) => {
                 const ins = insights[a.id];
                 return (
                   <TableRow
@@ -133,13 +194,27 @@ export function ClientAdAccounts() {
                       <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} />
                     </TableCell>
                     <TableCell>
-                      <div className="text-xs space-y-1">
-                        <div>Today: <span className="font-medium">${ins?.today_spend?.toLocaleString() ?? '—'}</span></div>
-                        <div>Yesterday: <span className="font-medium">${ins?.yesterday_spend?.toLocaleString() ?? '—'}</span></div>
-                      </div>
+                      <span className="text-sm font-medium">${ins?.today_spend?.toLocaleString() ?? '—'}</span>
                     </TableCell>
                     <TableCell>
-                      <span className="text-sm font-semibold">${ins?.current_balance?.toLocaleString() ?? (Number(a.spend_cap) - Number(a.amount_spent)).toLocaleString()}</span>
+                      <span className="text-sm font-medium">${ins?.yesterday_spend?.toLocaleString() ?? '—'}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm font-semibold">${ins?.balance?.toLocaleString() ?? '—'}</span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-xs space-y-0.5">
+                        {ins?.cards && ins.cards.length > 0 ? (
+                          ins.cards.map((card: any, i: number) => (
+                            <div key={i} className="flex items-center gap-1">
+                              <CreditCard className="h-3 w-3 text-muted-foreground" />
+                              <span>{card.display_string}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-2">
@@ -166,7 +241,7 @@ export function ClientAdAccounts() {
                 );
               })}
               {(!accounts || accounts.length === 0) && (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No ad accounts assigned to you yet</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">No ad accounts assigned to you yet</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
