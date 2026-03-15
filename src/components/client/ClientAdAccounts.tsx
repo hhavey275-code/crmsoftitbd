@@ -375,9 +375,6 @@ export function ClientAdAccounts() {
                 <TableHead className="w-[90px] hidden sm:table-cell">
                   <span className="text-xs font-medium">Status</span>
                 </TableHead>
-                <TableHead className="w-[110px]">
-                  <span className="text-xs font-medium">Card Name</span>
-                </TableHead>
                 <TableHead className="w-[50px]">
                   <span className="text-xs font-medium">Actions</span>
                 </TableHead>
@@ -431,40 +428,26 @@ export function ClientAdAccounts() {
                       <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} />
                     </TableCell>
                     <TableCell className="hidden sm:table-cell"><StatusBadge status={a.status} /></TableCell>
-                    <TableCell>
-                      <div className="text-sm whitespace-nowrap">
-                        {ins?.cards && ins.cards.length > 0 ? (
-                          ins.cards.map((card: any, i: number) => (
-                            <div key={i} className="flex items-center gap-1.5">
-                              <CardBrandIcon displayString={card.display_string} size="xs" />
-                              <span>{card.display_string}</span>
-                            </div>
-                          ))
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </div>
-                    </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <Button
-                        size="icon"
+                        size="sm"
                         variant="default"
-                        className="h-8 w-8"
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
                         disabled={isInactive}
                         onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
-                        title="Top Up"
                       >
                         <ArrowUpCircle className="h-4 w-4" />
+                        Top Up
                       </Button>
                     </TableCell>
                   </TableRow>
                 );
               })}
               {(!accounts || accounts.length === 0) && (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No ad accounts assigned to you yet</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No ad accounts assigned to you yet</TableCell></TableRow>
               )}
               {accounts && accounts.length > 0 && paginatedAccounts.length === 0 && (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No accounts match your filters</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No accounts match your filters</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
