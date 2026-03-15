@@ -5,10 +5,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
 import { CardBrandIcon } from "@/components/CardBrandIcon";
-import { ArrowUp, ArrowDown, AppWindow, RefreshCw } from "lucide-react";
+import { ArrowUp, ArrowDown, AppWindow, RefreshCw, Search } from "lucide-react";
 import { toast } from "sonner";
 
 interface InsightsData {
