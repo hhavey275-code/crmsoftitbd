@@ -190,7 +190,7 @@ export default function ClientDetailPage() {
                       <TableCell>${Number(acc.spend_cap).toLocaleString()}</TableCell>
                       <TableCell><StatusBadge status={acc.status} /></TableCell>
                       <TableCell>
-                        <SpendProgressBar spent={Number(acc.amount_spent)} cap={Number(acc.spend_cap)} />
+                        <SpendProgressBar amountSpent={Number(acc.amount_spent)} spendCap={Number(acc.spend_cap)} />
                       </TableCell>
                     </TableRow>
                   ))}
