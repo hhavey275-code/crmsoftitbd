@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN usd_rate numeric DEFAULT NULL;

@@ -210,6 +210,7 @@ export type Database = {
           phone: string | null
           status: string
           updated_at: string
+          usd_rate: number | null
           user_id: string
         }
         Insert: {
@@ -221,6 +222,7 @@ export type Database = {
           phone?: string | null
           status?: string
           updated_at?: string
+          usd_rate?: number | null
           user_id: string
         }
         Update: {
@@ -232,6 +234,7 @@ export type Database = {
           phone?: string | null
           status?: string
           updated_at?: string
+          usd_rate?: number | null
           user_id?: string
         }
         Relationships: []
