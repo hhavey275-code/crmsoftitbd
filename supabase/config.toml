@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.rename-ad-account]
 verify_jwt = false
+
+[functions.get-account-insights]
+verify_jwt = false
