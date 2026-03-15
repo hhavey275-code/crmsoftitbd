@@ -23,6 +23,8 @@ const PAGE_SIZE = 20;
 interface InsightsData {
   today_spend: number;
   yesterday_spend: number;
+  today_orders: number;
+  yesterday_orders: number;
   balance: number;
   cards: { id: string; display_string: string; type: number }[];
   updated_at?: string;
