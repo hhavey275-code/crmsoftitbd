@@ -173,16 +173,16 @@ export function ClientTopUp() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card className="shadow-sm">
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
               <ArrowUpCircle className="h-5 w-5 text-primary" />
               Submit Top-Up Request
             </CardTitle>
-            <CardDescription>Select a bank, enter BDT amount, and submit your payment details</CardDescription>
+            <CardDescription className="text-xs">Select a bank, enter BDT amount, and submit your payment details</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="p-4 pt-2 space-y-3">
             <div className="space-y-2">
               <Label>Payment Bank</Label>
               <Select value={selectedBank} onValueChange={setSelectedBank}>
