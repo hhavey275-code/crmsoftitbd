@@ -4,8 +4,8 @@ import { AdminBusinessManagers } from "@/components/admin/AdminBusinessManagers"
 import { Navigate } from "react-router-dom";
 
 export default function BusinessManagersPage() {
-  const { role } = useAuth();
-  if (role !== "admin") return <Navigate to="/dashboard" replace />;
+  const { isAdmin } = useAuth();
+  if (!isAdmin) return <Navigate to="/dashboard" replace />;
   return (
     <DashboardLayout>
       <AdminBusinessManagers />
