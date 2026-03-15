@@ -146,25 +146,45 @@ export function AdminAdAccounts() {
     return sortDir === "asc" ? <ArrowUp className="h-3 w-3 ml-1" /> : <ArrowDown className="h-3 w-3 ml-1" />;
   };
 
+  const uniqueCards = useMemo(() => {
+    const cards = new Set<string>();
+    Object.values(insights).forEach((ins: any) => {
+      ins?.cards?.forEach((c: any) => cards.add(c.display_string));
+    });
+    return Array.from(cards);
+  }, [insights]);
+
   const sortedAccounts = useMemo(() => {
     if (!accounts) return [];
-    return [...accounts].sort((a, b) => {
-      let valA: any, valB: any;
-      const insA = insights[a.id];
-      const insB = insights[b.id];
-      switch (sortField) {
-        case "account_name": valA = a.account_name?.toLowerCase(); valB = b.account_name?.toLowerCase(); break;
-        case "today_spend": valA = insA?.today_spend ?? 0; valB = insB?.today_spend ?? 0; break;
-        case "yesterday_spend": valA = insA?.yesterday_spend ?? 0; valB = insB?.yesterday_spend ?? 0; break;
-        case "balance": valA = insA?.balance ?? 0; valB = insB?.balance ?? 0; break;
-        case "spend_cap": valA = Number(a.spend_cap); valB = Number(b.spend_cap); break;
-        default: valA = a.account_name?.toLowerCase(); valB = b.account_name?.toLowerCase();
-      }
-      if (valA < valB) return sortDir === "asc" ? -1 : 1;
-      if (valA > valB) return sortDir === "asc" ? 1 : -1;
-      return 0;
-    });
-  }, [accounts, insights, sortField, sortDir]);
+    const q = search.toLowerCase();
+    return [...accounts]
+      .filter((a: any) => {
+        if (q && !a.account_name?.toLowerCase().includes(q) && !a.account_id?.toLowerCase().includes(q)) return false;
+        if (statusFilter !== "all" && a.status?.toLowerCase() !== statusFilter) return false;
+        if (cardFilter !== "all") {
+          const ins = insights[a.id];
+          const hasCard = ins?.cards?.some((c: any) => c.display_string === cardFilter);
+          if (!hasCard) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        let valA: any, valB: any;
+        const insA = insights[a.id];
+        const insB = insights[b.id];
+        switch (sortField) {
+          case "account_name": valA = a.account_name?.toLowerCase(); valB = b.account_name?.toLowerCase(); break;
+          case "today_spend": valA = insA?.today_spend ?? 0; valB = insB?.today_spend ?? 0; break;
+          case "yesterday_spend": valA = insA?.yesterday_spend ?? 0; valB = insB?.yesterday_spend ?? 0; break;
+          case "balance": valA = insA?.balance ?? 0; valB = insB?.balance ?? 0; break;
+          case "spend_cap": valA = Number(a.spend_cap); valB = Number(b.spend_cap); break;
+          default: valA = a.account_name?.toLowerCase(); valB = b.account_name?.toLowerCase();
+        }
+        if (valA < valB) return sortDir === "asc" ? -1 : 1;
+        if (valA > valB) return sortDir === "asc" ? 1 : -1;
+        return 0;
+      });
+  }, [accounts, insights, sortField, sortDir, search, statusFilter, cardFilter]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
