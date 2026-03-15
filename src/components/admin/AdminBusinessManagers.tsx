@@ -224,7 +224,8 @@ export function AdminBusinessManagers() {
               </Button>
             </DialogFooter>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
 
       {bms?.map((bm: any) => (
