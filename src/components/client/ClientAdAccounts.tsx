@@ -430,14 +430,14 @@ export function ClientAdAccounts() {
                     <TableCell className="hidden sm:table-cell"><StatusBadge status={a.status} /></TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <Button
-                        size="icon"
+                        size="sm"
                         variant="default"
-                        className="h-8 w-8"
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
                         disabled={isInactive}
                         onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
-                        title="Top Up"
                       >
                         <ArrowUpCircle className="h-4 w-4" />
+                        Top Up
                       </Button>
                     </TableCell>
                   </TableRow>
