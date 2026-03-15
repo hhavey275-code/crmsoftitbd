@@ -76,14 +76,35 @@ export default function BillingsPage() {
     return new Date(times.sort().reverse()[0]!).toLocaleString();
   }, [insights]);
 
+  const uniqueCards = useMemo(() => {
+    if (!insights) return [];
+    const cards = new Set<string>();
+    Object.values(insights as Record<string, InsightsData>).forEach((ins) => {
+      ins.cards?.forEach((c) => cards.add(c.display_string));
+    });
+    return Array.from(cards);
+  }, [insights]);
+
   const sorted = useMemo(() => {
     if (!accounts) return [];
-    return [...accounts].sort((a, b) => {
-      const balA = Number((insights as any)[a.id]?.balance ?? 0);
-      const balB = Number((insights as any)[b.id]?.balance ?? 0);
-      return sortDir === "asc" ? balA - balB : balB - balA;
-    });
-  }, [accounts, insights, sortDir]);
+    const q = search.toLowerCase();
+    return [...accounts]
+      .filter((a: any) => {
+        if (q && !a.account_name?.toLowerCase().includes(q) && !a.account_id?.toLowerCase().includes(q)) return false;
+        if (statusFilter !== "all" && a.status?.toLowerCase() !== statusFilter) return false;
+        if (cardFilter !== "all") {
+          const ins = (insights as any)[a.id] as InsightsData | undefined;
+          const hasCard = ins?.cards?.some((c) => c.display_string === cardFilter);
+          if (!hasCard) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const balA = Number((insights as any)[a.id]?.balance ?? 0);
+        const balB = Number((insights as any)[b.id]?.balance ?? 0);
+        return sortDir === "asc" ? balA - balB : balB - balA;
+      });
+  }, [accounts, insights, sortDir, search, statusFilter, cardFilter]);
 
   return (
     <DashboardLayout>
