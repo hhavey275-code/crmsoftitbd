@@ -60,6 +60,21 @@ export default function SettingsPage() {
     }
   };
 
+  const handleSaveSiteName = async () => {
+    if (!siteNameInput.trim()) return;
+    setSavingSiteName(true);
+    const { error } = await supabase
+      .from("site_settings")
+      .upsert({ key: "site_name", value: siteNameInput.trim() }, { onConflict: "key" });
+    setSavingSiteName(false);
+    if (error) {
+      toast.error("Failed to save site name");
+    } else {
+      toast.success("Site name updated!");
+      refetch();
+    }
+  };
+
   const handleSaveRate = async () => {
     if (!usdRate || isNaN(Number(usdRate))) return;
     setSavingRate(true);
