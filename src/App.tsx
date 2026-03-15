@@ -12,6 +12,7 @@ import AdAccountsPage from "./pages/AdAccountsPage";
 import TopUpPage from "./pages/TopUpPage";
 import TransactionsPage from "./pages/TransactionsPage";
 import SettingsPage from "./pages/SettingsPage";
+import BusinessManagersPage from "./pages/BusinessManagersPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();

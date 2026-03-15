@@ -23,7 +23,7 @@ export function ClientDashboard() {
   const { data: adAccounts } = useQuery({
     queryKey: ["client-ad-accounts", user?.id],
     queryFn: async () => {
-      const { data } = await supabase.from("ad_accounts").select("*").eq("user_id", user!.id);
+      const { data } = await supabase.from("ad_accounts").select("*").eq("assigned_user_id", user!.id);
       return data ?? [];
     },
     enabled: !!user,
