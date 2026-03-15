@@ -6,6 +6,21 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+async function fetchAllPages(url: string): Promise<any[]> {
+  const results: any[] = [];
+  let nextUrl: string | null = url;
+  while (nextUrl) {
+    const res = await fetch(nextUrl);
+    const data = await res.json();
+    if (data.error) {
+      throw new Error(data.error.message);
+    }
+    results.push(...(data.data ?? []));
+    nextUrl = data.paging?.next ?? null;
+  }
+  return results;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -77,37 +92,55 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Use Meta API v24.0
-    let allAccounts: any[] = [];
-    let nextUrl: string | null = `https://graph.facebook.com/v24.0/${bm.bm_id}/owned_ad_accounts?fields=id,name,account_id,account_status,spend_cap,amount_spent,business_name&access_token=${bm.access_token}&limit=100`;
+    const fields = "id,name,account_id,account_status,spend_cap,amount_spent,business_name";
+    const baseUrl = `https://graph.facebook.com/v24.0/${bm.bm_id}`;
 
-    // Paginate through all results
-    while (nextUrl) {
-      const metaRes = await fetch(nextUrl);
-      const metaData = await metaRes.json();
+    // Fetch from BOTH endpoints: owned + client ad accounts
+    let ownedAccounts: any[] = [];
+    let clientAccounts: any[] = [];
 
-      if (metaData.error) {
-        // Log the failed sync
-        await supabase.from("sync_logs").insert({
-          business_manager_id: bm.id,
-          synced_count: 0,
-          total_count: 0,
-          status: "error",
-          error_message: metaData.error.message,
-        });
-
-        return new Response(
-          JSON.stringify({
-            error: `Meta API error: ${metaData.error.message}`,
-          }),
-          { status: 400, headers: corsHeaders }
-        );
-      }
-
-      allAccounts = allAccounts.concat(metaData.data ?? []);
-      nextUrl = metaData.paging?.next ?? null;
+    try {
+      ownedAccounts = await fetchAllPages(
+        `${baseUrl}/owned_ad_accounts?fields=${fields}&access_token=${bm.access_token}&limit=100`
+      );
+    } catch (e) {
+      console.error("Error fetching owned_ad_accounts:", e.message);
     }
 
+    try {
+      clientAccounts = await fetchAllPages(
+        `${baseUrl}/client_ad_accounts?fields=${fields}&access_token=${bm.access_token}&limit=100`
+      );
+    } catch (e) {
+      console.error("Error fetching client_ad_accounts:", e.message);
+    }
+
+    // If both failed, log error and return
+    if (ownedAccounts.length === 0 && clientAccounts.length === 0) {
+      await supabase.from("sync_logs").insert({
+        business_manager_id: bm.id,
+        synced_count: 0,
+        total_count: 0,
+        status: "error",
+        error_message: "No accounts returned from owned or client endpoints",
+      });
+
+      return new Response(
+        JSON.stringify({ error: "No ad accounts found from Meta API" }),
+        { status: 400, headers: corsHeaders }
+      );
+    }
+
+    // Deduplicate by account_id
+    const accountMap = new Map<string, any>();
+    for (const account of [...ownedAccounts, ...clientAccounts]) {
+      const accountId = account.account_id || account.id?.replace("act_", "");
+      if (accountId && !accountMap.has(accountId)) {
+        accountMap.set(accountId, account);
+      }
+    }
+
+    const allAccounts = Array.from(accountMap.values());
     let synced = 0;
 
     for (const account of allAccounts) {
@@ -138,13 +171,11 @@ Deno.serve(async (req) => {
 
     const now = new Date().toISOString();
 
-    // Update last_synced_at on the BM
     await supabase
       .from("business_managers")
       .update({ last_synced_at: now })
       .eq("id", bm.id);
 
-    // Insert sync log
     await supabase.from("sync_logs").insert({
       business_manager_id: bm.id,
       synced_count: synced,
@@ -157,6 +188,8 @@ Deno.serve(async (req) => {
         success: true,
         synced,
         total: allAccounts.length,
+        owned: ownedAccounts.length,
+        client: clientAccounts.length,
         last_synced_at: now,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
