@@ -166,7 +166,7 @@ export default function SettingsPage() {
   };
 
 
-    setSavingWelcome(true);
+    const handleSaveWelcome = async () => {
     const { error: e1 } = await supabase
       .from("site_settings")
       .upsert({ key: "welcome_title", value: welcomeTitleInput.trim() }, { onConflict: "key" });
