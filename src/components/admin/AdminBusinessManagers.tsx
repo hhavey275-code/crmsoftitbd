@@ -633,6 +633,35 @@ export function AdminBusinessManagers() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Access Token Dialog */}
+      <Dialog open={editOpen} onOpenChange={(v) => { setEditOpen(v); if (!v) setEditBmId(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Access Token</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>New Access Token</Label>
+              <Input
+                type="password"
+                value={editAccessToken}
+                onChange={(e) => setEditAccessToken(e.target.value)}
+                placeholder="EAA..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => editBmId && updateTokenMutation.mutate({ id: editBmId, token: editAccessToken })}
+              disabled={!editAccessToken || updateTokenMutation.isPending}
+            >
+              {updateTokenMutation.isPending ? "Updating..." : "Update Token"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
