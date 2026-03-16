@@ -291,9 +291,9 @@ export function AdminAdAccounts() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">All Ad Accounts</h1>
         <div className="flex items-center gap-3">
-          {lastUpdated && (
+          {timeAgoStr && (
             <span className="text-xs text-muted-foreground">
-              Last synced: {lastUpdated.toLocaleString()}
+              Synced {timeAgoStr}
             </span>
           )}
           {showSelect && selectedIds.size > 0 && (
