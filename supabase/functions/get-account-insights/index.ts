@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { ad_account_ids, source = "cache" } = await req.json();
+    const { ad_account_ids, source = "cache", date } = await req.json();
     if (!ad_account_ids || !Array.isArray(ad_account_ids) || ad_account_ids.length === 0) {
       return new Response(JSON.stringify({ error: "ad_account_ids required" }), {
         status: 400,
