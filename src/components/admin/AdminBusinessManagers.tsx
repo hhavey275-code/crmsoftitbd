@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, RefreshCw, Building2, ChevronDown, ChevronRight, Clock, AlertCircle, CheckCircle2, Search } from "lucide-react";
+import { Plus, RefreshCw, Building2, ChevronDown, ChevronRight, Clock, AlertCircle, CheckCircle2, Search, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 
@@ -40,6 +40,11 @@ export function AdminBusinessManagers() {
   const [importStatusFilter, setImportStatusFilter] = useState("all");
   const [importSearch, setImportSearch] = useState("");
   const [existingAccountIds, setExistingAccountIds] = useState<Set<string>>(new Set());
+
+  // Edit BM state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editBmId, setEditBmId] = useState<string | null>(null);
+  const [editAccessToken, setEditAccessToken] = useState("");
 
   const { data: bms } = useQuery({
     queryKey: ["admin-business-managers"],
@@ -202,6 +207,24 @@ export function AdminBusinessManagers() {
 
   const newAccountsCount = syncedAccounts.filter((a) => !existingAccountIds.has(a.account_id)).length;
   const alreadyImportedCount = syncedAccounts.filter((a) => existingAccountIds.has(a.account_id)).length;
+
+  const updateTokenMutation = useMutation({
+    mutationFn: async ({ id, token }: { id: string; token: string }) => {
+      const { error } = await supabase
+        .from("business_managers")
+        .update({ access_token: token })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Access token updated");
+      setEditOpen(false);
+      setEditBmId(null);
+      setEditAccessToken("");
+      queryClient.invalidateQueries({ queryKey: ["admin-business-managers"] });
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
 
   const assignMutation = useMutation({
     mutationFn: async ({ accountId, userId }: { accountId: string; userId: string | null }) => {
@@ -376,6 +399,19 @@ export function AdminBusinessManagers() {
               </div>
               <div className="flex items-center gap-2">
                 <StatusBadge status={bm.status} />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditBmId(bm.id);
+                    setEditAccessToken("");
+                    setEditOpen(true);
+                  }}
+                >
+                  <Pencil className="mr-1 h-3 w-3" />
+                  Edit
+                </Button>
                 <Button
                   size="sm"
                   variant="outline"
@@ -593,6 +629,35 @@ export function AdminBusinessManagers() {
               disabled={selectedImportIds.size === 0 || importMutation.isPending}
             >
               {importMutation.isPending ? "Importing..." : `Import ${selectedImportIds.size} Account(s)`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Access Token Dialog */}
+      <Dialog open={editOpen} onOpenChange={(v) => { setEditOpen(v); if (!v) setEditBmId(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Access Token</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>New Access Token</Label>
+              <Input
+                type="password"
+                value={editAccessToken}
+                onChange={(e) => setEditAccessToken(e.target.value)}
+                placeholder="EAA..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => editBmId && updateTokenMutation.mutate({ id: editBmId, token: editAccessToken })}
+              disabled={!editAccessToken || updateTokenMutation.isPending}
+            >
+              {updateTokenMutation.isPending ? "Updating..." : "Update Token"}
             </Button>
           </DialogFooter>
         </DialogContent>
