@@ -178,7 +178,19 @@ export function AdminTopUp() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Top-Up Requests</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Top-Up Requests</h1>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={fetchTelegram}
+          disabled={isFetchingTelegram}
+          className="gap-1.5"
+        >
+          <Radio className="h-3.5 w-3.5" />
+          {isFetchingTelegram ? "Fetching..." : "Fetch Telegram"}
+        </Button>
+      </div>
 
       <Tabs value={statusFilter} onValueChange={setStatusFilter}>
         <TabsList>
