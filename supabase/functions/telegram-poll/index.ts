@@ -115,6 +115,35 @@ Deno.serve(async (req) => {
     currentOffset = newOffset;
   };
 
+  // Auto-verify all pending top-up requests
+  const autoVerifyPending = async () => {
+    const { data: pendingRequests } = await supabase
+      .from('top_up_requests')
+      .select('id')
+      .eq('status', 'pending');
+
+    if (!pendingRequests || pendingRequests.length === 0) return 0;
+
+    let verified = 0;
+    for (const req of pendingRequests) {
+      try {
+        const verifyResponse = await fetch(`${supabaseUrl}/functions/v1/verify-topup`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({ request_id: req.id }),
+        });
+        const result = await verifyResponse.json();
+        if (result.auto_approved) verified++;
+      } catch (e) {
+        console.error(`Auto-verify failed for ${req.id}:`, e);
+      }
+    }
+    return verified;
+  };
+
   if (quickMode) {
     // Quick mode: single instant call with timeout=0
     const response = await fetch(`${TELEGRAM_API}/getUpdates`, {
@@ -140,6 +169,16 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: (e as Error).message }), { status: 500, headers: corsHeaders });
       }
     }
+
+    // Auto-verify pending requests after fetching new messages
+    let autoVerified = 0;
+    try {
+      autoVerified = await autoVerifyPending();
+    } catch (e) {
+      console.error('Auto-verify sweep failed:', e);
+    }
+
+    return new Response(JSON.stringify({ ok: true, processed: totalProcessed, finalOffset: currentOffset, auto_verified: autoVerified }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } else {
     // Long-polling mode for cron/background runs
     while (true) {
@@ -174,7 +213,17 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: (e as Error).message }), { status: 500, headers: corsHeaders });
       }
     }
-  }
 
-  return new Response(JSON.stringify({ ok: true, processed: totalProcessed, finalOffset: currentOffset }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    // Auto-verify after long-polling loop ends
+    let autoVerified = 0;
+    if (totalProcessed > 0) {
+      try {
+        autoVerified = await autoVerifyPending();
+      } catch (e) {
+        console.error('Auto-verify sweep failed:', e);
+      }
+    }
+
+    return new Response(JSON.stringify({ ok: true, processed: totalProcessed, finalOffset: currentOffset, auto_verified: autoVerified }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  }
 });

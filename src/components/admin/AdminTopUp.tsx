@@ -12,7 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { useState, Fragment } from "react";
-import { Check, X, Pause, ImageIcon, Radio, ChevronDown, ChevronUp, MessageSquareText } from "lucide-react";
+import { Check, X, Pause, ImageIcon, Radio, ChevronDown, ChevronUp, MessageSquareText, RotateCcw } from "lucide-react";
 
 type ActionType = "approved" | "rejected" | "hold";
 
@@ -164,6 +164,7 @@ export function AdminTopUp() {
   const [proofDialog, setProofDialog] = useState<string | null>(null);
   const [isFetchingTelegram, setIsFetchingTelegram] = useState(false);
   const [expandedSms, setExpandedSms] = useState<Record<string, boolean>>({});
+  const [verifyingIds, setVerifyingIds] = useState<Record<string, boolean>>({});
   const [actionDialog, setActionDialog] = useState<{
     id: string;
     action: ActionType;
@@ -182,11 +183,30 @@ export function AdminTopUp() {
     try {
       const { data, error } = await supabase.functions.invoke('telegram-poll', { body: { quick: true } });
       if (error) throw error;
-      toast.success(`Telegram synced! ${data?.processed ?? 0} new messages fetched.`);
+      toast.success(`Telegram synced! ${data?.processed ?? 0} messages fetched${data?.auto_verified ? `, ${data.auto_verified} request(s) auto-approved!` : ''}.`);
     } catch (err: any) {
       toast.error(`Telegram fetch failed: ${err.message}`);
     } finally {
       setIsFetchingTelegram(false);
+    }
+  };
+
+  const reVerify = async (requestId: string) => {
+    setVerifyingIds(prev => ({ ...prev, [requestId]: true }));
+    try {
+      const { data, error } = await supabase.functions.invoke('verify-topup', { body: { request_id: requestId } });
+      if (error) throw error;
+      if (data?.auto_approved) {
+        toast.success('Request auto-approved!');
+        queryClient.invalidateQueries({ queryKey: ["admin-topup-requests"] });
+        queryClient.invalidateQueries({ queryKey: ["admin-wallets"] });
+      } else {
+        toast.info(`Not auto-approved: ${data?.reason || 'No match found'}`);
+      }
+    } catch (err: any) {
+      toast.error(`Verify failed: ${err.message}`);
+    } finally {
+      setVerifyingIds(prev => ({ ...prev, [requestId]: false }));
     }
   };
 
@@ -427,6 +447,18 @@ export function AdminTopUp() {
                               <X className="h-4 w-4" />
                             </Button>
                           </>
+                        )}
+                        {r.status === "pending" && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="hover:text-primary"
+                            title="Re-verify"
+                            onClick={() => reVerify(r.id)}
+                            disabled={verifyingIds[r.id]}
+                          >
+                            <RotateCcw className={`h-4 w-4 ${verifyingIds[r.id] ? 'animate-spin' : ''}`} />
+                          </Button>
                         )}
                         <Button
                           size="sm"
