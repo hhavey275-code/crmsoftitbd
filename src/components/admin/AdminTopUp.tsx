@@ -164,6 +164,7 @@ export function AdminTopUp() {
   const [proofDialog, setProofDialog] = useState<string | null>(null);
   const [isFetchingTelegram, setIsFetchingTelegram] = useState(false);
   const [expandedSms, setExpandedSms] = useState<Record<string, boolean>>({});
+  const [verifyingIds, setVerifyingIds] = useState<Record<string, boolean>>({});
   const [actionDialog, setActionDialog] = useState<{
     id: string;
     action: ActionType;
