@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { ad_account_ids, source = "cache" } = await req.json();
+    const { ad_account_ids, source = "cache", date } = await req.json();
     if (!ad_account_ids || !Array.isArray(ad_account_ids) || ad_account_ids.length === 0) {
       return new Response(JSON.stringify({ error: "ad_account_ids required" }), {
         status: 400,
@@ -142,9 +142,25 @@ Deno.serve(async (req) => {
       }
 
       try {
+        // Build date query params
+        let todayUrl: string;
+        let yesterdayUrl: string;
+        if (date) {
+          // Custom date: fetch spend for that specific date
+          todayUrl = `https://graph.facebook.com/v24.0/${actId}/insights?fields=spend,actions&time_range={"since":"${date}","until":"${date}"}&access_token=${accessToken}`;
+          // For custom date, yesterday is not applicable, but we still fetch it as the day before
+          const d = new Date(date);
+          d.setDate(d.getDate() - 1);
+          const prevDate = d.toISOString().split("T")[0];
+          yesterdayUrl = `https://graph.facebook.com/v24.0/${actId}/insights?fields=spend,actions&time_range={"since":"${prevDate}","until":"${prevDate}"}&access_token=${accessToken}`;
+        } else {
+          todayUrl = `https://graph.facebook.com/v24.0/${actId}/insights?fields=spend,actions&date_preset=today&access_token=${accessToken}`;
+          yesterdayUrl = `https://graph.facebook.com/v24.0/${actId}/insights?fields=spend,actions&date_preset=yesterday&access_token=${accessToken}`;
+        }
+
         const [todayRes, yesterdayRes, accountRes, activeCampaigns] = await Promise.all([
-          fetch(`https://graph.facebook.com/v24.0/${actId}/insights?fields=spend,actions&date_preset=today&access_token=${accessToken}`),
-          fetch(`https://graph.facebook.com/v24.0/${actId}/insights?fields=spend,actions&date_preset=yesterday&access_token=${accessToken}`),
+          fetch(todayUrl),
+          fetch(yesterdayUrl),
           fetch(`https://graph.facebook.com/v24.0/${actId}?fields=balance,funding_source_details&access_token=${accessToken}`),
           fetchActiveCampaignCount(actId, accessToken),
         ]);
@@ -171,6 +187,7 @@ Deno.serve(async (req) => {
         insights[account.id] = {
           today_spend: todaySpend,
           yesterday_spend: yesterdaySpend,
+          date_spend: date ? todaySpend : undefined,
           today_orders: extractOrders(todayData),
           yesterday_orders: extractOrders(yesterdayData),
           active_campaigns: activeCampaigns,

@@ -2,11 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MetricCard } from "@/components/MetricCard";
-import { Users, Wallet, Clock, Activity, Ban, TrendingUp, Trophy, Crown, Medal, RefreshCw, DollarSign } from "lucide-react";
+import { Users, Wallet, Clock, Activity, Ban, TrendingUp, Trophy, Crown, Medal, RefreshCw, DollarSign, CalendarIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import { toast } from "sonner";
+import { format } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 const CHART_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#14b8a6"];
 
@@ -15,6 +19,9 @@ export function AdminDashboard() {
   const [metaLoading, setMetaLoading] = useState(false);
   const [dailySpendLoading, setDailySpendLoading] = useState(false);
   const [spendData, setSpendData] = useState<{ today: number; yesterday: number } | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [dateSpend, setDateSpend] = useState<number | null>(null);
+  const [dateSpendLoading, setDateSpendLoading] = useState(false);
 
   const { data: profiles } = useQuery({
     queryKey: ["admin-profiles"],
@@ -227,11 +234,53 @@ export function AdminDashboard() {
               </p>
             </div>
             <div className="h-10 w-px bg-border hidden sm:block" />
-            <div>
-              <p className="text-xs text-muted-foreground">Total Spent (All Time)</p>
-              <p className="text-lg font-bold">
-                ${(adAccounts?.reduce((sum: number, a: any) => sum + Number(a.amount_spent), 0) ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </p>
+            <div className="flex items-center gap-2">
+              <div>
+                <p className="text-xs text-muted-foreground">
+                  {selectedDate ? format(selectedDate, "dd MMM yyyy") + " Spend" : "Pick a Date"}
+                </p>
+                <p className="text-lg font-bold">
+                  {dateSpendLoading
+                    ? "Loading..."
+                    : dateSpend !== null
+                      ? `$${dateSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : "—"}
+                </p>
+              </div>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="icon" className="h-8 w-8">
+                    <CalendarIcon className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={async (date) => {
+                      if (!date || !adAccounts?.length) return;
+                      setSelectedDate(date);
+                      setDateSpendLoading(true);
+                      try {
+                        const ids = adAccounts.map((a: any) => a.id);
+                        const { data, error } = await supabase.functions.invoke("get-account-insights", {
+                          body: { ad_account_ids: ids, source: "meta", date: format(date, "yyyy-MM-dd") },
+                        });
+                        if (error) throw error;
+                        const insights = data?.insights ?? {};
+                        const total = Object.values(insights).reduce((sum: number, ins: any) => sum + (Number(ins?.date_spend) || 0), 0) as number;
+                        setDateSpend(total);
+                      } catch (err: any) {
+                        toast.error("Failed to fetch spend: " + (err.message || "Unknown error"));
+                      } finally {
+                        setDateSpendLoading(false);
+                      }
+                    }}
+                    disabled={(date) => date > new Date()}
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
           <Button

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,7 +14,8 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ArrowUpCircle, ExternalLink, Wallet, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, AppWindow, Search, ListChecks, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowUpCircle, ExternalLink, Wallet, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, AppWindow, Search, ListChecks, Trash2, ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { CardBrandIcon } from "@/components/CardBrandIcon";
 
 const PAGE_SIZE = 20;
@@ -269,50 +270,64 @@ export function AdminAdAccounts() {
     return new Date(Math.min(...times.map((t: string) => new Date(t).getTime())));
   }, [insights]);
 
+  const [timeAgoStr, setTimeAgoStr] = useState("");
+  useEffect(() => {
+    if (!lastUpdated) { setTimeAgoStr(""); return; }
+    const update = () => {
+      const diffMs = Date.now() - lastUpdated.getTime();
+      const diffSec = Math.floor(diffMs / 1000);
+      if (diffSec < 60) setTimeAgoStr("just now");
+      else if (diffSec < 3600) setTimeAgoStr(`${Math.floor(diffSec / 60)} min ago`);
+      else if (diffSec < 86400) setTimeAgoStr(`${Math.floor(diffSec / 3600)} hr ago`);
+      else setTimeAgoStr(`${Math.floor(diffSec / 86400)} day(s) ago`);
+    };
+    update();
+    const id = setInterval(update, 30000);
+    return () => clearInterval(id);
+  }, [lastUpdated]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">All Ad Accounts</h1>
         <div className="flex items-center gap-3">
-          {lastUpdated && (
+          {timeAgoStr && (
             <span className="text-xs text-muted-foreground">
-              Last synced: {lastUpdated.toLocaleString()}
+              Synced {timeAgoStr}
             </span>
           )}
           {showSelect && selectedIds.size > 0 && (
-            <>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => setShowDeleteConfirm(true)}
-              >
-                <Trash2 className="h-4 w-4 mr-1" />
-                Delete {selectedIds.size} Selected
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => { setShowAssignDialog(true); setAssignClientId(""); }}
-              >
-                Assign {selectedIds.size} Selected
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowUnassignConfirm(true)}
-              >
-                Unassign {selectedIds.size} Selected
-              </Button>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => refreshSelectedMutation.mutate()}
-                disabled={refreshSelectedMutation.isPending}
-              >
-                <RefreshCw className={`h-4 w-4 mr-1 ${refreshSelectedMutation.isPending ? 'animate-spin' : ''}`} />
-                {refreshSelectedMutation.isPending ? "Updating..." : `Update ${selectedIds.size} Selected`}
-              </Button>
-            </>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="secondary" size="sm">
+                  <MoreHorizontal className="h-4 w-4 mr-1" />
+                  Actions ({selectedIds.size})
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => refreshSelectedMutation.mutate()}
+                  disabled={refreshSelectedMutation.isPending}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${refreshSelectedMutation.isPending ? 'animate-spin' : ''}`} />
+                  Update Selected
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setShowAssignDialog(true); setAssignClientId(""); }}>
+                  Assign Selected
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowUnassignConfirm(true)}>
+                  Unassign Selected
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => setShowDeleteConfirm(true)}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Selected
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           <Button
             variant="outline"
