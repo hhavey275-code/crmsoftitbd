@@ -270,6 +270,37 @@ export default function SettingsPage() {
           </Card>
         )}
 
+        {/* Telegram Bot Token - Admin only */}
+        {isAdmin && (
+          <Card className="max-w-xl">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bot className="h-5 w-5 text-sky-600" />
+                Telegram Bot Token
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Enter your Telegram Bot Token (from @BotFather). This is used for receiving bank notification messages.
+              </p>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 space-y-2">
+                  <Label>Bot Token</Label>
+                  <Input
+                    type="password"
+                    value={botTokenInput}
+                    onChange={(e) => setBotTokenInput(e.target.value)}
+                    placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+                  />
+                </div>
+                <Button onClick={handleSaveBotToken} disabled={savingBotToken} className="mt-6">
+                  {savingBotToken ? "Saving..." : "Save Token"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Site Name - Admin only */}
         {isAdmin && (
           <Card className="max-w-xl">
