@@ -258,8 +258,14 @@ Deno.serve(async (req) => {
       reference_id: request_id,
     });
 
-    // Send 👍 reaction on matched Telegram message
+    // Mark matched Telegram message so it can't be reused
     if (matchedMsg) {
+      await supabase
+        .from('telegram_messages')
+        .update({ matched_request_id: request_id })
+        .eq('update_id', matchedMsg.update_id);
+
+      // Send 👍 reaction on matched Telegram message
       try {
         const raw = matchedMsg.raw_update || {};
         const payload = raw.message || raw.edited_message || raw.channel_post || raw.edited_channel_post || {};
