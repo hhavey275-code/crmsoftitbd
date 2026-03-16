@@ -183,7 +183,7 @@ export function AdminTopUp() {
     try {
       const { data, error } = await supabase.functions.invoke('telegram-poll', { body: { quick: true } });
       if (error) throw error;
-      toast.success(`Telegram synced! ${data?.processed ?? 0} new messages fetched.`);
+      toast.success(`Telegram synced! ${data?.processed ?? 0} messages fetched${data?.auto_verified ? `, ${data.auto_verified} request(s) auto-approved!` : ''}.`);
     } catch (err: any) {
       toast.error(`Telegram fetch failed: ${err.message}`);
     } finally {
