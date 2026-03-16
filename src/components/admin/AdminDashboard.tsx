@@ -137,8 +137,9 @@ export function AdminDashboard() {
       });
       if (error) throw error;
       const insights = data?.insights ?? {};
-      const total = Object.values(insights).reduce((sum: number, ins: any) => sum + (Number(ins?.today_spend) || 0), 0) as number;
-      setDailySpend(total);
+      const today = Object.values(insights).reduce((sum: number, ins: any) => sum + (Number(ins?.today_spend) || 0), 0) as number;
+      const yesterday = Object.values(insights).reduce((sum: number, ins: any) => sum + (Number(ins?.yesterday_spend) || 0), 0) as number;
+      setSpendData({ today, yesterday });
       await queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
     } catch (err: any) {
       toast.error("Failed to fetch daily spend: " + (err.message || "Unknown error"));
