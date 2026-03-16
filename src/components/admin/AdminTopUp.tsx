@@ -11,8 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { useState, Fragment } from "react";
-import { Check, X, Pause, ImageIcon, Radio, ChevronDown, ChevronUp, MessageSquareText, RotateCcw } from "lucide-react";
+import { useState, Fragment, useMemo } from "react";
+import { Check, X, Pause, ImageIcon, Radio, ChevronDown, ChevronUp, MessageSquareText, RotateCcw, ClipboardCheck } from "lucide-react";
 import { Link } from "react-router-dom";
 
 type ActionType = "approved" | "rejected" | "hold";
