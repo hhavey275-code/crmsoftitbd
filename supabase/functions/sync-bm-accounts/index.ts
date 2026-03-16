@@ -141,7 +141,7 @@ Deno.serve(async (req) => {
 
     const allAccounts = Array.from(accountMap.values());
 
-    // Batch upsert all accounts at once instead of one-by-one
+    // Transform to normalized format (but do NOT insert into DB)
     const rows = allAccounts.map((account) => {
       const accountId = account.account_id || account.id?.replace("act_", "");
       return {
@@ -149,7 +149,6 @@ Deno.serve(async (req) => {
         account_name: account.name || `Ad Account ${accountId}`,
         business_manager_id: bm.id,
         business_name: account.business_name || null,
-        user_id: userId,
         status:
           account.account_status === 1
             ? "active"
@@ -161,20 +160,9 @@ Deno.serve(async (req) => {
       };
     });
 
-    const { data: upsertData, error: upsertError } = await supabase
-      .from("ad_accounts")
-      .upsert(rows, { onConflict: "account_id" })
-      .select("id");
-
-    const synced = upsertError ? 0 : (upsertData?.length ?? rows.length);
-
-    if (upsertError) {
-      console.error("Batch upsert error:", upsertError.message);
-    }
-
     const now = new Date().toISOString();
 
-    // Update BM last_synced_at and insert sync log in parallel
+    // Update BM last_synced_at and insert sync log
     await Promise.all([
       supabase
         .from("business_managers")
@@ -182,17 +170,18 @@ Deno.serve(async (req) => {
         .eq("id", bm.id),
       supabase.from("sync_logs").insert({
         business_manager_id: bm.id,
-        synced_count: synced,
+        synced_count: rows.length,
         total_count: allAccounts.length,
-        status: upsertError ? "error" : "success",
-        error_message: upsertError?.message || null,
+        status: "success",
+        error_message: null,
       }),
     ]);
 
+    // Return the accounts list for frontend selection (no auto-insert)
     return new Response(
       JSON.stringify({
         success: true,
-        synced,
+        accounts: rows,
         total: allAccounts.length,
         owned: ownedAccounts.length,
         client: clientAccounts.length,

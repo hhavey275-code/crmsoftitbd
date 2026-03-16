@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -71,13 +71,29 @@ export default function BillingsPage() {
     },
   });
 
-  const lastUpdated = useMemo(() => {
+  const lastUpdatedDate = useMemo(() => {
     const times = Object.values(insights as Record<string, InsightsData>)
       .map((i) => i.updated_at)
       .filter(Boolean);
     if (times.length === 0) return null;
-    return new Date(times.sort().reverse()[0]!).toLocaleString();
+    return new Date(times.sort().reverse()[0]!);
   }, [insights]);
+
+  const [timeAgoStr, setTimeAgoStr] = useState("");
+  useEffect(() => {
+    if (!lastUpdatedDate) { setTimeAgoStr(""); return; }
+    const update = () => {
+      const diffMs = Date.now() - lastUpdatedDate.getTime();
+      const diffSec = Math.floor(diffMs / 1000);
+      if (diffSec < 60) setTimeAgoStr("just now");
+      else if (diffSec < 3600) setTimeAgoStr(`${Math.floor(diffSec / 60)} min ago`);
+      else if (diffSec < 86400) setTimeAgoStr(`${Math.floor(diffSec / 3600)} hr ago`);
+      else setTimeAgoStr(`${Math.floor(diffSec / 86400)} day(s) ago`);
+    };
+    update();
+    const id = setInterval(update, 30000);
+    return () => clearInterval(id);
+  }, [lastUpdatedDate]);
 
   const uniqueCards = useMemo(() => {
     if (!insights) return [];
@@ -122,8 +138,8 @@ export default function BillingsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Billings</h1>
-            {lastUpdated && (
-              <p className="text-xs text-muted-foreground mt-0.5">Last synced: {lastUpdated}</p>
+            {timeAgoStr && (
+              <p className="text-xs text-muted-foreground mt-0.5">Synced {timeAgoStr}</p>
             )}
           </div>
           <Button
