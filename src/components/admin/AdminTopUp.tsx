@@ -22,6 +22,7 @@ export function AdminTopUp() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [adminNote, setAdminNote] = useState("");
   const [proofDialog, setProofDialog] = useState<string | null>(null);
+  const [isFetchingTelegram, setIsFetchingTelegram] = useState(false);
   const [actionDialog, setActionDialog] = useState<{
     id: string;
     action: ActionType;
@@ -30,6 +31,19 @@ export function AdminTopUp() {
     bdtAmount: number | null;
     usdRate: number | null;
   } | null>(null);
+
+  const fetchTelegram = async () => {
+    setIsFetchingTelegram(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('telegram-poll', { body: {} });
+      if (error) throw error;
+      toast.success(`Telegram synced! ${data?.processed ?? 0} new messages fetched.`);
+    } catch (err: any) {
+      toast.error(`Telegram fetch failed: ${err.message}`);
+    } finally {
+      setIsFetchingTelegram(false);
+    }
+  };
 
   const { data: requests } = useQuery({
     queryKey: ["admin-topup-requests"],
