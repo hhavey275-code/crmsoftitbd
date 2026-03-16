@@ -12,7 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { useState } from "react";
-import { Check, X, Pause } from "lucide-react";
+import { Check, X, Pause, ImageIcon } from "lucide-react";
 
 type ActionType = "approved" | "rejected" | "hold";
 
@@ -21,6 +21,7 @@ export function AdminTopUp() {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState("all");
   const [adminNote, setAdminNote] = useState("");
+  const [proofDialog, setProofDialog] = useState<string | null>(null);
   const [actionDialog, setActionDialog] = useState<{
     id: string;
     action: ActionType;
@@ -28,7 +29,6 @@ export function AdminTopUp() {
     amount: number;
     bdtAmount: number | null;
     usdRate: number | null;
-    proofUrl: string | null;
   } | null>(null);
 
   const { data: requests } = useQuery({
@@ -39,18 +39,30 @@ export function AdminTopUp() {
         .select("*")
         .order("created_at", { ascending: false });
 
-      const userIds = [...new Set((data ?? []).map((r: any) => r.user_id))];
-      const reviewerIds = [...new Set((data ?? []).filter((r: any) => r.reviewed_by).map((r: any) => r.reviewed_by))];
+      const rows = data ?? [];
+      const userIds = [...new Set(rows.map((r: any) => r.user_id))];
+      const reviewerIds = [...new Set(rows.filter((r: any) => r.reviewed_by).map((r: any) => r.reviewed_by))];
       const allIds = [...new Set([...userIds, ...reviewerIds])];
+      const bankIds = [...new Set(rows.filter((r: any) => r.bank_account_id).map((r: any) => r.bank_account_id))];
 
-      const { data: profiles } = await supabase.from("profiles").select("user_id, full_name, email").in("user_id", allIds);
+      const [{ data: profiles }, { data: banks }] = await Promise.all([
+        supabase.from("profiles").select("user_id, full_name, email").in("user_id", allIds),
+        bankIds.length > 0
+          ? supabase.from("bank_accounts").select("id, bank_name, account_number").in("id", bankIds)
+          : Promise.resolve({ data: [] }),
+      ]);
+
       const profileMap: Record<string, any> = {};
       profiles?.forEach((p: any) => { profileMap[p.user_id] = p; });
 
-      return (data ?? []).map((r: any) => ({
+      const bankMap: Record<string, any> = {};
+      (banks ?? []).forEach((b: any) => { bankMap[b.id] = b; });
+
+      return rows.map((r: any) => ({
         ...r,
         profile: profileMap[r.user_id] || null,
         reviewerProfile: r.reviewed_by ? profileMap[r.reviewed_by] || null : null,
+        bankAccount: r.bank_account_id ? bankMap[r.bank_account_id] || null : null,
       }));
     },
   });
@@ -63,7 +75,6 @@ export function AdminTopUp() {
     mutationFn: async ({ id, action, userId, amount }: {
       id: string; action: ActionType; userId: string; amount: number;
     }) => {
-      // Duplicate payment reference check on approve
       if (action === "approved") {
         const { data: reqData } = await supabase
           .from("top_up_requests")
@@ -85,10 +96,7 @@ export function AdminTopUp() {
       }
 
       const updateData: any = { status: action, reviewed_by: user!.id };
-      if (action === "rejected" && adminNote) {
-        updateData.admin_note = adminNote;
-      }
-      if (action === "hold" && adminNote) {
+      if ((action === "rejected" || action === "hold") && adminNote) {
         updateData.admin_note = adminNote;
       }
 
@@ -117,7 +125,6 @@ export function AdminTopUp() {
         if (txError) throw txError;
       }
 
-      // Create notification for the client
       await supabase.from("notifications").insert({
         user_id: userId,
         type: "top_up_update",
@@ -145,8 +152,14 @@ export function AdminTopUp() {
     setActionDialog({
       id: r.id, action, userId: r.user_id, amount: r.amount,
       bdtAmount: r.bdt_amount, usdRate: r.usd_rate,
-      proofUrl: r.proof_url,
     });
+  };
+
+  const getBankDisplay = (bank: any) => {
+    if (!bank) return "—";
+    const accNum = bank.account_number || "";
+    const last4 = accNum.slice(-4);
+    return `${bank.bank_name} ****${last4}`;
   };
 
   return (
@@ -174,30 +187,47 @@ export function AdminTopUp() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Client</TableHead>
-                <TableHead>BDT Amount</TableHead>
-                <TableHead>Rate</TableHead>
-                <TableHead>USD Amount</TableHead>
-                <TableHead>Reference</TableHead>
+                <TableHead className="w-12">SL</TableHead>
+                <TableHead>Bank Account</TableHead>
+                <TableHead>Client Name</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Transaction Ref</TableHead>
+                <TableHead>Payment Proof</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Reviewed By</TableHead>
-                <TableHead>Date</TableHead>
+                <TableHead>Processed By</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered?.map((r: any) => (
+              {filtered?.map((r: any, idx: number) => (
                 <TableRow key={r.id}>
+                  <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
+                  <TableCell className="text-sm">{getBankDisplay(r.bankAccount)}</TableCell>
                   <TableCell className="font-medium">{r.profile?.full_name || r.profile?.email || "Unknown"}</TableCell>
-                  <TableCell>{r.bdt_amount ? `৳${Number(r.bdt_amount).toLocaleString()}` : "—"}</TableCell>
-                  <TableCell>{r.usd_rate ? `৳${r.usd_rate}` : "—"}</TableCell>
-                  <TableCell className="font-semibold">${Number(r.amount).toLocaleString()}</TableCell>
-                  <TableCell className="text-sm">{r.payment_reference || "—"}</TableCell>
+                  <TableCell>
+                    <div>
+                      <span className="font-semibold">{r.bdt_amount ? `৳${Number(r.bdt_amount).toLocaleString()}` : "—"}</span>
+                      <span className="text-xs text-muted-foreground block">${Number(r.amount).toLocaleString()}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-sm font-mono">{r.payment_reference || "—"}</TableCell>
+                  <TableCell>
+                    {r.proof_url ? (
+                      <button
+                        onClick={() => setProofDialog(r.proof_url)}
+                        className="inline-flex items-center gap-1 text-primary hover:underline text-sm"
+                      >
+                        <ImageIcon className="h-4 w-4" />
+                        View
+                      </button>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">—</span>
+                    )}
+                  </TableCell>
                   <TableCell><StatusBadge status={r.status} /></TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {r.reviewerProfile ? r.reviewerProfile.full_name || r.reviewerProfile.email : "—"}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{format(new Date(r.created_at), "MMM d, yyyy")}</TableCell>
                   <TableCell>
                     {(r.status === "pending" || r.status === "hold") && (
                       <div className="flex gap-1">
@@ -228,6 +258,21 @@ export function AdminTopUp() {
         </CardContent>
       </Card>
 
+      {/* Payment Proof Image Dialog */}
+      <Dialog open={!!proofDialog} onOpenChange={() => setProofDialog(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Payment Proof</DialogTitle>
+          </DialogHeader>
+          {proofDialog && (
+            <a href={proofDialog} target="_blank" rel="noopener noreferrer">
+              <img src={proofDialog} alt="Payment proof" className="w-full rounded-md cursor-pointer hover:opacity-90 transition-opacity" />
+            </a>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Action Confirmation Dialog */}
       <Dialog open={!!actionDialog} onOpenChange={() => { setActionDialog(null); setAdminNote(""); }}>
         <DialogContent>
           <DialogHeader>
@@ -242,14 +287,6 @@ export function AdminTopUp() {
               ? "The client will be notified of the rejection."
               : "The request will be put on hold."}
           </p>
-          {actionDialog?.proofUrl && (
-            <div className="space-y-1">
-              <Label className="text-xs">Payment Proof</Label>
-              <a href={actionDialog.proofUrl} target="_blank" rel="noopener noreferrer">
-                <img src={actionDialog.proofUrl} alt="Payment proof" className="max-h-48 rounded-md border cursor-pointer hover:opacity-80 transition-opacity" />
-              </a>
-            </div>
-          )}
           {(actionDialog?.action === "rejected" || actionDialog?.action === "hold") && (
             <div className="space-y-2">
               <Label>{actionDialog.action === "rejected" ? "Rejection Reason" : "Note"}</Label>
