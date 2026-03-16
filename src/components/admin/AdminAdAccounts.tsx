@@ -281,39 +281,37 @@ export function AdminAdAccounts() {
             </span>
           )}
           {showSelect && selectedIds.size > 0 && (
-            <>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => setShowDeleteConfirm(true)}
-              >
-                <Trash2 className="h-4 w-4 mr-1" />
-                Delete {selectedIds.size} Selected
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => { setShowAssignDialog(true); setAssignClientId(""); }}
-              >
-                Assign {selectedIds.size} Selected
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowUnassignConfirm(true)}
-              >
-                Unassign {selectedIds.size} Selected
-              </Button>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => refreshSelectedMutation.mutate()}
-                disabled={refreshSelectedMutation.isPending}
-              >
-                <RefreshCw className={`h-4 w-4 mr-1 ${refreshSelectedMutation.isPending ? 'animate-spin' : ''}`} />
-                {refreshSelectedMutation.isPending ? "Updating..." : `Update ${selectedIds.size} Selected`}
-              </Button>
-            </>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="secondary" size="sm">
+                  <MoreHorizontal className="h-4 w-4 mr-1" />
+                  Actions ({selectedIds.size})
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => refreshSelectedMutation.mutate()}
+                  disabled={refreshSelectedMutation.isPending}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${refreshSelectedMutation.isPending ? 'animate-spin' : ''}`} />
+                  Update Selected
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setShowAssignDialog(true); setAssignClientId(""); }}>
+                  Assign Selected
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowUnassignConfirm(true)}>
+                  Unassign Selected
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => setShowDeleteConfirm(true)}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Selected
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           <Button
             variant="outline"
