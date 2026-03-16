@@ -257,6 +257,40 @@ Deno.serve(async (req) => {
       reference_id: request_id,
     });
 
+    // Send 👍 reaction on matched Telegram message
+    if (matchedMsg) {
+      try {
+        const raw = matchedMsg.raw_update || {};
+        const payload = raw.message || raw.edited_message || raw.channel_post || raw.edited_channel_post || {};
+        const messageId = payload.message_id;
+        const chatId = matchedMsg.chat_id;
+
+        if (messageId && chatId) {
+          const { data: botTokenSetting } = await supabase
+            .from('site_settings')
+            .select('value')
+            .eq('key', 'telegram_bot_token')
+            .single();
+
+          if (botTokenSetting?.value) {
+            const reactionResp = await fetch(`https://api.telegram.org/bot${botTokenSetting.value}/setMessageReaction`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: chatId,
+                message_id: messageId,
+                reaction: [{ type: 'emoji', emoji: '👍' }],
+              }),
+            });
+            const reactionData = await reactionResp.json();
+            console.log('Telegram reaction result:', JSON.stringify(reactionData));
+          }
+        }
+      } catch (e) {
+        console.error('Telegram reaction failed (non-blocking):', e);
+      }
+    }
+
     return new Response(JSON.stringify({ ok: true, auto_approved: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error: any) {
