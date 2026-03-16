@@ -10,7 +10,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, RefreshCw, Building2, ChevronDown, ChevronRight, Clock, AlertCircle, CheckCircle2, Search, Pencil } from "lucide-react";
+import { Plus, RefreshCw, Building2, ChevronDown, ChevronRight, Clock, AlertCircle, CheckCircle2, Search, Pencil, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 
@@ -45,6 +46,7 @@ export function AdminBusinessManagers() {
   const [editOpen, setEditOpen] = useState(false);
   const [editBmId, setEditBmId] = useState<string | null>(null);
   const [editAccessToken, setEditAccessToken] = useState("");
+  const [deleteBmId, setDeleteBmId] = useState<string | null>(null);
 
   const { data: bms } = useQuery({
     queryKey: ["admin-business-managers"],
@@ -222,6 +224,40 @@ export function AdminBusinessManagers() {
       setEditBmId(null);
       setEditAccessToken("");
       queryClient.invalidateQueries({ queryKey: ["admin-business-managers"] });
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const deleteBmMutation = useMutation({
+    mutationFn: async (bmId: string) => {
+      // Get all ad account IDs under this BM
+      const { data: accounts } = await supabase
+        .from("ad_accounts")
+        .select("id")
+        .eq("business_manager_id", bmId);
+      const accountIds = (accounts ?? []).map((a: any) => a.id);
+
+      if (accountIds.length > 0) {
+        // Delete assignments
+        await (supabase as any).from("user_ad_accounts").delete().in("ad_account_id", accountIds);
+        // Delete insights
+        await supabase.from("ad_account_insights").delete().in("ad_account_id", accountIds);
+        // Delete ad accounts
+        await supabase.from("ad_accounts").delete().eq("business_manager_id", bmId);
+      }
+      // Delete sync logs
+      await (supabase as any).from("sync_logs").delete().eq("business_manager_id", bmId);
+      // Delete BM
+      const { error } = await supabase.from("business_managers").delete().eq("id", bmId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Business Manager and all ad accounts removed");
+      setDeleteBmId(null);
+      queryClient.invalidateQueries({ queryKey: ["admin-business-managers"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-bm-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-user-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -411,6 +447,18 @@ export function AdminBusinessManagers() {
                 >
                   <Pencil className="mr-1 h-3 w-3" />
                   Edit
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-destructive hover:text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeleteBmId(bm.id);
+                  }}
+                >
+                  <Trash2 className="mr-1 h-3 w-3" />
+                  Remove
                 </Button>
                 <Button
                   size="sm"
@@ -662,6 +710,28 @@ export function AdminBusinessManagers() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete BM Confirmation */}
+      <AlertDialog open={!!deleteBmId} onOpenChange={(v) => { if (!v) setDeleteBmId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Business Manager?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this Business Manager along with all its ad accounts, assignments, insights, and sync logs. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteBmId && deleteBmMutation.mutate(deleteBmId)}
+              disabled={deleteBmMutation.isPending}
+            >
+              {deleteBmMutation.isPending ? "Removing..." : "Remove"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
