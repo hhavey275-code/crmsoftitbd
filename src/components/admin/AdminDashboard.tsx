@@ -13,6 +13,8 @@ const CHART_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#0
 export function AdminDashboard() {
   const queryClient = useQueryClient();
   const [metaLoading, setMetaLoading] = useState(false);
+  const [dailySpendLoading, setDailySpendLoading] = useState(false);
+  const [dailySpend, setDailySpend] = useState<number | null>(null);
 
   const { data: profiles } = useQuery({
     queryKey: ["admin-profiles"],
