@@ -173,6 +173,7 @@ Deno.serve(async (req) => {
 
         if (hasLast4 && hasAmount) {
           telegramMatch = true;
+          matchedMsg = msg;
           telegramMatchDetail = `last4: ${bankLast4}, amount: ৳${matchedTelegramAmount} (submitted: ৳${bdtNum}, diff: ৳${Math.abs(matchedTelegramAmount - bdtNum)})`;
           console.log(`Telegram match found: ${telegramMatchDetail}, text snippet: ${text.substring(0, 100)}`);
           break;
