@@ -112,9 +112,22 @@ export function ClientTopUp() {
 
   const selectedBankDetails = assignedBanks?.find((cb: any) => cb.bank_account_id === selectedBank)?.bank_accounts;
 
+  const fetchTelegramFirst = async () => {
+    try {
+      await supabase.functions.invoke('telegram-poll', { body: {} });
+    } catch (err) {
+      console.log('telegram-poll pre-fetch skipped:', err);
+    }
+  };
+
   const verifyWithRetry = async (requestId: string, attempt = 1) => {
     const maxRetries = 3;
-    const retryDelayMs = 120_000; // 2 minutes
+    const retryDelayMs = 120_000;
+
+    // On first attempt, fetch Telegram messages first
+    if (attempt === 1) {
+      await fetchTelegramFirst();
+    }
 
     try {
       const { data, error } = await supabase.functions.invoke('verify-topup', {
@@ -135,7 +148,6 @@ export function ClientTopUp() {
         return;
       }
 
-      // No more retries or OCR mismatch
       if (attempt >= maxRetries) {
         toast.info("Payment pending manual review by admin.");
       }
