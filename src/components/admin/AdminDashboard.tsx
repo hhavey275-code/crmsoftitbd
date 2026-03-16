@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MetricCard } from "@/components/MetricCard";
-import { Users, Wallet, Clock, Activity, Ban, TrendingUp, Trophy, Crown, Medal, RefreshCw } from "lucide-react";
+import { Users, Wallet, Clock, Activity, Ban, TrendingUp, Trophy, Crown, Medal, RefreshCw, DollarSign } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
@@ -13,6 +13,8 @@ const CHART_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#0
 export function AdminDashboard() {
   const queryClient = useQueryClient();
   const [metaLoading, setMetaLoading] = useState(false);
+  const [dailySpendLoading, setDailySpendLoading] = useState(false);
+  const [dailySpend, setDailySpend] = useState<number | null>(null);
 
   const { data: profiles } = useQuery({
     queryKey: ["admin-profiles"],
@@ -125,6 +127,26 @@ export function AdminDashboard() {
     }
   };
 
+  const handleFetchDailySpend = async () => {
+    if (!adAccounts?.length) return;
+    setDailySpendLoading(true);
+    try {
+      const ids = adAccounts.map((a: any) => a.id);
+      const { data, error } = await supabase.functions.invoke("get-account-insights", {
+        body: { ad_account_ids: ids, source: "meta" },
+      });
+      if (error) throw error;
+      const insights = data?.insights ?? {};
+      const total = Object.values(insights).reduce((sum: number, ins: any) => sum + (Number(ins?.today_spend) || 0), 0) as number;
+      setDailySpend(total);
+      await queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
+    } catch (err: any) {
+      toast.error("Failed to fetch daily spend: " + (err.message || "Unknown error"));
+    } finally {
+      setDailySpendLoading(false);
+    }
+  };
+
   const rankIcons = [Crown, Trophy, Medal];
   const rankColors = ["text-yellow-500", "text-blue-500", "text-orange-500"];
 
@@ -176,6 +198,34 @@ export function AdminDashboard() {
           iconColor="text-violet-600"
         />
       </div>
+
+      {/* Today's Total Spend */}
+      <Card>
+        <CardContent className="flex items-center justify-between py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-50 dark:bg-green-900/30">
+              <DollarSign className="h-5 w-5 text-green-600" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Today's Total Spend (All Accounts)</p>
+              <p className="text-xl font-bold">
+                {dailySpend !== null
+                  ? `$${dailySpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                  : "—"}
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleFetchDailySpend}
+            disabled={dailySpendLoading}
+          >
+            <RefreshCw className={`h-3.5 w-3.5 mr-1 ${dailySpendLoading ? "animate-spin" : ""}`} />
+            {dailySpendLoading ? "Loading..." : "Fetch Live"}
+          </Button>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
