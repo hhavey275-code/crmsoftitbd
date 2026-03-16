@@ -112,11 +112,42 @@ export function ClientTopUp() {
 
   const selectedBankDetails = assignedBanks?.find((cb: any) => cb.bank_account_id === selectedBank)?.bank_accounts;
 
+  const verifyWithRetry = async (requestId: string, attempt = 1) => {
+    const maxRetries = 3;
+    const retryDelayMs = 120_000; // 2 minutes
+
+    try {
+      const { data, error } = await supabase.functions.invoke('verify-topup', {
+        body: { request_id: requestId },
+      });
+      if (error) throw error;
+
+      if (data?.auto_approved) {
+        toast.success("Payment auto-approved! ✅");
+        queryClient.invalidateQueries({ queryKey: ["client-topup-history"] });
+        queryClient.invalidateQueries({ queryKey: ["client-wallet"] });
+        return;
+      }
+
+      if (data?.retry_suggested && attempt < maxRetries) {
+        toast.info(`Verifying payment... retry ${attempt}/${maxRetries} in 2 min`);
+        setTimeout(() => verifyWithRetry(requestId, attempt + 1), retryDelayMs);
+        return;
+      }
+
+      // No more retries or OCR mismatch
+      if (attempt >= maxRetries) {
+        toast.info("Payment pending manual review by admin.");
+      }
+    } catch (err) {
+      console.error('verify-topup error:', err);
+    }
+  };
+
   const submitMutation = useMutation({
     mutationFn: async () => {
       let proofUrl: string | null = null;
 
-      // Upload payment proof if provided
       if (proofFile) {
         const ext = proofFile.name.split(".").pop();
         const filePath = `${user!.id}/${Date.now()}.${ext}`;
@@ -142,15 +173,13 @@ export function ClientTopUp() {
       } as any).select("id").single();
       if (error) throw error;
 
-      // Trigger async auto-verification
+      // Trigger async auto-verification with retry
       if (inserted?.id) {
-        supabase.functions.invoke('verify-topup', {
-          body: { request_id: inserted.id },
-        }).catch(console.error);
+        verifyWithRetry(inserted.id);
       }
     },
     onSuccess: () => {
-      toast.success("Top-up request submitted!");
+      toast.success("Top-up request submitted! Verifying payment...");
       queryClient.invalidateQueries({ queryKey: ["client-pending-topups"] });
       queryClient.invalidateQueries({ queryKey: ["client-topup-history"] });
       setBdtAmount("");

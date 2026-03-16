@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 Deno.serve(async (req) => {
@@ -81,7 +81,6 @@ Deno.serve(async (req) => {
         if (aiResponse.ok) {
           const aiData = await aiResponse.json();
           const content = aiData.choices?.[0]?.message?.content || '';
-          // Parse JSON from response (may have markdown fences)
           const jsonMatch = content.match(/\{[^}]+\}/);
           if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]);
@@ -91,7 +90,6 @@ Deno.serve(async (req) => {
         }
       } catch (e) {
         console.error('AI OCR failed:', e);
-        // Continue without OCR - will not auto-approve
       }
     }
 
@@ -101,28 +99,28 @@ Deno.serve(async (req) => {
 
     if (!refMatch || !amountMatch) {
       console.log(`OCR mismatch: ocrRef=${ocrRef} vs submitted=${payment_reference}, ocrAmount=${ocrAmount} vs submitted=${bdt_amount}`);
-      return new Response(JSON.stringify({ ok: true, auto_approved: false, reason: 'OCR mismatch' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ ok: true, auto_approved: false, reason: 'OCR mismatch', retry_suggested: false }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // 5. Search Telegram messages for matching bank notification
+    // 5. Search Telegram messages for matching bank notification (±30 min window)
     const requestTime = new Date(request.created_at);
-    const windowStart = new Date(requestTime.getTime() - 15 * 60 * 1000).toISOString();
-    const windowEnd = new Date(requestTime.getTime() + 15 * 60 * 1000).toISOString();
+    const windowStart = new Date(requestTime.getTime() - 30 * 60 * 1000).toISOString();
+    const windowEnd = new Date(requestTime.getTime() + 30 * 60 * 1000).toISOString();
 
     const { data: telegramMsgs } = await supabase
       .from('telegram_messages')
       .select('text')
       .gte('created_at', windowStart)
-      .lte('created_at', windowEnd);
+      .lte('created_at', windowEnd)
+      .order('created_at', { ascending: false })
+      .limit(100);
 
     let telegramMatch = false;
     if (telegramMsgs && bankLast4) {
       const bdtNum = Number(bdt_amount);
       for (const msg of telegramMsgs) {
         const text = msg.text || '';
-        // Check if message contains the last 4 digits AND the BDT amount
         const hasLast4 = text.includes(bankLast4);
-        // Match amount - look for the number in the text (with possible commas)
         const amountStr = bdtNum.toLocaleString('en-IN');
         const amountStrPlain = String(bdtNum);
         const hasAmount = text.includes(amountStr) || text.includes(amountStrPlain) || text.includes(amountStr.replace(/,/g, ''));
@@ -136,7 +134,7 @@ Deno.serve(async (req) => {
 
     if (!telegramMatch) {
       console.log(`Telegram mismatch: bankLast4=${bankLast4}, bdt_amount=${bdt_amount}`);
-      return new Response(JSON.stringify({ ok: true, auto_approved: false, reason: 'No matching Telegram message' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ ok: true, auto_approved: false, reason: 'No matching Telegram message', retry_suggested: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // 6. All 3 checks passed - auto-approve!

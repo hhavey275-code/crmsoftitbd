@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS idx_telegram_messages_chat_created ON public.telegram_messages (chat_id, created_at);

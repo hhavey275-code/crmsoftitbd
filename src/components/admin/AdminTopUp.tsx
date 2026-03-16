@@ -12,7 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { useState } from "react";
-import { Check, X, Pause, ImageIcon } from "lucide-react";
+import { Check, X, Pause, ImageIcon, Radio } from "lucide-react";
 
 type ActionType = "approved" | "rejected" | "hold";
 
@@ -22,6 +22,7 @@ export function AdminTopUp() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [adminNote, setAdminNote] = useState("");
   const [proofDialog, setProofDialog] = useState<string | null>(null);
+  const [isFetchingTelegram, setIsFetchingTelegram] = useState(false);
   const [actionDialog, setActionDialog] = useState<{
     id: string;
     action: ActionType;
@@ -30,6 +31,19 @@ export function AdminTopUp() {
     bdtAmount: number | null;
     usdRate: number | null;
   } | null>(null);
+
+  const fetchTelegram = async () => {
+    setIsFetchingTelegram(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('telegram-poll', { body: {} });
+      if (error) throw error;
+      toast.success(`Telegram synced! ${data?.processed ?? 0} new messages fetched.`);
+    } catch (err: any) {
+      toast.error(`Telegram fetch failed: ${err.message}`);
+    } finally {
+      setIsFetchingTelegram(false);
+    }
+  };
 
   const { data: requests } = useQuery({
     queryKey: ["admin-topup-requests"],
@@ -164,7 +178,19 @@ export function AdminTopUp() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Top-Up Requests</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Top-Up Requests</h1>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={fetchTelegram}
+          disabled={isFetchingTelegram}
+          className="gap-1.5"
+        >
+          <Radio className="h-3.5 w-3.5" />
+          {isFetchingTelegram ? "Fetching..." : "Fetch Telegram"}
+        </Button>
+      </div>
 
       <Tabs value={statusFilter} onValueChange={setStatusFilter}>
         <TabsList>
