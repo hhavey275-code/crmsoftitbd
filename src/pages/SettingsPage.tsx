@@ -43,6 +43,18 @@ export default function SettingsPage() {
   // Notification sound state
   const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem("notification_sound") !== "false");
 
+  // Telegram Bot Token state
+  const { data: currentBotToken, refetch: refetchBotToken } = useQuery({
+    queryKey: ["telegram-bot-token-setting"],
+    queryFn: async () => {
+      const { data } = await supabase.from("site_settings").select("value").eq("key", "telegram_bot_token").single();
+      return data?.value ?? "";
+    },
+    enabled: isAdmin,
+  });
+  const [botTokenInput, setBotTokenInput] = useState("");
+  const [savingBotToken, setSavingBotToken] = useState(false);
+
   // USD Rate state
   const { data: currentRate, refetch: refetchRate } = useQuery({
     queryKey: ["usd-rate-setting"],
