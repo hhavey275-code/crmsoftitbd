@@ -41,6 +41,11 @@ export function AdminBusinessManagers() {
   const [importSearch, setImportSearch] = useState("");
   const [existingAccountIds, setExistingAccountIds] = useState<Set<string>>(new Set());
 
+  // Edit BM state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editBmId, setEditBmId] = useState<string | null>(null);
+  const [editAccessToken, setEditAccessToken] = useState("");
+
   const { data: bms } = useQuery({
     queryKey: ["admin-business-managers"],
     queryFn: async () => {
