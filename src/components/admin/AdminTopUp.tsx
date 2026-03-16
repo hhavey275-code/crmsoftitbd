@@ -11,8 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { useState, Fragment } from "react";
-import { Check, X, Pause, ImageIcon, Radio, ChevronDown, ChevronUp, MessageSquareText, RotateCcw } from "lucide-react";
+import { useState, Fragment, useMemo } from "react";
+import { Check, X, Pause, ImageIcon, Radio, ChevronDown, ChevronUp, MessageSquareText, RotateCcw, ClipboardCheck } from "lucide-react";
 import { Link } from "react-router-dom";
 
 type ActionType = "approved" | "rejected" | "hold";
@@ -423,22 +423,9 @@ export function AdminTopUp() {
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={r.status} />
-                      {r.status === "approved" && r.admin_note ? (
-                        <div className="mt-1">
-                          <button
-                            onClick={() => setExpandedSms(prev => ({ ...prev, [`note-${r.id}`]: !prev[`note-${r.id}`] }))}
-                            className="text-xs text-primary hover:underline flex items-center gap-0.5"
-                          >
-                            Match Details
-                            {expandedSms[`note-${r.id}`] ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                          </button>
-                          {expandedSms[`note-${r.id}`] && (
-                            <p className="text-xs text-muted-foreground mt-1 max-w-[300px] whitespace-pre-wrap leading-tight bg-muted/30 p-2 rounded">{r.admin_note}</p>
-                          )}
-                        </div>
-                      ) : r.admin_note ? (
+                      {r.status !== "approved" && r.admin_note && (
                         <p className="text-xs text-muted-foreground mt-1 max-w-[250px] whitespace-pre-wrap leading-tight">{r.admin_note}</p>
-                      ) : null}
+                      )}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {r.reviewerProfile ? r.reviewerProfile.full_name || r.reviewerProfile.email : "—"}
@@ -475,6 +462,18 @@ export function AdminTopUp() {
                             <RotateCcw className={`h-4 w-4 ${verifyingIds[r.id] ? 'animate-spin' : ''}`} />
                           </Button>
                         )}
+                        {r.admin_note && r.status === "approved" && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            title="Match Details"
+                            onClick={() => setExpandedSms(prev => ({ ...prev, [`note-${r.id}`]: !prev[`note-${r.id}`] }))}
+                            className={expandedSms[`note-${r.id}`] ? "text-primary" : ""}
+                          >
+                            <ClipboardCheck className="h-4 w-4" />
+                            {expandedSms[`note-${r.id}`] ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="ghost"
@@ -488,6 +487,36 @@ export function AdminTopUp() {
                       </div>
                     </TableCell>
                   </TableRow>
+                  {expandedSms[`note-${r.id}`] && r.admin_note && (
+                    <TableRow>
+                      <TableCell colSpan={9} className="bg-muted/20 p-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <ClipboardCheck className="h-4 w-4 text-primary" />
+                          <span className="text-sm font-semibold">Match Details</span>
+                        </div>
+                        <div className="space-y-1.5">
+                          {r.admin_note.split(' | ').map((entry: string, i: number) => {
+                            const isPass = entry.startsWith('✅');
+                            const isFail = entry.startsWith('❌');
+                            const isWarn = entry.startsWith('⚠️');
+                            return (
+                              <div
+                                key={i}
+                                className={`text-xs px-2.5 py-1.5 rounded-md border ${
+                                  isPass ? 'bg-green-500/10 border-green-500/30 text-green-700 dark:text-green-400' :
+                                  isFail ? 'bg-destructive/10 border-destructive/30 text-destructive' :
+                                  isWarn ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-700 dark:text-yellow-400' :
+                                  'bg-muted/40 border-border text-muted-foreground'
+                                }`}
+                              >
+                                {entry.replace(/^Auto-verification:\s*/, '')}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
                   {expandedSms[r.id] && (
                     <TableRow>
                       <TableCell colSpan={9} className="bg-muted/20 p-3">
