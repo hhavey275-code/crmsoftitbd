@@ -404,6 +404,19 @@ export function AdminBusinessManagers() {
                   variant="outline"
                   onClick={(e) => {
                     e.stopPropagation();
+                    setEditBmId(bm.id);
+                    setEditAccessToken("");
+                    setEditOpen(true);
+                  }}
+                >
+                  <Pencil className="mr-1 h-3 w-3" />
+                  Edit
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setShowLogs(showLogs === bm.id ? null : bm.id);
                   }}
                 >
