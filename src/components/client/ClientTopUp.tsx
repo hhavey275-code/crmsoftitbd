@@ -130,7 +130,7 @@ export function ClientTopUp() {
         proofUrl = urlData.publicUrl;
       }
 
-      const { error } = await supabase.from("top_up_requests").insert({
+      const { data: inserted, error } = await supabase.from("top_up_requests").insert({
         user_id: user!.id,
         amount: parseFloat(usdEquivalent),
         bdt_amount: parseFloat(bdtAmount),
@@ -139,8 +139,15 @@ export function ClientTopUp() {
         payment_reference: paymentRef || null,
         payment_method: "bank_transfer",
         proof_url: proofUrl,
-      } as any);
+      } as any).select("id").single();
       if (error) throw error;
+
+      // Trigger async auto-verification
+      if (inserted?.id) {
+        supabase.functions.invoke('verify-topup', {
+          body: { request_id: inserted.id },
+        }).catch(console.error);
+      }
     },
     onSuccess: () => {
       toast.success("Top-up request submitted!");
