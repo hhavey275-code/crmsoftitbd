@@ -127,6 +127,26 @@ export function AdminDashboard() {
     }
   };
 
+  const handleFetchDailySpend = async () => {
+    if (!adAccounts?.length) return;
+    setDailySpendLoading(true);
+    try {
+      const ids = adAccounts.map((a: any) => a.id);
+      const { data, error } = await supabase.functions.invoke("get-account-insights", {
+        body: { ad_account_ids: ids, source: "meta" },
+      });
+      if (error) throw error;
+      const insights = data?.insights ?? {};
+      const total = Object.values(insights).reduce((sum: number, ins: any) => sum + (Number(ins?.today_spend) || 0), 0);
+      setDailySpend(total);
+      await queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
+    } catch (err: any) {
+      toast.error("Failed to fetch daily spend: " + (err.message || "Unknown error"));
+    } finally {
+      setDailySpendLoading(false);
+    }
+  };
+
   const rankIcons = [Crown, Trophy, Medal];
   const rankColors = ["text-yellow-500", "text-blue-500", "text-orange-500"];
 
