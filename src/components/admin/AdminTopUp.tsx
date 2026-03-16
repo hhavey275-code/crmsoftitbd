@@ -16,6 +16,28 @@ import { Check, X, Pause, ImageIcon, Radio, ChevronDown, ChevronUp, MessageSquar
 
 type ActionType = "approved" | "rejected" | "hold";
 
+const getTelegramDisplayText = (m: any) => {
+  const raw = m?.raw_update || {};
+  const payload = raw.message || raw.edited_message || raw.channel_post || raw.edited_channel_post || {};
+
+  if (typeof m?.text === "string" && m.text.trim()) return m.text;
+  if (typeof payload?.text === "string" && payload.text.trim()) return payload.text;
+  if (typeof payload?.caption === "string" && payload.caption.trim()) return payload.caption;
+
+  if (Array.isArray(payload?.new_chat_members) && payload.new_chat_members.length > 0) {
+    const names = payload.new_chat_members
+      .map((member: any) => member?.username || member?.first_name || "member")
+      .join(", ");
+    return `[service] new_chat_members: ${names}`;
+  }
+
+  if (payload?.left_chat_member) {
+    return `[service] left_chat_member: ${payload.left_chat_member?.username || payload.left_chat_member?.first_name || "member"}`;
+  }
+
+  return "(non-text Telegram update)";
+};
+
 function BankSmsPanel({ request }: { request: any }) {
   const last4 = request.bankAccount?.account_number?.slice(-4) || "";
   const bdtAmount = request.bdt_amount ? Number(request.bdt_amount) : null;
@@ -39,11 +61,10 @@ function BankSmsPanel({ request }: { request: any }) {
   });
 
   const relevantMessages = messages?.filter((m: any) => {
-    const text = (m.text || "").toLowerCase();
-    if (!text) return false;
+    const text = getTelegramDisplayText(m).toLowerCase();
     const hasLast4 = last4 && text.includes(last4);
     const hasAmount = bdtAmount && text.includes(String(Math.round(bdtAmount)));
-    const hasRef = request.payment_reference && text.toLowerCase().includes(request.payment_reference.toLowerCase());
+    const hasRef = request.payment_reference && text.includes(String(request.payment_reference).toLowerCase());
     return hasLast4 || hasAmount || hasRef;
   }) ?? [];
 
@@ -53,8 +74,16 @@ function BankSmsPanel({ request }: { request: any }) {
 
   if (relevantMessages.length === 0) {
     return (
-      <div className="px-4 py-3 text-sm text-muted-foreground bg-muted/30 rounded-md">
-        No matching bank SMS found within ±60 min window
+      <div className="space-y-2">
+        <div className="px-4 py-3 text-sm text-muted-foreground bg-muted/30 rounded-md">
+          No matching bank SMS found within ±60 min window
+        </div>
+        {messages?.slice(0, 5).map((m: any) => (
+          <div key={m.update_id} className="p-3 bg-muted/40 rounded-md border text-sm space-y-1">
+            <span className="text-xs text-muted-foreground">{format(new Date(m.created_at), "MMM d, HH:mm:ss")}</span>
+            <p className="whitespace-pre-wrap text-foreground">{getTelegramDisplayText(m)}</p>
+          </div>
+        ))}
       </div>
     );
   }
@@ -66,7 +95,7 @@ function BankSmsPanel({ request }: { request: any }) {
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground">{format(new Date(m.created_at), "MMM d, HH:mm:ss")}</span>
           </div>
-          <p className="whitespace-pre-wrap text-foreground">{m.text || "(no text)"}</p>
+          <p className="whitespace-pre-wrap text-foreground">{getTelegramDisplayText(m)}</p>
         </div>
       ))}
     </div>
@@ -86,7 +115,7 @@ function BankSmsTab() {
     },
   });
 
-  const textMessages = messages?.filter((m: any) => m.text) ?? [];
+  const allMessages = messages ?? [];
 
   if (isLoading) {
     return (
@@ -101,23 +130,23 @@ function BankSmsTab() {
       <CardHeader>
         <CardTitle className="text-lg flex items-center gap-2">
           <MessageSquareText className="h-5 w-5 text-primary" />
-          Bank SMS Messages ({textMessages.length})
+          Bank SMS Messages ({allMessages.length})
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {textMessages.length === 0 ? (
+        {allMessages.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">
             No bank SMS messages found. Make sure the bot's Group Privacy is turned OFF in BotFather and the bot is added to your bank SMS group.
           </p>
         ) : (
           <div className="space-y-2 max-h-[500px] overflow-y-auto">
-            {textMessages.map((m: any) => (
+            {allMessages.map((m: any) => (
               <div key={m.update_id} className="p-3 bg-muted/40 rounded-md border text-sm space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">{format(new Date(m.created_at), "MMM d, yyyy HH:mm:ss")}</span>
                   <span className="text-xs text-muted-foreground">Chat: {m.chat_id}</span>
                 </div>
-                <p className="whitespace-pre-wrap text-foreground">{m.text}</p>
+                <p className="whitespace-pre-wrap text-foreground">{getTelegramDisplayText(m)}</p>
               </div>
             ))}
           </div>

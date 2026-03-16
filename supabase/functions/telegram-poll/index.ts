@@ -3,9 +3,39 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const MAX_RUNTIME_MS = 55_000;
 const MIN_REMAINING_MS = 5_000;
 
+type TelegramPayload = {
+  chat?: { id?: number };
+  text?: string;
+  caption?: string;
+  new_chat_members?: Array<{ username?: string; first_name?: string }>;
+  left_chat_member?: { username?: string; first_name?: string };
+};
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+};
+
+const getPayload = (update: any): TelegramPayload | null => {
+  return update.message || update.edited_message || update.channel_post || update.edited_channel_post || null;
+};
+
+const getTextFromPayload = (payload: TelegramPayload): string | null => {
+  if (payload.text?.trim()) return payload.text.trim();
+  if (payload.caption?.trim()) return payload.caption.trim();
+
+  if (payload.new_chat_members?.length) {
+    const names = payload.new_chat_members
+      .map((m) => m.username || m.first_name || 'member')
+      .join(', ');
+    return `[service] new_chat_members: ${names}`;
+  }
+
+  if (payload.left_chat_member) {
+    return `[service] left_chat_member: ${payload.left_chat_member.username || payload.left_chat_member.first_name || 'member'}`;
+  }
+
+  return null;
 };
 
 Deno.serve(async (req) => {
@@ -19,7 +49,6 @@ Deno.serve(async (req) => {
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-  // Read bot token from site_settings
   const { data: tokenRow, error: tokenErr } = await supabase
     .from('site_settings')
     .select('value')
@@ -61,7 +90,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         offset: currentOffset,
         timeout,
-        allowed_updates: ['message'],
+        allowed_updates: ['message', 'edited_message', 'channel_post', 'edited_channel_post'],
       }),
     });
 
@@ -74,13 +103,19 @@ Deno.serve(async (req) => {
     if (updates.length === 0) continue;
 
     const rows = updates
-      .filter((u: any) => u.message)
-      .map((u: any) => ({
-        update_id: u.update_id,
-        chat_id: u.message.chat.id,
-        text: u.message.text ?? null,
-        raw_update: u,
-      }));
+      .map((u: any) => {
+        const payload = getPayload(u);
+        const chatId = payload?.chat?.id;
+        if (!payload || !chatId) return null;
+
+        return {
+          update_id: u.update_id,
+          chat_id: chatId,
+          text: getTextFromPayload(payload),
+          raw_update: u,
+        };
+      })
+      .filter((row: any) => !!row);
 
     if (rows.length > 0) {
       const { error: insertErr } = await supabase
