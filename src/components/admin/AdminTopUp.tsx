@@ -180,7 +180,7 @@ export function AdminTopUp() {
   const fetchTelegram = async () => {
     setIsFetchingTelegram(true);
     try {
-      const { data, error } = await supabase.functions.invoke('telegram-poll', { body: {} });
+      const { data, error } = await supabase.functions.invoke('telegram-poll', { body: { quick: true } });
       if (error) throw error;
       toast.success(`Telegram synced! ${data?.processed ?? 0} new messages fetched.`);
     } catch (err: any) {

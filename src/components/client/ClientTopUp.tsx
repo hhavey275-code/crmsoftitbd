@@ -114,7 +114,7 @@ export function ClientTopUp() {
 
   const fetchTelegramFirst = async () => {
     try {
-      await supabase.functions.invoke('telegram-poll', { body: {} });
+      await supabase.functions.invoke('telegram-poll', { body: { quick: true } });
     } catch (err) {
       console.log('telegram-poll pre-fetch skipped:', err);
     }
