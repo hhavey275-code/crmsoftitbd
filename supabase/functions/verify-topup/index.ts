@@ -5,6 +5,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
+const BDT_TOLERANCE = 15; // ±15 BDT to account for bank transfer charges (~10 BDT)
+
+function amountMatches(a: number, b: number): boolean {
+  return Math.abs(a - b) <= BDT_TOLERANCE;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -33,6 +39,8 @@ Deno.serve(async (req) => {
     }
 
     const { payment_reference, bdt_amount, bank_account_id, proof_url, user_id, amount } = request;
+    const bdtNum = Number(bdt_amount);
+    const verificationLog: string[] = [];
 
     // 2. Get bank account last 4 digits
     let bankLast4 = '';
@@ -47,10 +55,12 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 3. AI OCR - Extract ref and amount from screenshot (optional — does not block)
+    // 3. Step 1 & 2: AI OCR — Extract ref and amount from screenshot
     let ocrRef = '';
     let ocrAmount = 0;
-    let ocrSuccess = false;
+    let ocrRefMatch = false;
+    let ocrAmountMatch = false;
+
     if (proof_url) {
       try {
         const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -87,73 +97,133 @@ Deno.serve(async (req) => {
             const parsed = JSON.parse(jsonMatch[0]);
             ocrRef = String(parsed.ref || '').trim();
             ocrAmount = Number(parsed.amount) || 0;
-            ocrSuccess = true;
           }
         }
       } catch (e) {
         console.error('AI OCR failed (non-blocking):', e);
+        verificationLog.push('⚠️ OCR failed (non-blocking)');
       }
     }
 
-    // 4. Check OCR match (optional — adds confidence but doesn't gate)
-    const refMatch = ocrRef && payment_reference && ocrRef.toLowerCase() === payment_reference.toLowerCase();
-    const amountMatch = ocrAmount > 0 && bdt_amount && (Math.abs(ocrAmount - Number(bdt_amount)) / Number(bdt_amount)) < 0.02;
-    const ocrPassed = refMatch && amountMatch;
-
-    if (ocrSuccess && !ocrPassed) {
-      console.log(`OCR mismatch (non-blocking): ocrRef=${ocrRef} vs submitted=${payment_reference}, ocrAmount=${ocrAmount} vs submitted=${bdt_amount}`);
+    // Step 1: OCR Ref match
+    if (ocrRef && payment_reference) {
+      ocrRefMatch = ocrRef.toLowerCase() === payment_reference.toLowerCase();
+      if (ocrRefMatch) {
+        verificationLog.push(`✅ OCR Ref matched (${ocrRef})`);
+      } else {
+        verificationLog.push(`❌ OCR Ref mismatch (OCR: ${ocrRef} vs Submitted: ${payment_reference})`);
+      }
+    } else {
+      verificationLog.push(`⚠️ OCR Ref skipped (OCR: "${ocrRef}", Submitted: "${payment_reference || ''}")`);
     }
 
-    // 5. Search Telegram messages — window from request time -30min to NOW
+    // Step 2: OCR Amount match (±15 BDT tolerance)
+    if (ocrAmount > 0 && bdtNum > 0) {
+      ocrAmountMatch = amountMatches(ocrAmount, bdtNum);
+      if (ocrAmountMatch) {
+        verificationLog.push(`✅ OCR Amount matched (OCR: ৳${ocrAmount} vs Submitted: ৳${bdtNum}, diff: ৳${Math.abs(ocrAmount - bdtNum)})`);
+      } else {
+        verificationLog.push(`❌ OCR Amount mismatch (OCR: ৳${ocrAmount} vs Submitted: ৳${bdtNum}, diff: ৳${Math.abs(ocrAmount - bdtNum)})`);
+      }
+    } else {
+      verificationLog.push(`⚠️ OCR Amount skipped (OCR: ${ocrAmount}, Submitted: ${bdtNum})`);
+    }
+
+    // Step 3: Telegram SMS match — window: request time -30min to +10min (Bangladesh timezone)
     const requestTime = new Date(request.created_at);
     const windowStart = new Date(requestTime.getTime() - 30 * 60 * 1000).toISOString();
-    const windowEnd = new Date().toISOString(); // Use current time, not request time
+    const windowEnd = new Date(requestTime.getTime() + 10 * 60 * 1000).toISOString();
 
     console.log(`Telegram search window: ${windowStart} → ${windowEnd}`);
 
     const { data: telegramMsgs } = await supabase
       .from('telegram_messages')
-      .select('text')
+      .select('text, raw_update, created_at')
       .gte('created_at', windowStart)
       .lte('created_at', windowEnd)
       .order('created_at', { ascending: false })
       .limit(200);
 
     let telegramMatch = false;
-    if (telegramMsgs && bankLast4) {
-      const bdtNum = Number(bdt_amount);
+    let telegramMatchDetail = '';
+
+    if (telegramMsgs && bankLast4 && bdtNum > 0) {
       for (const msg of telegramMsgs) {
-        const text = msg.text || '';
-        const hasLast4 = text.includes(bankLast4);
-        const amountStr = bdtNum.toLocaleString('en-IN');
-        const amountStrPlain = String(bdtNum);
-        const amountStrNoComma = amountStr.replace(/,/g, '');
-        const amountRounded = String(Math.round(bdtNum));
-        const hasAmount = text.includes(amountStr) || text.includes(amountStrPlain) || text.includes(amountStrNoComma) || text.includes(amountRounded);
+        // Get text from multiple possible fields
+        const raw = (msg as any).raw_update || {};
+        const payload = raw.message || raw.edited_message || raw.channel_post || raw.edited_channel_post || {};
+        const text = msg.text || payload.text || payload.caption || '';
         
+        const hasLast4 = text.includes(bankLast4);
+        
+        // Check amount with ±15 BDT tolerance
+        // Extract all numbers from the text and check if any match within tolerance
+        const numberMatches = text.match(/[\d,]+/g) || [];
+        let hasAmount = false;
+        let matchedTelegramAmount = 0;
+        
+        for (const numStr of numberMatches) {
+          const num = Number(numStr.replace(/,/g, ''));
+          if (num > 0 && amountMatches(num, bdtNum)) {
+            hasAmount = true;
+            matchedTelegramAmount = num;
+            break;
+          }
+        }
+
         if (hasLast4 && hasAmount) {
           telegramMatch = true;
-          console.log(`Telegram match found: last4=${bankLast4}, amount=${bdtNum}, text snippet: ${text.substring(0, 100)}`);
+          telegramMatchDetail = `last4: ${bankLast4}, amount: ৳${matchedTelegramAmount} (submitted: ৳${bdtNum}, diff: ৳${Math.abs(matchedTelegramAmount - bdtNum)})`;
+          console.log(`Telegram match found: ${telegramMatchDetail}, text snippet: ${text.substring(0, 100)}`);
           break;
         }
       }
     }
 
-    if (!telegramMatch) {
-      console.log(`Telegram mismatch: bankLast4=${bankLast4}, bdt_amount=${bdt_amount}, messages checked: ${telegramMsgs?.length ?? 0}`);
-      return new Response(JSON.stringify({ ok: true, auto_approved: false, reason: 'No matching Telegram message', retry_suggested: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    if (telegramMatch) {
+      verificationLog.push(`✅ Telegram SMS matched (${telegramMatchDetail})`);
+    } else {
+      verificationLog.push(`❌ Telegram SMS no match (bankLast4=${bankLast4}, bdt=${bdtNum}, messages checked: ${telegramMsgs?.length ?? 0}, window: ${windowStart} → ${windowEnd})`);
     }
 
-    // 6. Telegram matched! Auto-approve (OCR is bonus confidence, not required)
-    console.log(`Auto-approving request ${request_id}: telegramMatch=true, ocrPassed=${ocrPassed}`);
-    
+    // Decision: All 3 steps must pass (OCR ref, OCR amount, Telegram SMS)
+    // If OCR was skipped (no proof or OCR failed), only require Telegram match
+    const ocrAvailable = ocrRef !== '' || ocrAmount > 0;
+    const allPassed = ocrAvailable 
+      ? (ocrRefMatch && ocrAmountMatch && telegramMatch)
+      : telegramMatch;
+
+    const logText = `Auto-verification: ${verificationLog.join(' | ')}`;
+
+    if (!allPassed) {
+      // Save partial verification log even on failure
+      await supabase
+        .from('top_up_requests')
+        .update({ admin_note: logText })
+        .eq('id', request_id);
+
+      const failReasons: string[] = [];
+      if (ocrAvailable && !ocrRefMatch) failReasons.push('OCR ref mismatch');
+      if (ocrAvailable && !ocrAmountMatch) failReasons.push('OCR amount mismatch');
+      if (!telegramMatch) failReasons.push('No Telegram SMS match');
+
+      console.log(`Verification failed for ${request_id}: ${failReasons.join(', ')}`);
+      return new Response(JSON.stringify({ 
+        ok: true, 
+        auto_approved: false, 
+        reason: failReasons.join(', '),
+        retry_suggested: !telegramMatch 
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // All checks passed — Auto-approve!
+    console.log(`Auto-approving request ${request_id}: ${logText}`);
+
     const { error: updateErr } = await supabase
       .from('top_up_requests')
       .update({ 
         status: 'approved', 
-        admin_note: ocrPassed 
-          ? 'Auto-approved by system (OCR + Telegram verified)' 
-          : 'Auto-approved by system (Telegram bank SMS verified)'
+        admin_note: logText
       })
       .eq('id', request_id);
     if (updateErr) throw updateErr;
