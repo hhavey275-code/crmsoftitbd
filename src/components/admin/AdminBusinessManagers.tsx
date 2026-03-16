@@ -451,6 +451,18 @@ export function AdminBusinessManagers() {
                 <Button
                   size="sm"
                   variant="outline"
+                  className="text-destructive hover:text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeleteBmId(bm.id);
+                  }}
+                >
+                  <Trash2 className="mr-1 h-3 w-3" />
+                  Remove
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
                   onClick={(e) => {
                     e.stopPropagation();
                     setShowLogs(showLogs === bm.id ? null : bm.id);
