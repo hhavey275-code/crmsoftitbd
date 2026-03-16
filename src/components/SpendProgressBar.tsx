@@ -21,7 +21,7 @@ export function SpendProgressBar({ amountSpent, spendCap }: SpendProgressBarProp
       ? "bg-destructive"
       : ratio >= 0.5
         ? "bg-yellow-500"
-        : "bg-primary";
+        : "bg-blue-500";
 
   return (
     <div className="w-full min-w-[80px]">
