@@ -462,6 +462,18 @@ export function AdminTopUp() {
                             <RotateCcw className={`h-4 w-4 ${verifyingIds[r.id] ? 'animate-spin' : ''}`} />
                           </Button>
                         )}
+                        {r.admin_note && r.status === "approved" && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            title="Match Details"
+                            onClick={() => setExpandedSms(prev => ({ ...prev, [`note-${r.id}`]: !prev[`note-${r.id}`] }))}
+                            className={expandedSms[`note-${r.id}`] ? "text-primary" : ""}
+                          >
+                            <ClipboardCheck className="h-4 w-4" />
+                            {expandedSms[`note-${r.id}`] ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="ghost"
