@@ -198,7 +198,7 @@ export function AdminTopUp() {
   });
 
   const filtered = requests?.filter((r: any) =>
-    statusFilter === "all" ? true : r.status === statusFilter
+    statusFilter === "all" || statusFilter === "bank_sms" ? true : r.status === statusFilter
   );
 
   const processMutation = useMutation({
