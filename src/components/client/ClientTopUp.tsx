@@ -121,13 +121,11 @@ export function ClientTopUp() {
   };
 
   const verifyWithRetry = async (requestId: string, attempt = 1) => {
-    const maxRetries = 3;
-    const retryDelayMs = 120_000;
+    const maxRetries = 5;
+    const retryDelayMs = 5 * 60 * 1000; // 5 minutes
 
-    // On first attempt, fetch Telegram messages first
-    if (attempt === 1) {
-      await fetchTelegramFirst();
-    }
+    // Fetch Telegram messages before each verify attempt
+    await fetchTelegramFirst();
 
     try {
       const { data, error } = await supabase.functions.invoke('verify-topup', {
@@ -139,20 +137,23 @@ export function ClientTopUp() {
         toast.success("Payment auto-approved! ✅");
         queryClient.invalidateQueries({ queryKey: ["client-topup-history"] });
         queryClient.invalidateQueries({ queryKey: ["client-wallet"] });
-        return;
+        return; // Stop retrying — approved
       }
 
-      if (data?.retry_suggested && attempt < maxRetries) {
-        toast.info(`Verifying payment... retry ${attempt}/${maxRetries} in 2 min`);
+      if (attempt < maxRetries) {
+        toast.info(`Verifying payment... retry ${attempt}/${maxRetries} in 5 min`);
         setTimeout(() => verifyWithRetry(requestId, attempt + 1), retryDelayMs);
         return;
       }
 
-      if (attempt >= maxRetries) {
-        toast.info("Payment pending manual review by admin.");
-      }
+      // All retries exhausted
+      toast.info("Payment pending manual review by admin.");
     } catch (err) {
       console.error('verify-topup error:', err);
+      // Still retry on error if attempts remain
+      if (attempt < maxRetries) {
+        setTimeout(() => verifyWithRetry(requestId, attempt + 1), retryDelayMs);
+      }
     }
   };
 

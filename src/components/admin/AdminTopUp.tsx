@@ -423,9 +423,6 @@ export function AdminTopUp() {
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={r.status} />
-                      {r.status !== "approved" && r.admin_note && (
-                        <p className="text-xs text-muted-foreground mt-1 max-w-[250px] whitespace-pre-wrap leading-tight">{r.admin_note}</p>
-                      )}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {r.reviewerProfile ? r.reviewerProfile.full_name || r.reviewerProfile.email : "—"}
