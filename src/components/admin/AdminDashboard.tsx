@@ -14,7 +14,7 @@ export function AdminDashboard() {
   const queryClient = useQueryClient();
   const [metaLoading, setMetaLoading] = useState(false);
   const [dailySpendLoading, setDailySpendLoading] = useState(false);
-  const [dailySpend, setDailySpend] = useState<number | null>(null);
+  const [spendData, setSpendData] = useState<{ today: number; yesterday: number } | null>(null);
 
   const { data: profiles } = useQuery({
     queryKey: ["admin-profiles"],
@@ -137,8 +137,9 @@ export function AdminDashboard() {
       });
       if (error) throw error;
       const insights = data?.insights ?? {};
-      const total = Object.values(insights).reduce((sum: number, ins: any) => sum + (Number(ins?.today_spend) || 0), 0) as number;
-      setDailySpend(total);
+      const today = Object.values(insights).reduce((sum: number, ins: any) => sum + (Number(ins?.today_spend) || 0), 0) as number;
+      const yesterday = Object.values(insights).reduce((sum: number, ins: any) => sum + (Number(ins?.yesterday_spend) || 0), 0) as number;
+      setSpendData({ today, yesterday });
       await queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
     } catch (err: any) {
       toast.error("Failed to fetch daily spend: " + (err.message || "Unknown error"));
@@ -199,19 +200,37 @@ export function AdminDashboard() {
         />
       </div>
 
-      {/* Today's Total Spend */}
+      {/* Spend Overview */}
       <Card>
         <CardContent className="flex items-center justify-between py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-50 dark:bg-green-900/30">
-              <DollarSign className="h-5 w-5 text-green-600" />
+          <div className="flex items-center gap-6 flex-wrap">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-900/30">
+                <DollarSign className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Today's Spend</p>
+                <p className="text-lg font-bold">
+                  {spendData !== null
+                    ? `$${spendData.today.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : "—"}
+                </p>
+              </div>
             </div>
+            <div className="h-10 w-px bg-border hidden sm:block" />
             <div>
-              <p className="text-sm text-muted-foreground">Today's Total Spend (All Accounts)</p>
-              <p className="text-xl font-bold">
-                {dailySpend !== null
-                  ? `$${dailySpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+              <p className="text-xs text-muted-foreground">Yesterday's Spend</p>
+              <p className="text-lg font-bold">
+                {spendData !== null
+                  ? `$${spendData.yesterday.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                   : "—"}
+              </p>
+            </div>
+            <div className="h-10 w-px bg-border hidden sm:block" />
+            <div>
+              <p className="text-xs text-muted-foreground">Total Spent (All Time)</p>
+              <p className="text-lg font-bold">
+                ${(adAccounts?.reduce((sum: number, a: any) => sum + Number(a.amount_spent), 0) ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
           </div>
