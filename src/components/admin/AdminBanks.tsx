@@ -259,6 +259,26 @@ export function AdminBanks() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Bank Dialog */}
+      <Dialog open={!!editingBank} onOpenChange={(open) => { if (!open) { setEditingBank(null); setForm(emptyForm); } }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Bank Account</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Bank Name</Label><Input value={form.bank_name} onChange={e => setForm(f => ({ ...f, bank_name: e.target.value }))} /></div>
+            <div><Label>Account Name</Label><Input value={form.account_name} onChange={e => setForm(f => ({ ...f, account_name: e.target.value }))} /></div>
+            <div><Label>Account Number</Label><Input value={form.account_number} onChange={e => setForm(f => ({ ...f, account_number: e.target.value }))} /></div>
+            <div><Label>Branch</Label><Input value={form.branch} onChange={e => setForm(f => ({ ...f, branch: e.target.value }))} /></div>
+            <div><Label>Routing Number</Label><Input value={form.routing_number} onChange={e => setForm(f => ({ ...f, routing_number: e.target.value }))} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setEditingBank(null); setForm(emptyForm); }}>Cancel</Button>
+            <Button onClick={() => editMutation.mutate()} disabled={!form.bank_name || !form.account_name || !form.account_number || editMutation.isPending}>
+              {editMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
