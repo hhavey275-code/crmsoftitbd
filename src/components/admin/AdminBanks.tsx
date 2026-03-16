@@ -10,13 +10,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { StatusBadge } from "@/components/StatusBadge";
 import { toast } from "sonner";
-import { Plus, Trash2, UserPlus } from "lucide-react";
+import { Plus, Trash2, UserPlus, Pencil } from "lucide-react";
+
+const emptyForm = { bank_name: "", account_name: "", account_number: "", branch: "", routing_number: "" };
 
 export function AdminBanks() {
   const queryClient = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
   const [showAssign, setShowAssign] = useState<string | null>(null);
-  const [form, setForm] = useState({ bank_name: "", account_name: "", account_number: "", branch: "", routing_number: "" });
+  const [editingBank, setEditingBank] = useState<any>(null);
+  const [form, setForm] = useState(emptyForm);
   const [selectedClient, setSelectedClient] = useState("");
 
   const { data: banks } = useQuery({
@@ -52,7 +55,27 @@ export function AdminBanks() {
       toast.success("Bank added!");
       queryClient.invalidateQueries({ queryKey: ["admin-banks"] });
       setShowAdd(false);
-      setForm({ bank_name: "", account_name: "", account_number: "", branch: "", routing_number: "" });
+      setForm(emptyForm);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const editMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await (supabase as any).from("bank_accounts").update({
+        bank_name: form.bank_name,
+        account_name: form.account_name,
+        account_number: form.account_number,
+        branch: form.branch,
+        routing_number: form.routing_number,
+      }).eq("id", editingBank.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Bank updated!");
+      queryClient.invalidateQueries({ queryKey: ["admin-banks"] });
+      setEditingBank(null);
+      setForm(emptyForm);
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -133,6 +156,12 @@ export function AdminBanks() {
                   <TableCell><StatusBadge status={b.status} /></TableCell>
                   <TableCell>
                     <div className="flex gap-1">
+                      <Button size="sm" variant="ghost" onClick={() => {
+                        setEditingBank(b);
+                        setForm({ bank_name: b.bank_name, account_name: b.account_name, account_number: b.account_number, branch: b.branch || "", routing_number: b.routing_number || "" });
+                      }}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
                       <Button size="sm" variant="ghost" onClick={() => setShowAssign(b.id)}>
                         <UserPlus className="h-4 w-4" />
                       </Button>
@@ -226,6 +255,26 @@ export function AdminBanks() {
             <Button variant="outline" onClick={() => setShowAssign(null)}>Cancel</Button>
             <Button onClick={() => assignMutation.mutate()} disabled={!selectedClient || assignMutation.isPending}>
               {assignMutation.isPending ? "Assigning..." : "Assign"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Bank Dialog */}
+      <Dialog open={!!editingBank} onOpenChange={(open) => { if (!open) { setEditingBank(null); setForm(emptyForm); } }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Bank Account</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Bank Name</Label><Input value={form.bank_name} onChange={e => setForm(f => ({ ...f, bank_name: e.target.value }))} /></div>
+            <div><Label>Account Name</Label><Input value={form.account_name} onChange={e => setForm(f => ({ ...f, account_name: e.target.value }))} /></div>
+            <div><Label>Account Number</Label><Input value={form.account_number} onChange={e => setForm(f => ({ ...f, account_number: e.target.value }))} /></div>
+            <div><Label>Branch</Label><Input value={form.branch} onChange={e => setForm(f => ({ ...f, branch: e.target.value }))} /></div>
+            <div><Label>Routing Number</Label><Input value={form.routing_number} onChange={e => setForm(f => ({ ...f, routing_number: e.target.value }))} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setEditingBank(null); setForm(emptyForm); }}>Cancel</Button>
+            <Button onClick={() => editMutation.mutate()} disabled={!form.bank_name || !form.account_name || !form.account_number || editMutation.isPending}>
+              {editMutation.isPending ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>
