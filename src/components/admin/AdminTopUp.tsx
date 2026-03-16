@@ -75,16 +75,8 @@ function BankSmsPanel({ request }: { request: any }) {
 
   if (relevantMessages.length === 0) {
     return (
-      <div className="space-y-2">
-        <div className="px-4 py-3 text-sm text-muted-foreground bg-muted/30 rounded-md">
-          No matching bank SMS found within ±60 min window
-        </div>
-        {messages?.slice(0, 5).map((m: any) => (
-          <div key={m.update_id} className="p-3 bg-muted/40 rounded-md border text-sm space-y-1">
-            <span className="text-xs text-muted-foreground">{format(new Date(m.created_at), "MMM d, HH:mm:ss")}</span>
-            <p className="whitespace-pre-wrap text-foreground">{getTelegramDisplayText(m)}</p>
-          </div>
-        ))}
+      <div className="px-4 py-3 text-sm text-muted-foreground bg-muted/30 rounded-md">
+        No matching bank SMS found
       </div>
     );
   }
