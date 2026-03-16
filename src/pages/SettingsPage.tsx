@@ -150,7 +150,22 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSaveWelcome = async () => {
+  const handleSaveBotToken = async () => {
+    if (!botTokenInput.trim()) return;
+    setSavingBotToken(true);
+    const { error } = await supabase
+      .from("site_settings")
+      .upsert({ key: "telegram_bot_token", value: botTokenInput.trim() }, { onConflict: "key" });
+    setSavingBotToken(false);
+    if (error) {
+      toast.error("Failed to save bot token");
+    } else {
+      toast.success("Telegram bot token updated!");
+      refetchBotToken();
+    }
+  };
+
+
     setSavingWelcome(true);
     const { error: e1 } = await supabase
       .from("site_settings")
