@@ -228,6 +228,40 @@ export function AdminBusinessManagers() {
     onError: (err: any) => toast.error(err.message),
   });
 
+  const deleteBmMutation = useMutation({
+    mutationFn: async (bmId: string) => {
+      // Get all ad account IDs under this BM
+      const { data: accounts } = await supabase
+        .from("ad_accounts")
+        .select("id")
+        .eq("business_manager_id", bmId);
+      const accountIds = (accounts ?? []).map((a: any) => a.id);
+
+      if (accountIds.length > 0) {
+        // Delete assignments
+        await (supabase as any).from("user_ad_accounts").delete().in("ad_account_id", accountIds);
+        // Delete insights
+        await supabase.from("ad_account_insights").delete().in("ad_account_id", accountIds);
+        // Delete ad accounts
+        await supabase.from("ad_accounts").delete().eq("business_manager_id", bmId);
+      }
+      // Delete sync logs
+      await (supabase as any).from("sync_logs").delete().eq("business_manager_id", bmId);
+      // Delete BM
+      const { error } = await supabase.from("business_managers").delete().eq("id", bmId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Business Manager and all ad accounts removed");
+      setDeleteBmId(null);
+      queryClient.invalidateQueries({ queryKey: ["admin-business-managers"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-bm-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-user-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
   const assignMutation = useMutation({
     mutationFn: async ({ accountId, userId }: { accountId: string; userId: string | null }) => {
       await (supabase as any).from("user_ad_accounts").delete().eq("ad_account_id", accountId);
