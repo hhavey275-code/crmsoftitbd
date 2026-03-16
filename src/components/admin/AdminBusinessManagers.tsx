@@ -208,6 +208,24 @@ export function AdminBusinessManagers() {
   const newAccountsCount = syncedAccounts.filter((a) => !existingAccountIds.has(a.account_id)).length;
   const alreadyImportedCount = syncedAccounts.filter((a) => existingAccountIds.has(a.account_id)).length;
 
+  const updateTokenMutation = useMutation({
+    mutationFn: async ({ id, token }: { id: string; token: string }) => {
+      const { error } = await supabase
+        .from("business_managers")
+        .update({ access_token: token })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Access token updated");
+      setEditOpen(false);
+      setEditBmId(null);
+      setEditAccessToken("");
+      queryClient.invalidateQueries({ queryKey: ["admin-business-managers"] });
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
   const assignMutation = useMutation({
     mutationFn: async ({ accountId, userId }: { accountId: string; userId: string | null }) => {
       await (supabase as any).from("user_ad_accounts").delete().eq("ad_account_id", accountId);
