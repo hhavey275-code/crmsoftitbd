@@ -396,7 +396,11 @@ export function AdminTopUp() {
                   <TableRow>
                     <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
                     <TableCell className="text-sm">{getBankDisplay(r.bankAccount)}</TableCell>
-                    <TableCell className="font-medium">{r.profile?.full_name || r.profile?.email || "Unknown"}</TableCell>
+                    <TableCell className="font-medium">
+                      <Link to={`/clients/${r.user_id}`} className="text-primary hover:underline">
+                        {r.profile?.full_name || r.profile?.email || "Unknown"}
+                      </Link>
+                    </TableCell>
                     <TableCell>
                       <div>
                         <span className="font-semibold">{r.bdt_amount ? `৳${Number(r.bdt_amount).toLocaleString()}` : "—"}</span>
