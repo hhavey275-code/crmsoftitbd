@@ -1,4 +1,3 @@
-// Edge function: update-spend-cap v2
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -14,7 +13,7 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -28,16 +27,13 @@ Deno.serve(async (req) => {
     );
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: userError } =
-      await supabaseUser.auth.getUser(token);
+    const { data: { user }, error: userError } = await supabaseUser.auth.getUser(token);
     if (userError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    const callerId = user.id;
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -47,7 +43,7 @@ Deno.serve(async (req) => {
     const { data: roleData } = await supabase
       .from("user_roles")
       .select("role")
-      .eq("user_id", callerId)
+      .eq("user_id", user.id)
       .eq("role", "admin")
       .single();
 
@@ -61,16 +57,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    const walletUserId = target_user_id || callerId;
+    const walletUserId = target_user_id || user.id;
 
-    if (!isAdmin && walletUserId !== callerId) {
+    if (!isAdmin && walletUserId !== user.id) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Fetch profile for frozen check and due_limit
     const { data: userProfile } = await supabase
       .from("profiles")
       .select("status, due_limit")
@@ -88,7 +83,7 @@ Deno.serve(async (req) => {
       const { data: assignment } = await supabase
         .from("user_ad_accounts")
         .select("id")
-        .eq("user_id", callerId)
+        .eq("user_id", user.id)
         .eq("ad_account_id", ad_account_id)
         .single();
       if (!assignment) {
@@ -99,7 +94,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fetch ad account + BM info first (for account name in description)
     const { data: account, error: accErr } = await supabase
       .from("ad_accounts")
       .select("*, business_managers!inner(access_token, bm_id)")
@@ -113,7 +107,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Wallet deduction
     if (deduct_wallet) {
       const { data: wallet, error: walletErr } = await supabase
         .from("wallets")
@@ -131,7 +124,6 @@ Deno.serve(async (req) => {
       const dueLimit = Number(userProfile?.due_limit ?? 0);
       const effectiveBalance = Number(wallet.balance) + dueLimit;
 
-      // Clients cannot exceed wallet balance + due_limit; admins can (allows negative)
       if (!isAdmin && effectiveBalance < amount) {
         return new Response(
           JSON.stringify({ error: "Insufficient wallet balance" }),
@@ -153,13 +145,12 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Log transaction with account name
       await supabase.from("transactions").insert({
         user_id: walletUserId,
         amount: -amount,
         balance_after: newBalance,
         type: "ad_topup",
-        description: `Ad account top-up: $${amount} → ${account.account_name}`,
+        description: `Ad account top-up: $${amount} to ${account.account_name}`,
         reference_id: ad_account_id,
       });
     }
@@ -187,7 +178,6 @@ Deno.serve(async (req) => {
     const metaData = await metaRes.json();
 
     if (metaData.error) {
-      // Rollback wallet deduction on Meta API failure
       if (deduct_wallet) {
         const { data: wallet } = await supabase
           .from("wallets")
@@ -233,7 +223,7 @@ Deno.serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
-    console.error("update-spend-cap error:", err);
+    console.error("spend-cap-update error:", err);
     return new Response(
       JSON.stringify({ error: err instanceof Error ? err.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
