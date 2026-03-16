@@ -138,8 +138,8 @@ export default function BillingsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Billings</h1>
-            {lastUpdated && (
-              <p className="text-xs text-muted-foreground mt-0.5">Last synced: {lastUpdated}</p>
+            {timeAgoStr && (
+              <p className="text-xs text-muted-foreground mt-0.5">Synced {timeAgoStr}</p>
             )}
           </div>
           <Button

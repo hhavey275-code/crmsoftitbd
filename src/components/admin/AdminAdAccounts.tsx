@@ -664,20 +664,32 @@ export function AdminAdAccounts() {
       </Dialog>
 
       {/* Assign Selected Dialog */}
-      <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
+      <Dialog open={showAssignDialog} onOpenChange={(open) => { setShowAssignDialog(open); if (!open) setClientSearch(""); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Assign {selectedIds.size} Account(s) to Client</DialogTitle>
             <DialogDescription>Select a client to assign the selected ad accounts to. Existing assignments will be replaced.</DialogDescription>
           </DialogHeader>
-          <div className="py-4">
+          <div className="py-4 space-y-3">
             <Label>Client</Label>
+            <Input
+              placeholder="Search client by name or email..."
+              value={clientSearch}
+              onChange={(e) => setClientSearch(e.target.value)}
+              className="h-9"
+            />
             <Select value={assignClientId} onValueChange={setAssignClientId}>
               <SelectTrigger className="mt-1.5"><SelectValue placeholder="Select a client" /></SelectTrigger>
               <SelectContent>
-                {clients?.map((c: any) => (
-                  <SelectItem key={c.user_id} value={c.user_id}>{c.full_name || c.email}</SelectItem>
-                ))}
+                {clients
+                  ?.filter((c: any) => {
+                    if (!clientSearch) return true;
+                    const q = clientSearch.toLowerCase();
+                    return (c.full_name?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q));
+                  })
+                  .map((c: any) => (
+                    <SelectItem key={c.user_id} value={c.user_id}>{c.full_name || c.email}</SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
