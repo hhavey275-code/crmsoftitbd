@@ -167,6 +167,22 @@ export function AdminTopUp() {
     usdRate: number | null;
   } | null>(null);
 
+  // Realtime subscription for top_up_requests
+  useEffect(() => {
+    const channel = supabase
+      .channel("admin-topup-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "top_up_requests" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["admin-topup-requests"] });
+          queryClient.invalidateQueries({ queryKey: ["admin-wallets"] });
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
+
   const toggleSms = (id: string) => {
     setExpandedSms(prev => ({ ...prev, [id]: !prev[id] }));
   };
