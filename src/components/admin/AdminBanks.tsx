@@ -55,7 +55,27 @@ export function AdminBanks() {
       toast.success("Bank added!");
       queryClient.invalidateQueries({ queryKey: ["admin-banks"] });
       setShowAdd(false);
-      setForm({ bank_name: "", account_name: "", account_number: "", branch: "", routing_number: "" });
+      setForm(emptyForm);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const editMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await (supabase as any).from("bank_accounts").update({
+        bank_name: form.bank_name,
+        account_name: form.account_name,
+        account_number: form.account_number,
+        branch: form.branch,
+        routing_number: form.routing_number,
+      }).eq("id", editingBank.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Bank updated!");
+      queryClient.invalidateQueries({ queryKey: ["admin-banks"] });
+      setEditingBank(null);
+      setForm(emptyForm);
     },
     onError: (e: any) => toast.error(e.message),
   });
