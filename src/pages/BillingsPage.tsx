@@ -64,6 +64,8 @@ export default function BillingsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["billings-insights"] });
+      queryClient.invalidateQueries({ queryKey: ["billings-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
       toast.success("Data updated from Meta");
     },
     onError: () => {

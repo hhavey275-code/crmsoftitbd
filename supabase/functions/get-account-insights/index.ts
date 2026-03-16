@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { ad_account_ids, source = "cache", date } = await req.json();
+    const { ad_account_ids, source = "cache", date, date_from, date_to } = await req.json();
     if (!ad_account_ids || !Array.isArray(ad_account_ids) || ad_account_ids.length === 0) {
       return new Response(JSON.stringify({ error: "ad_account_ids required" }), {
         status: 400,
@@ -132,6 +132,9 @@ Deno.serve(async (req) => {
       balance: 0, cards: [],
     };
 
+    // Track amount_spent updates for ad_accounts table
+    const amountSpentUpdates: { id: string; amount_spent: number }[] = [];
+
     const promises = (accounts ?? []).map(async (account: any) => {
       const accessToken = account.business_managers?.access_token;
       const actId = account.account_id;
@@ -142,13 +145,20 @@ Deno.serve(async (req) => {
       }
 
       try {
-        // Build date query params
+        // Determine if this is a date range query or single date query
+        const isDateRange = date_from && date_to;
+        const isSingleDate = date && !isDateRange;
+
         let todayUrl: string;
         let yesterdayUrl: string;
-        if (date) {
-          // Custom date: fetch spend for that specific date
+
+        if (isDateRange) {
+          // Date range: fetch spend for the range
+          todayUrl = `https://graph.facebook.com/v24.0/${actId}/insights?fields=spend,actions&time_range={"since":"${date_from}","until":"${date_to}"}&access_token=${accessToken}`;
+          // No meaningful "yesterday" for range, skip
+          yesterdayUrl = "";
+        } else if (isSingleDate) {
           todayUrl = `https://graph.facebook.com/v24.0/${actId}/insights?fields=spend,actions&time_range={"since":"${date}","until":"${date}"}&access_token=${accessToken}`;
-          // For custom date, yesterday is not applicable, but we still fetch it as the day before
           const d = new Date(date);
           d.setDate(d.getDate() - 1);
           const prevDate = d.toISOString().split("T")[0];
@@ -158,21 +168,41 @@ Deno.serve(async (req) => {
           yesterdayUrl = `https://graph.facebook.com/v24.0/${actId}/insights?fields=spend,actions&date_preset=yesterday&access_token=${accessToken}`;
         }
 
-        const [todayRes, yesterdayRes, accountRes, activeCampaigns] = await Promise.all([
+        const fetchPromises: Promise<Response>[] = [
           fetch(todayUrl),
-          fetch(yesterdayUrl),
-          fetch(`https://graph.facebook.com/v24.0/${actId}?fields=balance,funding_source_details&access_token=${accessToken}`),
-          fetchActiveCampaignCount(actId, accessToken),
-        ]);
+          fetch(`https://graph.facebook.com/v24.0/${actId}?fields=balance,amount_spent,funding_source_details&access_token=${accessToken}`),
+          fetchActiveCampaignCount(actId, accessToken).then(c => ({ json: async () => c } as any)),
+        ];
+        if (yesterdayUrl) {
+          fetchPromises.splice(1, 0, fetch(yesterdayUrl));
+        }
 
-        const todayData = await todayRes.json();
-        const yesterdayData = await yesterdayRes.json();
-        const accountData = await accountRes.json();
+        const responses = await Promise.all(fetchPromises);
+        
+        let todayData: any, yesterdayData: any, accountData: any, activeCampaigns: number;
+        
+        if (yesterdayUrl) {
+          todayData = await responses[0].json();
+          yesterdayData = await responses[1].json();
+          accountData = await responses[2].json();
+          activeCampaigns = await responses[3].json();
+        } else {
+          todayData = await responses[0].json();
+          yesterdayData = { data: [] };
+          accountData = await responses[1].json();
+          activeCampaigns = await responses[2].json();
+        }
 
         const todaySpend = todayData?.data?.[0]?.spend ? parseFloat(todayData.data[0].spend) : 0;
         const yesterdaySpend = yesterdayData?.data?.[0]?.spend ? parseFloat(yesterdayData.data[0].spend) : 0;
 
         const balance = accountData?.balance ? parseFloat(accountData.balance) / 100 : 0;
+
+        // Update amount_spent from Meta account data (not from date-specific query)
+        if (!isSingleDate && !isDateRange && accountData?.amount_spent !== undefined) {
+          const metaAmountSpent = parseFloat(accountData.amount_spent) / 100;
+          amountSpentUpdates.push({ id: account.id, amount_spent: metaAmountSpent });
+        }
 
         const cards: any[] = [];
         const fsd = accountData?.funding_source_details;
@@ -187,7 +217,7 @@ Deno.serve(async (req) => {
         insights[account.id] = {
           today_spend: todaySpend,
           yesterday_spend: yesterdaySpend,
-          date_spend: date ? todaySpend : undefined,
+          date_spend: (isSingleDate || isDateRange) ? todaySpend : undefined,
           today_orders: extractOrders(todayData),
           yesterday_orders: extractOrders(yesterdayData),
           active_campaigns: activeCampaigns,
@@ -203,26 +233,41 @@ Deno.serve(async (req) => {
 
     await Promise.all(promises);
 
-    // Upsert all insights into DB
-    const upsertRows = Object.entries(insights).map(([adAccountId, data]: [string, any]) => ({
-      ad_account_id: adAccountId,
-      today_spend: data.today_spend,
-      yesterday_spend: data.yesterday_spend,
-      today_orders: data.today_orders,
-      yesterday_orders: data.yesterday_orders,
-      active_campaigns: data.active_campaigns,
-      today_messages: data.today_messages,
-      yesterday_messages: data.yesterday_messages,
-      balance: data.balance,
-      cards: data.cards,
-      updated_at: new Date().toISOString(),
-    }));
+    // Upsert all insights into DB (only for non-date queries)
+    if (!date && !date_from && !date_to) {
+      const upsertRows = Object.entries(insights).map(([adAccountId, data]: [string, any]) => ({
+        ad_account_id: adAccountId,
+        today_spend: data.today_spend,
+        yesterday_spend: data.yesterday_spend,
+        today_orders: data.today_orders,
+        yesterday_orders: data.yesterday_orders,
+        active_campaigns: data.active_campaigns,
+        today_messages: data.today_messages,
+        yesterday_messages: data.yesterday_messages,
+        balance: data.balance,
+        cards: data.cards,
+        updated_at: new Date().toISOString(),
+      }));
 
-    const upsertBatches = chunk(upsertRows, 30);
-    for (const batch of upsertBatches) {
-      await supabase
-        .from("ad_account_insights")
-        .upsert(batch, { onConflict: "ad_account_id" });
+      const upsertBatches = chunk(upsertRows, 30);
+      for (const batch of upsertBatches) {
+        await supabase
+          .from("ad_account_insights")
+          .upsert(batch, { onConflict: "ad_account_id" });
+      }
+
+      // Update ad_accounts.amount_spent with fresh data from Meta
+      if (amountSpentUpdates.length > 0) {
+        const updateBatches = chunk(amountSpentUpdates, 30);
+        for (const batch of updateBatches) {
+          for (const item of batch) {
+            await supabase
+              .from("ad_accounts")
+              .update({ amount_spent: item.amount_spent })
+              .eq("id", item.id);
+          }
+        }
+      }
     }
 
     const now = new Date().toISOString();
