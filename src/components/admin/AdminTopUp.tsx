@@ -459,7 +459,7 @@ export function AdminTopUp() {
                           >
                             <RotateCcw className={`h-4 w-4 ${verifyingIds[r.id] ? 'animate-spin' : ''}`} />
                           </Button>
-                        )
+                        )}
                         <Button
                           size="sm"
                           variant="ghost"
