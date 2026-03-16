@@ -71,6 +71,10 @@ export default function SettingsPage() {
   if (currentRate && !usdRate && !savingRate) {
     setUsdRate(currentRate);
   }
+  // Sync bot token input when data loads
+  if (currentBotToken && !botTokenInput && !savingBotToken) {
+    setBotTokenInput(currentBotToken);
+  }
   // Sync site name input when data loads
   if (currentSiteName && !siteNameInput && !savingSiteName) {
     setSiteNameInput(currentSiteName);
