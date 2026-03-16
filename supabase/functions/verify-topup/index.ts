@@ -138,9 +138,10 @@ Deno.serve(async (req) => {
 
     const { data: telegramMsgs } = await supabase
       .from('telegram_messages')
-      .select('text, raw_update, created_at, update_id, chat_id')
+      .select('text, raw_update, created_at, update_id, chat_id, matched_request_id')
       .gte('created_at', windowStart)
       .lte('created_at', windowEnd)
+      .is('matched_request_id', null)
       .order('created_at', { ascending: false })
       .limit(200);
 
