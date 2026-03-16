@@ -10,13 +10,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { StatusBadge } from "@/components/StatusBadge";
 import { toast } from "sonner";
-import { Plus, Trash2, UserPlus } from "lucide-react";
+import { Plus, Trash2, UserPlus, Pencil } from "lucide-react";
+
+const emptyForm = { bank_name: "", account_name: "", account_number: "", branch: "", routing_number: "" };
 
 export function AdminBanks() {
   const queryClient = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
   const [showAssign, setShowAssign] = useState<string | null>(null);
-  const [form, setForm] = useState({ bank_name: "", account_name: "", account_number: "", branch: "", routing_number: "" });
+  const [editingBank, setEditingBank] = useState<any>(null);
+  const [form, setForm] = useState(emptyForm);
   const [selectedClient, setSelectedClient] = useState("");
 
   const { data: banks } = useQuery({
