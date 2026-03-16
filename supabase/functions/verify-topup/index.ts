@@ -146,7 +146,7 @@ Deno.serve(async (req) => {
 
     let telegramMatch = false;
     let telegramMatchDetail = '';
-
+    let matchedMsg: any = null;
     if (telegramMsgs && bankLast4 && bdtNum > 0) {
       for (const msg of telegramMsgs) {
         // Get text from multiple possible fields
