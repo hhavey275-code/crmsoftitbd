@@ -138,7 +138,7 @@ Deno.serve(async (req) => {
 
     const { data: telegramMsgs } = await supabase
       .from('telegram_messages')
-      .select('text, raw_update, created_at')
+      .select('text, raw_update, created_at, update_id, chat_id')
       .gte('created_at', windowStart)
       .lte('created_at', windowEnd)
       .order('created_at', { ascending: false })
@@ -146,7 +146,7 @@ Deno.serve(async (req) => {
 
     let telegramMatch = false;
     let telegramMatchDetail = '';
-
+    let matchedMsg: any = null;
     if (telegramMsgs && bankLast4 && bdtNum > 0) {
       for (const msg of telegramMsgs) {
         // Get text from multiple possible fields
@@ -173,6 +173,7 @@ Deno.serve(async (req) => {
 
         if (hasLast4 && hasAmount) {
           telegramMatch = true;
+          matchedMsg = msg;
           telegramMatchDetail = `last4: ${bankLast4}, amount: ৳${matchedTelegramAmount} (submitted: ৳${bdtNum}, diff: ৳${Math.abs(matchedTelegramAmount - bdtNum)})`;
           console.log(`Telegram match found: ${telegramMatchDetail}, text snippet: ${text.substring(0, 100)}`);
           break;
@@ -255,6 +256,40 @@ Deno.serve(async (req) => {
       message: `Your top-up of $${amount} has been auto-approved.`,
       reference_id: request_id,
     });
+
+    // Send 👍 reaction on matched Telegram message
+    if (matchedMsg) {
+      try {
+        const raw = matchedMsg.raw_update || {};
+        const payload = raw.message || raw.edited_message || raw.channel_post || raw.edited_channel_post || {};
+        const messageId = payload.message_id;
+        const chatId = matchedMsg.chat_id;
+
+        if (messageId && chatId) {
+          const { data: botTokenSetting } = await supabase
+            .from('site_settings')
+            .select('value')
+            .eq('key', 'telegram_bot_token')
+            .single();
+
+          if (botTokenSetting?.value) {
+            const reactionResp = await fetch(`https://api.telegram.org/bot${botTokenSetting.value}/setMessageReaction`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: chatId,
+                message_id: messageId,
+                reaction: [{ type: 'emoji', emoji: '👍' }],
+              }),
+            });
+            const reactionData = await reactionResp.json();
+            console.log('Telegram reaction result:', JSON.stringify(reactionData));
+          }
+        }
+      } catch (e) {
+        console.error('Telegram reaction failed (non-blocking):', e);
+      }
+    }
 
     return new Response(JSON.stringify({ ok: true, auto_approved: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 

@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { useState, Fragment } from "react";
 import { Check, X, Pause, ImageIcon, Radio, ChevronDown, ChevronUp, MessageSquareText, RotateCcw } from "lucide-react";
+import { Link } from "react-router-dom";
 
 type ActionType = "approved" | "rejected" | "hold";
 
@@ -74,16 +75,8 @@ function BankSmsPanel({ request }: { request: any }) {
 
   if (relevantMessages.length === 0) {
     return (
-      <div className="space-y-2">
-        <div className="px-4 py-3 text-sm text-muted-foreground bg-muted/30 rounded-md">
-          No matching bank SMS found within ±60 min window
-        </div>
-        {messages?.slice(0, 5).map((m: any) => (
-          <div key={m.update_id} className="p-3 bg-muted/40 rounded-md border text-sm space-y-1">
-            <span className="text-xs text-muted-foreground">{format(new Date(m.created_at), "MMM d, HH:mm:ss")}</span>
-            <p className="whitespace-pre-wrap text-foreground">{getTelegramDisplayText(m)}</p>
-          </div>
-        ))}
+      <div className="px-4 py-3 text-sm text-muted-foreground bg-muted/30 rounded-md">
+        No matching bank SMS found
       </div>
     );
   }
@@ -403,7 +396,11 @@ export function AdminTopUp() {
                   <TableRow>
                     <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
                     <TableCell className="text-sm">{getBankDisplay(r.bankAccount)}</TableCell>
-                    <TableCell className="font-medium">{r.profile?.full_name || r.profile?.email || "Unknown"}</TableCell>
+                    <TableCell className="font-medium">
+                      <Link to={`/clients/${r.user_id}`} className="text-primary hover:underline">
+                        {r.profile?.full_name || r.profile?.email || "Unknown"}
+                      </Link>
+                    </TableCell>
                     <TableCell>
                       <div>
                         <span className="font-semibold">{r.bdt_amount ? `৳${Number(r.bdt_amount).toLocaleString()}` : "—"}</span>
@@ -426,9 +423,22 @@ export function AdminTopUp() {
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={r.status} />
-                      {r.admin_note && (
+                      {r.status === "approved" && r.admin_note ? (
+                        <div className="mt-1">
+                          <button
+                            onClick={() => setExpandedSms(prev => ({ ...prev, [`note-${r.id}`]: !prev[`note-${r.id}`] }))}
+                            className="text-xs text-primary hover:underline flex items-center gap-0.5"
+                          >
+                            Match Details
+                            {expandedSms[`note-${r.id}`] ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                          </button>
+                          {expandedSms[`note-${r.id}`] && (
+                            <p className="text-xs text-muted-foreground mt-1 max-w-[300px] whitespace-pre-wrap leading-tight bg-muted/30 p-2 rounded">{r.admin_note}</p>
+                          )}
+                        </div>
+                      ) : r.admin_note ? (
                         <p className="text-xs text-muted-foreground mt-1 max-w-[250px] whitespace-pre-wrap leading-tight">{r.admin_note}</p>
-                      )}
+                      ) : null}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {r.reviewerProfile ? r.reviewerProfile.full_name || r.reviewerProfile.email : "—"}
