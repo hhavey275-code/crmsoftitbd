@@ -14,6 +14,3 @@ verify_jwt = false
 
 [functions.get-account-insights]
 verify_jwt = false
-
-[functions.test-fn]
-verify_jwt = false
