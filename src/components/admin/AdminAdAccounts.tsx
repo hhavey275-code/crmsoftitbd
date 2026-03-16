@@ -107,6 +107,9 @@ export function AdminAdAccounts() {
     onSuccess: () => {
       toast.success("All accounts updated from Meta");
       refetchInsights();
+      queryClient.invalidateQueries({ queryKey: ["billings-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["billings-insights"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
     },
     onError: (err: any) => toast.error(err.message || "Failed to refresh"),
   });
@@ -125,6 +128,8 @@ export function AdminAdAccounts() {
       toast.success(`${selectedIds.size} account(s) updated from Meta`);
       refetchInsights();
       setSelectedIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ["billings-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["billings-insights"] });
     },
     onError: (err: any) => toast.error(err.message || "Failed to refresh"),
   });
