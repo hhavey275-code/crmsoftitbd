@@ -46,6 +46,7 @@ export function AdminBusinessManagers() {
   const [editOpen, setEditOpen] = useState(false);
   const [editBmId, setEditBmId] = useState<string | null>(null);
   const [editAccessToken, setEditAccessToken] = useState("");
+  const [deleteBmId, setDeleteBmId] = useState<string | null>(null);
 
   const { data: bms } = useQuery({
     queryKey: ["admin-business-managers"],
