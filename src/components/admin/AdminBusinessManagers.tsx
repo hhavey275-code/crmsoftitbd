@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,12 +6,23 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, RefreshCw, Building2, ChevronDown, ChevronRight, Clock, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Plus, RefreshCw, Building2, ChevronDown, ChevronRight, Clock, AlertCircle, CheckCircle2, Search } from "lucide-react";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
+
+interface SyncedAccount {
+  account_id: string;
+  account_name: string;
+  business_manager_id: string;
+  business_name: string | null;
+  status: string;
+  spend_cap: number;
+  amount_spent: number;
+}
 
 export function AdminBusinessManagers() {
   const queryClient = useQueryClient();
@@ -21,6 +32,14 @@ export function AdminBusinessManagers() {
   const [accessToken, setAccessToken] = useState("");
   const [expandedBm, setExpandedBm] = useState<string | null>(null);
   const [showLogs, setShowLogs] = useState<string | null>(null);
+
+  // Selective import state
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [syncedAccounts, setSyncedAccounts] = useState<SyncedAccount[]>([]);
+  const [selectedImportIds, setSelectedImportIds] = useState<Set<string>>(new Set());
+  const [importStatusFilter, setImportStatusFilter] = useState("all");
+  const [importSearch, setImportSearch] = useState("");
+  const [existingAccountIds, setExistingAccountIds] = useState<Set<string>>(new Set());
 
   const { data: bms } = useQuery({
     queryKey: ["admin-business-managers"],
@@ -86,7 +105,6 @@ export function AdminBusinessManagers() {
       setBmId("");
       setBmName("");
       setAccessToken("");
-      // Auto-sync ad accounts after connecting
       if (data?.id) {
         setExpandedBm(data.id);
         syncMutation.mutate(data.id);
@@ -113,14 +131,77 @@ export function AdminBusinessManagers() {
       if (!res.ok) throw new Error(result.error || "Sync failed");
       return result;
     },
-    onSuccess: (result) => {
-      toast.success(`Synced ${result.synced} of ${result.total} accounts`);
-      queryClient.invalidateQueries({ queryKey: ["admin-bm-ad-accounts"] });
+    onSuccess: async (result) => {
+      const accounts: SyncedAccount[] = result.accounts ?? [];
+      if (accounts.length === 0) {
+        toast.info("No accounts found from Meta");
+        return;
+      }
+      // Load existing account_ids to detect duplicates
+      const { data: existing } = await supabase.from("ad_accounts").select("account_id");
+      const existingIds = new Set((existing ?? []).map((a: any) => a.account_id));
+      setExistingAccountIds(existingIds);
+
+      // Only show accounts that are NOT already imported
+      setSyncedAccounts(accounts);
+      setSelectedImportIds(new Set());
+      setImportStatusFilter("all");
+      setImportSearch("");
+      setImportDialogOpen(true);
+
       queryClient.invalidateQueries({ queryKey: ["admin-business-managers"] });
       queryClient.invalidateQueries({ queryKey: ["admin-sync-logs"] });
     },
     onError: (err: any) => toast.error(err.message),
   });
+
+  const importMutation = useMutation({
+    mutationFn: async (accounts: SyncedAccount[]) => {
+      const rows = accounts.map((a) => ({
+        account_id: a.account_id,
+        account_name: a.account_name,
+        business_manager_id: a.business_manager_id,
+        business_name: a.business_name,
+        status: a.status,
+        spend_cap: a.spend_cap,
+        amount_spent: a.amount_spent,
+      }));
+      const { error } = await supabase.from("ad_accounts").upsert(rows, { onConflict: "account_id" });
+      if (error) throw error;
+      return rows.length;
+    },
+    onSuccess: (count) => {
+      toast.success(`${count} account(s) imported successfully`);
+      setImportDialogOpen(false);
+      setSyncedAccounts([]);
+      setSelectedImportIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ["admin-bm-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["billings-accounts"] });
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const handleImportSelected = () => {
+    const toImport = syncedAccounts.filter((a) => selectedImportIds.has(a.account_id));
+    if (toImport.length === 0) {
+      toast.error("No accounts selected");
+      return;
+    }
+    importMutation.mutate(toImport);
+  };
+
+  const filteredSyncedAccounts = useMemo(() => {
+    const q = importSearch.toLowerCase();
+    return syncedAccounts.filter((a) => {
+      if (importStatusFilter !== "all" && a.status !== importStatusFilter) return false;
+      if (q && !a.account_name.toLowerCase().includes(q) && !a.account_id.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [syncedAccounts, importStatusFilter, importSearch]);
+
+  const newAccountsCount = syncedAccounts.filter((a) => !existingAccountIds.has(a.account_id)).length;
+  const alreadyImportedCount = syncedAccounts.filter((a) => existingAccountIds.has(a.account_id)).length;
 
   const assignMutation = useMutation({
     mutationFn: async ({ accountId, userId }: { accountId: string; userId: string | null }) => {
@@ -154,6 +235,7 @@ export function AdminBusinessManagers() {
     mutationFn: async () => {
       if (!bms || bms.length === 0) throw new Error("No Business Managers to sync");
       const { data: { session } } = await supabase.auth.getSession();
+      const allSyncedAccounts: SyncedAccount[] = [];
       const results = await Promise.allSettled(
         bms.map(async (bm: any) => {
           const res = await fetch(
@@ -169,20 +251,57 @@ export function AdminBusinessManagers() {
           );
           const result = await res.json();
           if (!res.ok) throw new Error(result.error || "Sync failed");
+          if (result.accounts) allSyncedAccounts.push(...result.accounts);
           return result;
         })
       );
       const succeeded = results.filter(r => r.status === "fulfilled").length;
-      return { succeeded, total: bms.length };
+      return { succeeded, total: bms.length, accounts: allSyncedAccounts };
     },
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       toast.success(`Synced ${result.succeeded} of ${result.total} Business Managers`);
-      queryClient.invalidateQueries({ queryKey: ["admin-bm-ad-accounts"] });
+      if (result.accounts.length > 0) {
+        const { data: existing } = await supabase.from("ad_accounts").select("account_id");
+        const existingIds = new Set((existing ?? []).map((a: any) => a.account_id));
+        setExistingAccountIds(existingIds);
+        setSyncedAccounts(result.accounts);
+        setSelectedImportIds(new Set());
+        setImportStatusFilter("all");
+        setImportSearch("");
+        setImportDialogOpen(true);
+      }
       queryClient.invalidateQueries({ queryKey: ["admin-business-managers"] });
       queryClient.invalidateQueries({ queryKey: ["admin-sync-logs"] });
     },
     onError: (err: any) => toast.error(err.message),
   });
+
+  const toggleImportSelect = (accountId: string) => {
+    setSelectedImportIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(accountId)) next.delete(accountId);
+      else next.add(accountId);
+      return next;
+    });
+  };
+
+  const toggleSelectAllImport = () => {
+    const importable = filteredSyncedAccounts.filter((a) => !existingAccountIds.has(a.account_id));
+    const allSelected = importable.every((a) => selectedImportIds.has(a.account_id));
+    if (allSelected) {
+      setSelectedImportIds((prev) => {
+        const next = new Set(prev);
+        importable.forEach((a) => next.delete(a.account_id));
+        return next;
+      });
+    } else {
+      setSelectedImportIds((prev) => {
+        const next = new Set(prev);
+        importable.forEach((a) => next.add(a.account_id));
+        return next;
+      });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -281,7 +400,6 @@ export function AdminBusinessManagers() {
             </div>
           </CardHeader>
 
-          {/* Sync Logs Panel */}
           {showLogs === bm.id && (
             <CardContent className="border-t bg-muted/30">
               <h3 className="text-sm font-semibold mb-3">Sync History</h3>
@@ -313,7 +431,6 @@ export function AdminBusinessManagers() {
             </CardContent>
           )}
 
-          {/* Ad Accounts Table */}
           {expandedBm === bm.id && (
             <CardContent>
               <Table>
@@ -360,7 +477,7 @@ export function AdminBusinessManagers() {
                   {bmAccounts(bm.id).length === 0 && (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center text-muted-foreground">
-                        No accounts synced. Click "Sync" to fetch from Meta.
+                        No accounts imported. Click "Sync" to fetch from Meta.
                       </TableCell>
                     </TableRow>
                   )}
@@ -380,6 +497,106 @@ export function AdminBusinessManagers() {
           </CardContent>
         </Card>
       )}
+
+      {/* Import Selection Dialog */}
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Select Accounts to Import</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              {syncedAccounts.length} accounts found · {newAccountsCount} new · {alreadyImportedCount} already imported
+            </p>
+          </DialogHeader>
+          <div className="flex items-center gap-2 mt-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search accounts..."
+                value={importSearch}
+                onChange={(e) => setImportSearch(e.target.value)}
+                className="pl-9 h-9"
+              />
+            </div>
+            <Select value={importStatusFilter} onValueChange={setImportStatusFilter}>
+              <SelectTrigger className="w-[130px] h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="disabled">Disabled</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex-1 overflow-y-auto mt-2 border rounded-md">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[40px]">
+                    <Checkbox
+                      checked={
+                        filteredSyncedAccounts.filter((a) => !existingAccountIds.has(a.account_id)).length > 0 &&
+                        filteredSyncedAccounts
+                          .filter((a) => !existingAccountIds.has(a.account_id))
+                          .every((a) => selectedImportIds.has(a.account_id))
+                      }
+                      onCheckedChange={toggleSelectAllImport}
+                    />
+                  </TableHead>
+                  <TableHead>Account Name</TableHead>
+                  <TableHead>Account ID</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Spend Cap</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredSyncedAccounts.map((a) => {
+                  const alreadyExists = existingAccountIds.has(a.account_id);
+                  return (
+                    <TableRow key={a.account_id} className={alreadyExists ? "opacity-50" : ""}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedImportIds.has(a.account_id)}
+                          onCheckedChange={() => toggleImportSelect(a.account_id)}
+                          disabled={alreadyExists}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <span className="text-sm">{a.account_name}</span>
+                          {alreadyExists && (
+                            <span className="ml-2 text-xs text-muted-foreground">(already imported)</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">{a.account_id.replace(/^act_/, "")}</TableCell>
+                      <TableCell><StatusBadge status={a.status} /></TableCell>
+                      <TableCell>${a.spend_cap.toLocaleString()}</TableCell>
+                    </TableRow>
+                  );
+                })}
+                {filteredSyncedAccounts.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                      No accounts match your filters
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setImportDialogOpen(false)}>Cancel</Button>
+            <Button
+              onClick={handleImportSelected}
+              disabled={selectedImportIds.size === 0 || importMutation.isPending}
+            >
+              {importMutation.isPending ? "Importing..." : `Import ${selectedImportIds.size} Account(s)`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
