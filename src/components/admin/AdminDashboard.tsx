@@ -46,8 +46,9 @@ export function AdminDashboard() {
     } catch { return null; }
   });
 
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
-  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [selectedPreset, setSelectedPreset] = useState<string>("");
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [dateSpend, setDateSpend] = useState<number | null>(() => {
     try {
       const stored = sessionStorage.getItem(DATE_SPEND_SESSION_KEY);
