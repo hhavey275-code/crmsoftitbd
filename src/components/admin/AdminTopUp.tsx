@@ -190,6 +190,25 @@ export function AdminTopUp() {
     }
   };
 
+  const reVerify = async (requestId: string) => {
+    setVerifyingIds(prev => ({ ...prev, [requestId]: true }));
+    try {
+      const { data, error } = await supabase.functions.invoke('verify-topup', { body: { request_id: requestId } });
+      if (error) throw error;
+      if (data?.auto_approved) {
+        toast.success('Request auto-approved!');
+        queryClient.invalidateQueries({ queryKey: ["admin-topup-requests"] });
+        queryClient.invalidateQueries({ queryKey: ["admin-wallets"] });
+      } else {
+        toast.info(`Not auto-approved: ${data?.reason || 'No match found'}`);
+      }
+    } catch (err: any) {
+      toast.error(`Verify failed: ${err.message}`);
+    } finally {
+      setVerifyingIds(prev => ({ ...prev, [requestId]: false }));
+    }
+  };
+
   const { data: requests } = useQuery({
     queryKey: ["admin-topup-requests"],
     queryFn: async () => {
