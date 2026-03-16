@@ -108,6 +108,24 @@ export function ClientTopUp() {
     enabled: !!user,
   });
 
+  // Realtime subscription for top_up_requests
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel("client-topup-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "top_up_requests", filter: `user_id=eq.${user.id}` },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["client-topup-history", user.id] });
+          queryClient.invalidateQueries({ queryKey: ["client-wallet"] });
+          queryClient.invalidateQueries({ queryKey: ["client-pending-topups"] });
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user, queryClient]);
+
   const usdEquivalent = bdtAmount && usdRate ? (parseFloat(bdtAmount) / usdRate).toFixed(2) : "0.00";
 
   const selectedBankDetails = assignedBanks?.find((cb: any) => cb.bank_account_id === selectedBank)?.bank_accounts;
