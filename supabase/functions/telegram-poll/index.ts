@@ -45,6 +45,13 @@ Deno.serve(async (req) => {
 
   const startTime = Date.now();
 
+  // Parse request body for quick mode
+  let quickMode = false;
+  try {
+    const body = await req.json();
+    quickMode = body?.quick === true;
+  } catch { /* no body or invalid JSON */ }
+
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -76,38 +83,12 @@ Deno.serve(async (req) => {
 
   let currentOffset = state.update_offset;
 
-  while (true) {
-    const elapsed = Date.now() - startTime;
-    const remainingMs = MAX_RUNTIME_MS - elapsed;
-    if (remainingMs < MIN_REMAINING_MS) break;
-
-    const timeout = Math.min(50, Math.floor(remainingMs / 1000) - 5);
-    if (timeout < 1) break;
-
-    const response = await fetch(`${TELEGRAM_API}/getUpdates`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        offset: currentOffset,
-        timeout,
-        allowed_updates: ['message', 'edited_message', 'channel_post', 'edited_channel_post'],
-      }),
-    });
-
-    const data = await response.json();
-    if (!response.ok) {
-      return new Response(JSON.stringify({ error: data }), { status: 502, headers: corsHeaders });
-    }
-
-    const updates = data.result ?? [];
-    if (updates.length === 0) continue;
-
+  const processUpdates = async (updates: any[]) => {
     const rows = updates
       .map((u: any) => {
         const payload = getPayload(u);
         const chatId = payload?.chat?.id;
         if (!payload || !chatId) return null;
-
         return {
           update_id: u.update_id,
           chat_id: chatId,
@@ -121,9 +102,7 @@ Deno.serve(async (req) => {
       const { error: insertErr } = await supabase
         .from('telegram_messages')
         .upsert(rows, { onConflict: 'update_id' });
-      if (insertErr) {
-        return new Response(JSON.stringify({ error: insertErr.message }), { status: 500, headers: corsHeaders });
-      }
+      if (insertErr) throw new Error(insertErr.message);
       totalProcessed += rows.length;
     }
 
@@ -132,10 +111,69 @@ Deno.serve(async (req) => {
       .from('telegram_bot_state')
       .update({ update_offset: newOffset, updated_at: new Date().toISOString() })
       .eq('id', 1);
-    if (offsetErr) {
-      return new Response(JSON.stringify({ error: offsetErr.message }), { status: 500, headers: corsHeaders });
-    }
+    if (offsetErr) throw new Error(offsetErr.message);
     currentOffset = newOffset;
+  };
+
+  if (quickMode) {
+    // Quick mode: single instant call with timeout=0
+    const response = await fetch(`${TELEGRAM_API}/getUpdates`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        offset: currentOffset,
+        timeout: 0,
+        allowed_updates: ['message', 'edited_message', 'channel_post', 'edited_channel_post'],
+      }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      return new Response(JSON.stringify({ error: data }), { status: 502, headers: corsHeaders });
+    }
+
+    const updates = data.result ?? [];
+    if (updates.length > 0) {
+      try {
+        await processUpdates(updates);
+      } catch (e) {
+        return new Response(JSON.stringify({ error: (e as Error).message }), { status: 500, headers: corsHeaders });
+      }
+    }
+  } else {
+    // Long-polling mode for cron/background runs
+    while (true) {
+      const elapsed = Date.now() - startTime;
+      const remainingMs = MAX_RUNTIME_MS - elapsed;
+      if (remainingMs < MIN_REMAINING_MS) break;
+
+      const timeout = Math.min(50, Math.floor(remainingMs / 1000) - 5);
+      if (timeout < 1) break;
+
+      const response = await fetch(`${TELEGRAM_API}/getUpdates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          offset: currentOffset,
+          timeout,
+          allowed_updates: ['message', 'edited_message', 'channel_post', 'edited_channel_post'],
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        return new Response(JSON.stringify({ error: data }), { status: 502, headers: corsHeaders });
+      }
+
+      const updates = data.result ?? [];
+      if (updates.length === 0) continue;
+
+      try {
+        await processUpdates(updates);
+      } catch (e) {
+        return new Response(JSON.stringify({ error: (e as Error).message }), { status: 500, headers: corsHeaders });
+      }
+    }
   }
 
   return new Response(JSON.stringify({ ok: true, processed: totalProcessed, finalOffset: currentOffset }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
