@@ -12,21 +12,22 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // --- Auth ---
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    const token = authHeader.replace("Bearer ", "");
     const supabaseUser = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const token = authHeader.replace("Bearer ", "");
     const { data: { user }, error: userError } = await supabaseUser.auth.getUser(token);
     if (userError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -40,15 +41,16 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const { data: roleData } = await supabase
+    // --- Role check: admin OR superadmin ---
+    const { data: userRole } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
-      .eq("role", "admin")
       .single();
 
-    const isAdmin = !!roleData;
+    const isAdmin = userRole?.role === "admin" || userRole?.role === "superadmin";
 
+    // --- Parse body ---
     const { ad_account_id, amount, deduct_wallet, target_user_id } = await req.json();
     if (!ad_account_id || !amount) {
       return new Response(
@@ -57,35 +59,30 @@ Deno.serve(async (req) => {
       );
     }
 
-    const walletUserId = target_user_id || user.id;
-
-    if (!isAdmin && walletUserId !== user.id) {
-      return new Response(JSON.stringify({ error: "Forbidden" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const { data: userProfile } = await supabase
-      .from("profiles")
-      .select("status, due_limit")
-      .eq("user_id", walletUserId)
-      .single();
-
+    // --- Non-admin checks ---
     if (!isAdmin) {
-      if (userProfile?.status === "inactive") {
+      // Check account status
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("status, due_limit")
+        .eq("user_id", user.id)
+        .single();
+
+      if (profile?.status === "inactive") {
         return new Response(
-          JSON.stringify({ error: "Your account has been frozen. You cannot perform this action." }),
+          JSON.stringify({ error: "Your account has been frozen." }),
           { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
+      // Check assignment
       const { data: assignment } = await supabase
         .from("user_ad_accounts")
         .select("id")
         .eq("user_id", user.id)
         .eq("ad_account_id", ad_account_id)
         .single();
+
       if (!assignment) {
         return new Response(JSON.stringify({ error: "Forbidden" }), {
           status: 403,
@@ -94,6 +91,7 @@ Deno.serve(async (req) => {
       }
     }
 
+    // --- Fetch ad account with BM access token ---
     const { data: account, error: accErr } = await supabase
       .from("ad_accounts")
       .select("*, business_managers!inner(access_token, bm_id)")
@@ -107,7 +105,13 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (deduct_wallet) {
+    // --- Wallet deduction (only when deduct_wallet=true AND target_user_id exists) ---
+    const shouldDeductWallet = !!deduct_wallet && !!target_user_id;
+    const walletUserId = target_user_id || user.id;
+    let walletId: string | null = null;
+    let newBalance: number | null = null;
+
+    if (shouldDeductWallet) {
       const { data: wallet, error: walletErr } = await supabase
         .from("wallets")
         .select("id, balance")
@@ -121,24 +125,33 @@ Deno.serve(async (req) => {
         );
       }
 
-      const dueLimit = Number(userProfile?.due_limit ?? 0);
-      const effectiveBalance = Number(wallet.balance) + dueLimit;
+      // Non-admin balance check (with due_limit)
+      if (!isAdmin) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("due_limit")
+          .eq("user_id", walletUserId)
+          .single();
 
-      if (!isAdmin && effectiveBalance < amount) {
-        return new Response(
-          JSON.stringify({ error: "Insufficient wallet balance" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        const dueLimit = Number(prof?.due_limit ?? 0);
+        const effectiveBalance = Number(wallet.balance) + dueLimit;
+        if (effectiveBalance < amount) {
+          return new Response(
+            JSON.stringify({ error: "Insufficient wallet balance" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
       }
 
-      const newBalance = Number(wallet.balance) - amount;
+      newBalance = Number(wallet.balance) - amount;
+      walletId = wallet.id;
 
-      const { error: updateWalletErr } = await supabase
+      const { error: updateErr } = await supabase
         .from("wallets")
         .update({ balance: newBalance })
         .eq("id", wallet.id);
 
-      if (updateWalletErr) {
+      if (updateErr) {
         return new Response(
           JSON.stringify({ error: "Failed to deduct wallet" }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -155,6 +168,7 @@ Deno.serve(async (req) => {
       });
     }
 
+    // --- Meta API v24.0 spend cap update ---
     const bm = (account as any).business_managers;
     const oldSpendCap = Number(account.spend_cap);
     const newSpendCap = oldSpendCap + amount;
@@ -163,26 +177,24 @@ Deno.serve(async (req) => {
       ? account.account_id
       : `act_${account.account_id}`;
 
-    const metaRes = await fetch(
-      `https://graph.facebook.com/v24.0/${actId}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          spend_cap: String(Math.round(newSpendCap)),
-          access_token: bm.access_token,
-        }),
-      }
-    );
+    const metaRes = await fetch(`https://graph.facebook.com/v24.0/${actId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        spend_cap: String(Math.round(newSpendCap * 100)),
+        access_token: bm.access_token,
+      }),
+    });
 
     const metaData = await metaRes.json();
 
     if (metaData.error) {
-      if (deduct_wallet) {
+      // Rollback wallet if we deducted
+      if (shouldDeductWallet && walletId) {
         const { data: wallet } = await supabase
           .from("wallets")
           .select("id, balance")
-          .eq("user_id", walletUserId)
+          .eq("id", walletId)
           .single();
         if (wallet) {
           await supabase
@@ -209,6 +221,7 @@ Deno.serve(async (req) => {
       );
     }
 
+    // --- Update DB spend cap ---
     await supabase
       .from("ad_accounts")
       .update({ spend_cap: newSpendCap })
