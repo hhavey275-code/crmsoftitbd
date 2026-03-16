@@ -475,44 +475,61 @@ export function AdminTopUp() {
                       </div>
                     </TableCell>
                   </TableRow>
-                  {expandedSms[`note-${r.id}`] && r.admin_note && (
-                    <TableRow>
-                      <TableCell colSpan={9} className="bg-muted/20 p-3">
-                        <div className="flex items-center gap-2 mb-2">
-                          <ClipboardCheck className="h-4 w-4 text-primary" />
-                          <span className="text-sm font-semibold">Match Details</span>
-                        </div>
-                        <div className="space-y-1.5">
-                          {r.admin_note.split(' | ').map((entry: string, i: number) => {
-                            const isPass = entry.startsWith('✅');
-                            const isFail = entry.startsWith('❌');
-                            const isWarn = entry.startsWith('⚠️');
-                            return (
-                              <div
-                                key={i}
-                                className={`text-xs px-2.5 py-1.5 rounded-md border ${
-                                  isPass ? 'bg-green-500/10 border-green-500/30 text-green-700 dark:text-green-400' :
-                                  isFail ? 'bg-destructive/10 border-destructive/30 text-destructive' :
-                                  isWarn ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-700 dark:text-yellow-400' :
-                                  'bg-muted/40 border-border text-muted-foreground'
-                                }`}
-                              >
-                                {entry.replace(/^Auto-verification:\s*/, '')}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
                   {expandedSms[r.id] && (
                     <TableRow>
-                      <TableCell colSpan={9} className="bg-muted/20 p-3">
-                        <div className="flex items-center gap-2 mb-2">
-                          <MessageSquareText className="h-4 w-4 text-primary" />
-                          <span className="text-sm font-semibold">Bank SMS Messages</span>
+                      <TableCell colSpan={9} className="bg-muted/20 p-3 space-y-4">
+                        {r.admin_note && (
+                          <div>
+                            <div className="flex items-center gap-2 mb-2">
+                              <ClipboardCheck className="h-4 w-4 text-primary" />
+                              <span className="text-sm font-semibold">Match Details</span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                              {r.admin_note.split(' | ').map((entry: string, i: number) => {
+                                const cleaned = entry.replace(/^Auto-verification:\s*/, '').trim();
+                                if (!cleaned) return null;
+                                const isPass = cleaned.startsWith('✅');
+                                const isFail = cleaned.startsWith('❌');
+                                const isWarn = cleaned.startsWith('⚠️');
+                                // Split into label and detail
+                                const parts = cleaned.match(/^(✅|❌|⚠️)\s*(.+?)(?:\s*\((.+)\))?$/);
+                                const icon = parts?.[1] || '';
+                                const label = parts?.[2] || cleaned;
+                                const detail = parts?.[3] || '';
+                                return (
+                                  <div
+                                    key={i}
+                                    className={`px-3 py-2 rounded-lg border ${
+                                      isPass ? 'bg-green-500/10 border-green-500/30' :
+                                      isFail ? 'bg-destructive/10 border-destructive/30' :
+                                      isWarn ? 'bg-yellow-500/10 border-yellow-500/30' :
+                                      'bg-muted/40 border-border'
+                                    }`}
+                                  >
+                                    <div className={`text-xs font-medium ${
+                                      isPass ? 'text-green-700 dark:text-green-400' :
+                                      isFail ? 'text-destructive' :
+                                      isWarn ? 'text-yellow-700 dark:text-yellow-400' :
+                                      'text-muted-foreground'
+                                    }`}>
+                                      {icon} {label}
+                                    </div>
+                                    {detail && (
+                                      <div className="text-[11px] text-muted-foreground mt-0.5 break-all">{detail}</div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <MessageSquareText className="h-4 w-4 text-primary" />
+                            <span className="text-sm font-semibold">Bank SMS Messages</span>
+                          </div>
+                          <BankSmsPanel request={r} />
                         </div>
-                        <BankSmsPanel request={r} />
                       </TableCell>
                     </TableRow>
                   )}
