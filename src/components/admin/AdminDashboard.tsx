@@ -14,7 +14,7 @@ export function AdminDashboard() {
   const queryClient = useQueryClient();
   const [metaLoading, setMetaLoading] = useState(false);
   const [dailySpendLoading, setDailySpendLoading] = useState(false);
-  const [dailySpend, setDailySpend] = useState<number | null>(null);
+  const [spendData, setSpendData] = useState<{ today: number; yesterday: number } | null>(null);
 
   const { data: profiles } = useQuery({
     queryKey: ["admin-profiles"],
