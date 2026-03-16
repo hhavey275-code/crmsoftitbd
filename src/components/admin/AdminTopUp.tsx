@@ -423,22 +423,9 @@ export function AdminTopUp() {
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={r.status} />
-                      {r.status === "approved" && r.admin_note ? (
-                        <div className="mt-1">
-                          <button
-                            onClick={() => setExpandedSms(prev => ({ ...prev, [`note-${r.id}`]: !prev[`note-${r.id}`] }))}
-                            className="text-xs text-primary hover:underline flex items-center gap-0.5"
-                          >
-                            Match Details
-                            {expandedSms[`note-${r.id}`] ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                          </button>
-                          {expandedSms[`note-${r.id}`] && (
-                            <p className="text-xs text-muted-foreground mt-1 max-w-[300px] whitespace-pre-wrap leading-tight bg-muted/30 p-2 rounded">{r.admin_note}</p>
-                          )}
-                        </div>
-                      ) : r.admin_note ? (
+                      {r.status !== "approved" && r.admin_note && (
                         <p className="text-xs text-muted-foreground mt-1 max-w-[250px] whitespace-pre-wrap leading-tight">{r.admin_note}</p>
-                      ) : null}
+                      )}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {r.reviewerProfile ? r.reviewerProfile.full_name || r.reviewerProfile.email : "—"}
