@@ -254,42 +254,10 @@ export function AdminDashboard() {
         <MetricCard title="Remaining Limit" value={`$${remainingLimit.toLocaleString()}`} icon={TrendingUp} iconBg="bg-violet-50 dark:bg-violet-900/30" iconColor="text-violet-600" />
       </div>
 
-      {/* Spend Overview */}
+      {/* Spend Overview - Single Card */}
       <Card>
-        <CardContent className="py-4 space-y-4">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div className="flex items-center gap-6 flex-wrap">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-900/30">
-                  <DollarSign className="h-5 w-5 text-emerald-600" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Today's Spend</p>
-                  <p className="text-lg font-bold">
-                    {spendData !== null
-                      ? `$${spendData.today.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                      : "—"}
-                  </p>
-                </div>
-              </div>
-              <div className="h-10 w-px bg-border hidden sm:block" />
-              <div>
-                <p className="text-xs text-muted-foreground">Yesterday's Spend</p>
-                <p className="text-lg font-bold">
-                  {spendData !== null
-                    ? `$${spendData.yesterday.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                    : "—"}
-                </p>
-              </div>
-            </div>
-            <Button variant="outline" size="sm" onClick={handleFetchDailySpend} disabled={dailySpendLoading}>
-              <RefreshCw className={`h-3.5 w-3.5 mr-1 ${dailySpendLoading ? "animate-spin" : ""}`} />
-              {dailySpendLoading ? "Loading..." : "Fetch Live"}
-            </Button>
-          </div>
-
-          {/* Date Range Spend */}
-          <div className="flex items-center gap-3 flex-wrap border-t pt-3">
+        <CardContent className="py-4">
+          <div className="flex items-center gap-3 flex-wrap">
             <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className={cn("justify-start text-left font-normal gap-2", !dateRange?.from && "text-muted-foreground")}>
@@ -350,19 +318,21 @@ export function AdminDashboard() {
             </Popover>
 
             {/* Spend result */}
-            {dateSpend !== null && (
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-px bg-border" />
-                <div>
-                  <p className="text-xs text-muted-foreground">
-                    {dateRange?.from && dateRange?.to ? `${format(dateRange.from, "MMM d")} – ${format(dateRange.to, "MMM d, yyyy")}` : "Range"} Spend
-                  </p>
-                  <p className="text-lg font-bold">
-                    ${dateSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
-                </div>
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-px bg-border" />
+              <div>
+                <p className="text-xs text-muted-foreground">
+                  {dateRange?.from && dateRange?.to ? `${format(dateRange.from, "MMM d")} – ${format(dateRange.to, "MMM d, yyyy")}` : "Date Range"} Spend
+                </p>
+                <p className="text-lg font-bold">
+                  {dateSpendLoading
+                    ? "Loading..."
+                    : dateSpend !== null
+                      ? `$${dateSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : "—"}
+                </p>
               </div>
-            )}
+            </div>
           </div>
         </CardContent>
       </Card>
