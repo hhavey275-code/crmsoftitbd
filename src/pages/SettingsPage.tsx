@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Upload, Zap, DollarSign, Type, Megaphone, Volume2, Lock, Hand } from "lucide-react";
+import { Upload, Zap, DollarSign, Type, Megaphone, Volume2, Lock, Hand, Bot } from "lucide-react";
 
 export default function SettingsPage() {
   const { profile, user, role, isAdmin } = useAuth();
