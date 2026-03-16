@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Upload, Zap, DollarSign, Type, Megaphone, Volume2, Lock, Hand } from "lucide-react";
+import { Upload, Zap, DollarSign, Type, Megaphone, Volume2, Lock, Hand, Bot } from "lucide-react";
 
 export default function SettingsPage() {
   const { profile, user, role, isAdmin } = useAuth();
@@ -43,6 +43,18 @@ export default function SettingsPage() {
   // Notification sound state
   const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem("notification_sound") !== "false");
 
+  // Telegram Bot Token state
+  const { data: currentBotToken, refetch: refetchBotToken } = useQuery({
+    queryKey: ["telegram-bot-token-setting"],
+    queryFn: async () => {
+      const { data } = await supabase.from("site_settings").select("value").eq("key", "telegram_bot_token").single();
+      return data?.value ?? "";
+    },
+    enabled: isAdmin,
+  });
+  const [botTokenInput, setBotTokenInput] = useState("");
+  const [savingBotToken, setSavingBotToken] = useState(false);
+
   // USD Rate state
   const { data: currentRate, refetch: refetchRate } = useQuery({
     queryKey: ["usd-rate-setting"],
@@ -58,6 +70,10 @@ export default function SettingsPage() {
   // Sync rate input when data loads
   if (currentRate && !usdRate && !savingRate) {
     setUsdRate(currentRate);
+  }
+  // Sync bot token input when data loads
+  if (currentBotToken && !botTokenInput && !savingBotToken) {
+    setBotTokenInput(currentBotToken);
   }
   // Sync site name input when data loads
   if (currentSiteName && !siteNameInput && !savingSiteName) {
@@ -134,8 +150,23 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSaveWelcome = async () => {
-    setSavingWelcome(true);
+  const handleSaveBotToken = async () => {
+    if (!botTokenInput.trim()) return;
+    setSavingBotToken(true);
+    const { error } = await supabase
+      .from("site_settings")
+      .upsert({ key: "telegram_bot_token", value: botTokenInput.trim() }, { onConflict: "key" });
+    setSavingBotToken(false);
+    if (error) {
+      toast.error("Failed to save bot token");
+    } else {
+      toast.success("Telegram bot token updated!");
+      refetchBotToken();
+    }
+  };
+
+
+    const handleSaveWelcome = async () => {
     const { error: e1 } = await supabase
       .from("site_settings")
       .upsert({ key: "welcome_title", value: welcomeTitleInput.trim() }, { onConflict: "key" });
@@ -233,6 +264,37 @@ export default function SettingsPage() {
                 />
                 <Button onClick={handleSaveAnnouncement} disabled={savingAnnouncement}>
                   {savingAnnouncement ? "Saving..." : "Save Announcement"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Telegram Bot Token - Admin only */}
+        {isAdmin && (
+          <Card className="max-w-xl">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bot className="h-5 w-5 text-sky-600" />
+                Telegram Bot Token
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Enter your Telegram Bot Token (from @BotFather). This is used for receiving bank notification messages.
+              </p>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 space-y-2">
+                  <Label>Bot Token</Label>
+                  <Input
+                    type="password"
+                    value={botTokenInput}
+                    onChange={(e) => setBotTokenInput(e.target.value)}
+                    placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+                  />
+                </div>
+                <Button onClick={handleSaveBotToken} disabled={savingBotToken} className="mt-6">
+                  {savingBotToken ? "Saving..." : "Save Token"}
                 </Button>
               </div>
             </CardContent>

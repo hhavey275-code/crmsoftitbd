@@ -1,6 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const GATEWAY_URL = 'https://connector-gateway.lovable.dev/telegram';
 const MAX_RUNTIME_MS = 55_000;
 const MIN_REMAINING_MS = 5_000;
 
@@ -16,15 +15,23 @@ Deno.serve(async (req) => {
 
   const startTime = Date.now();
 
-  const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-  if (!LOVABLE_API_KEY) return new Response(JSON.stringify({ error: 'LOVABLE_API_KEY not configured' }), { status: 500, headers: corsHeaders });
-
-  const TELEGRAM_API_KEY = Deno.env.get('TELEGRAM_API_KEY');
-  if (!TELEGRAM_API_KEY) return new Response(JSON.stringify({ error: 'TELEGRAM_API_KEY not configured' }), { status: 500, headers: corsHeaders });
-
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+  // Read bot token from site_settings
+  const { data: tokenRow, error: tokenErr } = await supabase
+    .from('site_settings')
+    .select('value')
+    .eq('key', 'telegram_bot_token')
+    .single();
+
+  if (tokenErr || !tokenRow?.value) {
+    return new Response(JSON.stringify({ error: 'Telegram bot token not configured in settings' }), { status: 500, headers: corsHeaders });
+  }
+
+  const botToken = tokenRow.value;
+  const TELEGRAM_API = `https://api.telegram.org/bot${botToken}`;
 
   let totalProcessed = 0;
 
@@ -48,13 +55,9 @@ Deno.serve(async (req) => {
     const timeout = Math.min(50, Math.floor(remainingMs / 1000) - 5);
     if (timeout < 1) break;
 
-    const response = await fetch(`${GATEWAY_URL}/getUpdates`, {
+    const response = await fetch(`${TELEGRAM_API}/getUpdates`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'X-Connection-Api-Key': TELEGRAM_API_KEY,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         offset: currentOffset,
         timeout,
