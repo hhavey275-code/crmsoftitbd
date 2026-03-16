@@ -3,7 +3,7 @@ project_id = "xdltjsdhtcohyhwzcpsx"
 [functions.sync-bm-accounts]
 verify_jwt = false
 
-[functions.update-spendcap]
+[functions.update-spend-cap]
 verify_jwt = false
 
 [functions.scheduled-sync]
