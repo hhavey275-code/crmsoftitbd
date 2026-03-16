@@ -378,6 +378,7 @@ export function AdminTopUp() {
           </Table>
         </CardContent>
       </Card>
+      )}
 
       {/* Payment Proof Image Dialog */}
       <Dialog open={!!proofDialog} onOpenChange={() => setProofDialog(null)}>
