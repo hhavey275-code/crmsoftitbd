@@ -710,6 +710,28 @@ export function AdminBusinessManagers() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete BM Confirmation */}
+      <AlertDialog open={!!deleteBmId} onOpenChange={(v) => { if (!v) setDeleteBmId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Business Manager?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this Business Manager along with all its ad accounts, assignments, insights, and sync logs. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteBmId && deleteBmMutation.mutate(deleteBmId)}
+              disabled={deleteBmMutation.isPending}
+            >
+              {deleteBmMutation.isPending ? "Removing..." : "Remove"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
