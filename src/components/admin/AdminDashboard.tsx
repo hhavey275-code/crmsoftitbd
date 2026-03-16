@@ -179,6 +179,34 @@ export function AdminDashboard() {
         />
       </div>
 
+      {/* Today's Total Spend */}
+      <Card>
+        <CardContent className="flex items-center justify-between py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-50 dark:bg-green-900/30">
+              <DollarSign className="h-5 w-5 text-green-600" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Today's Total Spend (All Accounts)</p>
+              <p className="text-xl font-bold">
+                {dailySpend !== null
+                  ? `$${dailySpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                  : "—"}
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleFetchDailySpend}
+            disabled={dailySpendLoading}
+          >
+            <RefreshCw className={`h-3.5 w-3.5 mr-1 ${dailySpendLoading ? "animate-spin" : ""}`} />
+            {dailySpendLoading ? "Loading..." : "Fetch Live"}
+          </Button>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
