@@ -19,6 +19,9 @@ export function AdminDashboard() {
   const [metaLoading, setMetaLoading] = useState(false);
   const [dailySpendLoading, setDailySpendLoading] = useState(false);
   const [spendData, setSpendData] = useState<{ today: number; yesterday: number } | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [dateSpend, setDateSpend] = useState<number | null>(null);
+  const [dateSpendLoading, setDateSpendLoading] = useState(false);
 
   const { data: profiles } = useQuery({
     queryKey: ["admin-profiles"],
