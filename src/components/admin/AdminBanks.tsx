@@ -156,6 +156,12 @@ export function AdminBanks() {
                   <TableCell><StatusBadge status={b.status} /></TableCell>
                   <TableCell>
                     <div className="flex gap-1">
+                      <Button size="sm" variant="ghost" onClick={() => {
+                        setEditingBank(b);
+                        setForm({ bank_name: b.bank_name, account_name: b.account_name, account_number: b.account_number, branch: b.branch || "", routing_number: b.routing_number || "" });
+                      }}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
                       <Button size="sm" variant="ghost" onClick={() => setShowAssign(b.id)}>
                         <UserPlus className="h-4 w-4" />
                       </Button>
