@@ -242,6 +242,8 @@ export function AdminBusinessManagers() {
         await (supabase as any).from("user_ad_accounts").delete().in("ad_account_id", accountIds);
         // Delete insights
         await supabase.from("ad_account_insights").delete().in("ad_account_id", accountIds);
+        // Delete top-up requests referencing these accounts
+        await supabase.from("top_up_requests").delete().in("ad_account_id", accountIds);
         // Delete ad accounts
         await supabase.from("ad_accounts").delete().eq("business_manager_id", bmId);
       }
