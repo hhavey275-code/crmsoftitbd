@@ -187,6 +187,7 @@ Deno.serve(async (req) => {
         insights[account.id] = {
           today_spend: todaySpend,
           yesterday_spend: yesterdaySpend,
+          date_spend: date ? todaySpend : undefined,
           today_orders: extractOrders(todayData),
           yesterday_orders: extractOrders(yesterdayData),
           active_campaigns: activeCampaigns,
