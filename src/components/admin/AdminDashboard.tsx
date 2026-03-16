@@ -65,8 +65,9 @@ export function AdminDashboard() {
       const stored = sessionStorage.getItem(DATE_SPEND_SESSION_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed.dateFrom) setDateFrom(new Date(parsed.dateFrom));
-        if (parsed.dateTo) setDateTo(new Date(parsed.dateTo));
+        if (parsed.dateFrom && parsed.dateTo) {
+          setDateRange({ from: new Date(parsed.dateFrom), to: new Date(parsed.dateTo) });
+        }
       }
     } catch { /* ignore */ }
   }, []);
