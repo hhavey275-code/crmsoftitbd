@@ -454,6 +454,7 @@ export type Database = {
         Row: {
           chat_id: number
           created_at: string
+          matched_request_id: string | null
           raw_update: Json
           text: string | null
           update_id: number
@@ -461,6 +462,7 @@ export type Database = {
         Insert: {
           chat_id: number
           created_at?: string
+          matched_request_id?: string | null
           raw_update: Json
           text?: string | null
           update_id: number
@@ -468,6 +470,7 @@ export type Database = {
         Update: {
           chat_id?: number
           created_at?: string
+          matched_request_id?: string | null
           raw_update?: Json
           text?: string | null
           update_id?: number
