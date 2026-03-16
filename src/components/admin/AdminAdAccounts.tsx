@@ -44,6 +44,7 @@ export function AdminAdAccounts() {
   const [currentPage, setCurrentPage] = useState(1);
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [assignClientId, setAssignClientId] = useState("");
+  const [clientSearch, setClientSearch] = useState("");
   const [showUnassignConfirm, setShowUnassignConfirm] = useState(false);
 
   const { data: accounts } = useQuery({
