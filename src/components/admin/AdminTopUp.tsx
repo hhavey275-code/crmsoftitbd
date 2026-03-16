@@ -11,10 +11,67 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { useState } from "react";
-import { Check, X, Pause, ImageIcon, Radio } from "lucide-react";
+import { useState, Fragment } from "react";
+import { Check, X, Pause, ImageIcon, Radio, ChevronDown, ChevronUp, MessageSquareText } from "lucide-react";
 
 type ActionType = "approved" | "rejected" | "hold";
+
+function BankSmsPanel({ request }: { request: any }) {
+  const last4 = request.bankAccount?.account_number?.slice(-4) || "";
+  const bdtAmount = request.bdt_amount ? Number(request.bdt_amount) : null;
+  const createdAt = new Date(request.created_at);
+  const windowMs = 60 * 60 * 1000;
+
+  const { data: messages, isLoading } = useQuery({
+    queryKey: ["bank-sms", request.id],
+    queryFn: async () => {
+      const from = new Date(createdAt.getTime() - windowMs).toISOString();
+      const to = new Date(createdAt.getTime() + windowMs).toISOString();
+      const { data } = await (supabase as any)
+        .from("telegram_messages")
+        .select("*")
+        .gte("created_at", from)
+        .lte("created_at", to)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      return (data as any[]) ?? [];
+    },
+  });
+
+  const relevantMessages = messages?.filter((m: any) => {
+    const text = (m.text || "").toLowerCase();
+    if (!text) return false;
+    const hasLast4 = last4 && text.includes(last4);
+    const hasAmount = bdtAmount && text.includes(String(Math.round(bdtAmount)));
+    const hasRef = request.payment_reference && text.toLowerCase().includes(request.payment_reference.toLowerCase());
+    return hasLast4 || hasAmount || hasRef;
+  }) ?? [];
+
+  if (isLoading) {
+    return <div className="px-4 py-3 text-sm text-muted-foreground animate-pulse">Loading bank SMS...</div>;
+  }
+
+  if (relevantMessages.length === 0) {
+    return (
+      <div className="px-4 py-3 text-sm text-muted-foreground bg-muted/30 rounded-md">
+        No matching bank SMS found within ±60 min window
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {relevantMessages.map((m: any) => (
+        <div key={m.update_id} className="p-3 bg-muted/40 rounded-md border text-sm space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">{format(new Date(m.created_at), "MMM d, HH:mm:ss")}</span>
+          </div>
+          <p className="whitespace-pre-wrap text-foreground">{m.text || "(no text)"}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function AdminTopUp() {
   const { user } = useAuth();
@@ -23,6 +80,7 @@ export function AdminTopUp() {
   const [adminNote, setAdminNote] = useState("");
   const [proofDialog, setProofDialog] = useState<string | null>(null);
   const [isFetchingTelegram, setIsFetchingTelegram] = useState(false);
+  const [expandedSms, setExpandedSms] = useState<Record<string, boolean>>({});
   const [actionDialog, setActionDialog] = useState<{
     id: string;
     action: ActionType;
@@ -31,6 +89,10 @@ export function AdminTopUp() {
     bdtAmount: number | null;
     usdRate: number | null;
   } | null>(null);
+
+  const toggleSms = (id: string) => {
+    setExpandedSms(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const fetchTelegram = async () => {
     setIsFetchingTelegram(true);
@@ -226,55 +288,80 @@ export function AdminTopUp() {
             </TableHeader>
             <TableBody>
               {filtered?.map((r: any, idx: number) => (
-                <TableRow key={r.id}>
-                  <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
-                  <TableCell className="text-sm">{getBankDisplay(r.bankAccount)}</TableCell>
-                  <TableCell className="font-medium">{r.profile?.full_name || r.profile?.email || "Unknown"}</TableCell>
-                  <TableCell>
-                    <div>
-                      <span className="font-semibold">{r.bdt_amount ? `৳${Number(r.bdt_amount).toLocaleString()}` : "—"}</span>
-                      <span className="text-xs text-muted-foreground block">${Number(r.amount).toLocaleString()}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-sm font-mono">{r.payment_reference || "—"}</TableCell>
-                  <TableCell>
-                    {r.proof_url ? (
-                      <button
-                        onClick={() => setProofDialog(r.proof_url)}
-                        className="inline-flex items-center gap-1 text-primary hover:underline text-sm"
-                      >
-                        <ImageIcon className="h-4 w-4" />
-                        View
-                      </button>
-                    ) : (
-                      <span className="text-muted-foreground text-sm">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell><StatusBadge status={r.status} /></TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {r.reviewerProfile ? r.reviewerProfile.full_name || r.reviewerProfile.email : "—"}
-                  </TableCell>
-                  <TableCell>
-                    {(r.status === "pending" || r.status === "hold") && (
+                <Fragment key={r.id}>
+                  <TableRow>
+                    <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
+                    <TableCell className="text-sm">{getBankDisplay(r.bankAccount)}</TableCell>
+                    <TableCell className="font-medium">{r.profile?.full_name || r.profile?.email || "Unknown"}</TableCell>
+                    <TableCell>
+                      <div>
+                        <span className="font-semibold">{r.bdt_amount ? `৳${Number(r.bdt_amount).toLocaleString()}` : "—"}</span>
+                        <span className="text-xs text-muted-foreground block">${Number(r.amount).toLocaleString()}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm font-mono">{r.payment_reference || "—"}</TableCell>
+                    <TableCell>
+                      {r.proof_url ? (
+                        <button
+                          onClick={() => setProofDialog(r.proof_url)}
+                          className="inline-flex items-center gap-1 text-primary hover:underline text-sm"
+                        >
+                          <ImageIcon className="h-4 w-4" />
+                          View
+                        </button>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell><StatusBadge status={r.status} /></TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {r.reviewerProfile ? r.reviewerProfile.full_name || r.reviewerProfile.email : "—"}
+                    </TableCell>
+                    <TableCell>
                       <div className="flex gap-1">
-                        <Button size="sm" variant="ghost" className="hover:text-primary" title="Approve"
-                          onClick={() => openAction(r, "approved")}>
-                          <Check className="h-4 w-4" />
-                        </Button>
-                        {r.status !== "hold" && (
-                          <Button size="sm" variant="ghost" className="hover:text-orange-500" title="Hold"
-                            onClick={() => openAction(r, "hold")}>
-                            <Pause className="h-4 w-4" />
-                          </Button>
+                        {(r.status === "pending" || r.status === "hold") && (
+                          <>
+                            <Button size="sm" variant="ghost" className="hover:text-primary" title="Approve"
+                              onClick={() => openAction(r, "approved")}>
+                              <Check className="h-4 w-4" />
+                            </Button>
+                            {r.status !== "hold" && (
+                              <Button size="sm" variant="ghost" className="hover:text-orange-500" title="Hold"
+                                onClick={() => openAction(r, "hold")}>
+                                <Pause className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button size="sm" variant="ghost" className="hover:text-destructive" title="Reject"
+                              onClick={() => openAction(r, "rejected")}>
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </>
                         )}
-                        <Button size="sm" variant="ghost" className="hover:text-destructive" title="Reject"
-                          onClick={() => openAction(r, "rejected")}>
-                          <X className="h-4 w-4" />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          title="Bank SMS"
+                          onClick={() => toggleSms(r.id)}
+                          className={expandedSms[r.id] ? "text-primary" : ""}
+                        >
+                          <MessageSquareText className="h-4 w-4" />
+                          {expandedSms[r.id] ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                         </Button>
                       </div>
-                    )}
-                  </TableCell>
-                </TableRow>
+                    </TableCell>
+                  </TableRow>
+                  {expandedSms[r.id] && (
+                    <TableRow>
+                      <TableCell colSpan={9} className="bg-muted/20 p-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <MessageSquareText className="h-4 w-4 text-primary" />
+                          <span className="text-sm font-semibold">Bank SMS Messages</span>
+                        </div>
+                        <BankSmsPanel request={r} />
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </Fragment>
               ))}
               {(!filtered || filtered.length === 0) && (
                 <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">No requests</TableCell></TableRow>
