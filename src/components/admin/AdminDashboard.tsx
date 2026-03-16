@@ -7,10 +7,26 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subWeeks, subMonths } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import type { DateRange } from "react-day-picker";
+
+const DATE_PRESETS = [
+  { label: "Today", getValue: () => ({ from: new Date(), to: new Date() }) },
+  { label: "Yesterday", getValue: () => ({ from: subDays(new Date(), 1), to: subDays(new Date(), 1) }) },
+  { label: "Last 7 days", getValue: () => ({ from: subDays(new Date(), 6), to: new Date() }) },
+  { label: "Last 14 days", getValue: () => ({ from: subDays(new Date(), 13), to: new Date() }) },
+  { label: "Last 28 days", getValue: () => ({ from: subDays(new Date(), 27), to: new Date() }) },
+  { label: "Last 30 days", getValue: () => ({ from: subDays(new Date(), 29), to: new Date() }) },
+  { label: "This week", getValue: () => ({ from: startOfWeek(new Date(), { weekStartsOn: 1 }), to: new Date() }) },
+  { label: "Last week", getValue: () => ({ from: startOfWeek(subWeeks(new Date(), 1), { weekStartsOn: 1 }), to: endOfWeek(subWeeks(new Date(), 1), { weekStartsOn: 1 }) }) },
+  { label: "This month", getValue: () => ({ from: startOfMonth(new Date()), to: new Date() }) },
+  { label: "Last month", getValue: () => ({ from: startOfMonth(subMonths(new Date(), 1)), to: endOfMonth(subMonths(new Date(), 1)) }) },
+];
 
 const CHART_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#14b8a6"];
 
@@ -30,8 +46,9 @@ export function AdminDashboard() {
     } catch { return null; }
   });
 
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
-  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [selectedPreset, setSelectedPreset] = useState<string>("");
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [dateSpend, setDateSpend] = useState<number | null>(() => {
     try {
       const stored = sessionStorage.getItem(DATE_SPEND_SESSION_KEY);
@@ -48,8 +65,9 @@ export function AdminDashboard() {
       const stored = sessionStorage.getItem(DATE_SPEND_SESSION_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed.dateFrom) setDateFrom(new Date(parsed.dateFrom));
-        if (parsed.dateTo) setDateTo(new Date(parsed.dateTo));
+        if (parsed.dateFrom && parsed.dateTo) {
+          setDateRange({ from: new Date(parsed.dateFrom), to: new Date(parsed.dateTo) });
+        }
       }
     } catch { /* ignore */ }
   }, []);
@@ -185,12 +203,12 @@ export function AdminDashboard() {
   };
 
   const handleFetchDateRangeSpend = async () => {
-    if (!adAccounts?.length || !dateFrom || !dateTo) return;
+    if (!adAccounts?.length || !dateRange?.from || !dateRange?.to) return;
     setDateSpendLoading(true);
     try {
       const ids = adAccounts.map((a: any) => a.id);
-      const fromStr = format(dateFrom, "yyyy-MM-dd");
-      const toStr = format(dateTo, "yyyy-MM-dd");
+      const fromStr = format(dateRange.from, "yyyy-MM-dd");
+      const toStr = format(dateRange.to, "yyyy-MM-dd");
       const { data, error } = await supabase.functions.invoke("get-account-insights", {
         body: { ad_account_ids: ids, source: "meta", date_from: fromStr, date_to: toStr },
       });
@@ -200,13 +218,23 @@ export function AdminDashboard() {
       setDateSpend(total);
       sessionStorage.setItem(DATE_SPEND_SESSION_KEY, JSON.stringify({
         spend: total,
-        dateFrom: dateFrom.toISOString(),
-        dateTo: dateTo.toISOString(),
+        dateFrom: dateRange.from.toISOString(),
+        dateTo: dateRange.to.toISOString(),
       }));
+      setPickerOpen(false);
     } catch (err: any) {
       toast.error("Failed to fetch spend: " + (err.message || "Unknown error"));
     } finally {
       setDateSpendLoading(false);
+    }
+  };
+
+  const handlePresetChange = (presetLabel: string) => {
+    setSelectedPreset(presetLabel);
+    const preset = DATE_PRESETS.find(p => p.label === presetLabel);
+    if (preset) {
+      const range = preset.getValue();
+      setDateRange({ from: range.from, to: range.to });
     }
   };
 
@@ -261,52 +289,80 @@ export function AdminDashboard() {
           </div>
 
           {/* Date Range Spend */}
-          <div className="flex items-center gap-2 flex-wrap border-t pt-3">
-            <span className="text-sm font-medium text-muted-foreground">Custom Range:</span>
-            <Popover>
+          <div className="flex items-center gap-3 flex-wrap border-t pt-3">
+            <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
               <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className={cn("w-[130px] justify-start text-left font-normal", !dateFrom && "text-muted-foreground")}>
-                  <CalendarIcon className="mr-1 h-3 w-3" />
-                  {dateFrom ? format(dateFrom, "MMM d, yyyy") : "From"}
+                <Button variant="outline" size="sm" className={cn("justify-start text-left font-normal gap-2", !dateRange?.from && "text-muted-foreground")}>
+                  <CalendarIcon className="h-4 w-4" />
+                  {dateRange?.from && dateRange?.to
+                    ? `${format(dateRange.from, "MMM d, yyyy")} – ${format(dateRange.to, "MMM d, yyyy")}`
+                    : "Select date range"}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} disabled={(d) => d > new Date()} className={cn("p-3 pointer-events-auto")} />
+              <PopoverContent className="w-auto p-0" align="start" side="bottom">
+                <div className="flex pointer-events-auto">
+                  {/* Preset sidebar */}
+                  <div className="border-r p-3 space-y-1 min-w-[150px]">
+                    <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Presets</p>
+                    <RadioGroup value={selectedPreset} onValueChange={handlePresetChange}>
+                      {DATE_PRESETS.map((preset) => (
+                        <div key={preset.label} className="flex items-center space-x-2">
+                          <RadioGroupItem value={preset.label} id={`preset-${preset.label}`} className="h-3.5 w-3.5" />
+                          <Label htmlFor={`preset-${preset.label}`} className="text-sm cursor-pointer font-normal">
+                            {preset.label}
+                          </Label>
+                        </div>
+                      ))}
+                    </RadioGroup>
+                  </div>
+                  {/* Calendar */}
+                  <div className="p-3">
+                    <Calendar
+                      mode="range"
+                      selected={dateRange}
+                      onSelect={(range) => {
+                        setDateRange(range);
+                        setSelectedPreset("");
+                      }}
+                      numberOfMonths={2}
+                      disabled={(d) => d > new Date()}
+                      className="pointer-events-auto"
+                    />
+                  </div>
+                </div>
+                {/* Bottom bar */}
+                <div className="flex items-center justify-between border-t px-4 py-3">
+                  <div className="text-sm text-muted-foreground">
+                    {dateRange?.from && dateRange?.to
+                      ? `${format(dateRange.from, "MMM d, yyyy")} — ${format(dateRange.to, "MMM d, yyyy")}`
+                      : "Select a range"}
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={handleFetchDateRangeSpend}
+                    disabled={dateSpendLoading || !dateRange?.from || !dateRange?.to}
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 mr-1 ${dateSpendLoading ? "animate-spin" : ""}`} />
+                    {dateSpendLoading ? "Loading..." : "Update"}
+                  </Button>
+                </div>
               </PopoverContent>
             </Popover>
-            <span className="text-muted-foreground">—</span>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className={cn("w-[130px] justify-start text-left font-normal", !dateTo && "text-muted-foreground")}>
-                  <CalendarIcon className="mr-1 h-3 w-3" />
-                  {dateTo ? format(dateTo, "MMM d, yyyy") : "To"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={dateTo} onSelect={setDateTo} disabled={(d) => d > new Date()} className={cn("p-3 pointer-events-auto")} />
-              </PopoverContent>
-            </Popover>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleFetchDateRangeSpend}
-              disabled={dateSpendLoading || !dateFrom || !dateTo}
-            >
-              <RefreshCw className={`h-3.5 w-3.5 mr-1 ${dateSpendLoading ? "animate-spin" : ""}`} />
-              Fetch
-            </Button>
-            <div className="ml-2">
-              <p className="text-xs text-muted-foreground">
-                {dateFrom && dateTo ? `${format(dateFrom, "MMM d")} – ${format(dateTo, "MMM d, yyyy")}` : "Select dates"}
-              </p>
-              <p className="text-lg font-bold">
-                {dateSpendLoading
-                  ? "Loading..."
-                  : dateSpend !== null
-                    ? `$${dateSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                    : "—"}
-              </p>
-            </div>
+
+            {/* Spend result */}
+            {dateSpend !== null && (
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-px bg-border" />
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    {dateRange?.from && dateRange?.to ? `${format(dateRange.from, "MMM d")} – ${format(dateRange.to, "MMM d, yyyy")}` : "Range"} Spend
+                  </p>
+                  <p className="text-lg font-bold">
+                    ${dateSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
