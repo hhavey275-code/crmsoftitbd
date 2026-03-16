@@ -448,6 +448,18 @@ export function AdminTopUp() {
                             </Button>
                           </>
                         )}
+                        {r.status === "pending" && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="hover:text-primary"
+                            title="Re-verify"
+                            onClick={() => reVerify(r.id)}
+                            disabled={verifyingIds[r.id]}
+                          >
+                            <RotateCcw className={`h-4 w-4 ${verifyingIds[r.id] ? 'animate-spin' : ''}`} />
+                          </Button>
+                        )
                         <Button
                           size="sm"
                           variant="ghost"
