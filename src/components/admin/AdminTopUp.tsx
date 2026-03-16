@@ -73,6 +73,60 @@ function BankSmsPanel({ request }: { request: any }) {
   );
 }
 
+function BankSmsTab() {
+  const { data: messages, isLoading } = useQuery({
+    queryKey: ["all-bank-sms"],
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("telegram_messages")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      return (data as any[]) ?? [];
+    },
+  });
+
+  const textMessages = messages?.filter((m: any) => m.text) ?? [];
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-6 text-center text-muted-foreground animate-pulse">Loading bank SMS...</CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <MessageSquareText className="h-5 w-5 text-primary" />
+          Bank SMS Messages ({textMessages.length})
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {textMessages.length === 0 ? (
+          <p className="text-center text-muted-foreground py-8">
+            No bank SMS messages found. Make sure the bot's Group Privacy is turned OFF in BotFather and the bot is added to your bank SMS group.
+          </p>
+        ) : (
+          <div className="space-y-2 max-h-[500px] overflow-y-auto">
+            {textMessages.map((m: any) => (
+              <div key={m.update_id} className="p-3 bg-muted/40 rounded-md border text-sm space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">{format(new Date(m.created_at), "MMM d, yyyy HH:mm:ss")}</span>
+                  <span className="text-xs text-muted-foreground">Chat: {m.chat_id}</span>
+                </div>
+                <p className="whitespace-pre-wrap text-foreground">{m.text}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function AdminTopUp() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
