@@ -12,7 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { useState, Fragment } from "react";
-import { Check, X, Pause, ImageIcon, Radio, ChevronDown, ChevronUp, MessageSquareText } from "lucide-react";
+import { Check, X, Pause, ImageIcon, Radio, ChevronDown, ChevronUp, MessageSquareText, RotateCcw } from "lucide-react";
 
 type ActionType = "approved" | "rejected" | "hold";
 
