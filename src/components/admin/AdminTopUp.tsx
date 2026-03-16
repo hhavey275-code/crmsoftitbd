@@ -261,8 +261,16 @@ export function AdminTopUp() {
           <TabsTrigger value="approved">Approved</TabsTrigger>
           <TabsTrigger value="rejected">Rejected</TabsTrigger>
           <TabsTrigger value="hold">On Hold</TabsTrigger>
+          <TabsTrigger value="bank_sms" className="gap-1">
+            <MessageSquareText className="h-3.5 w-3.5" />
+            Bank SMS
+          </TabsTrigger>
         </TabsList>
       </Tabs>
+
+      {statusFilter === "bank_sms" ? (
+        <BankSmsTab />
+      ) : (
 
       <Card>
         <CardHeader>
