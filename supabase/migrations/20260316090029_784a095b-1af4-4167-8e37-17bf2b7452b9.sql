@@ -1,0 +1,1 @@
+ALTER TABLE public.telegram_messages ADD COLUMN matched_request_id uuid DEFAULT NULL;
