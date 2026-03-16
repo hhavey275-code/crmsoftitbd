@@ -236,7 +236,7 @@ export default function ClientDetailPage() {
     mutationFn: async () => {
       const amt = parseFloat(topUpAmount);
       if (!amt || amt <= 0) throw new Error("Invalid amount");
-      const { data, error } = await supabase.functions.invoke("update-spend-cap", {
+      const { data, error } = await supabase.functions.invoke("spend-cap-update", {
         body: {
           ad_account_id: selectedAccountId,
           amount: amt,

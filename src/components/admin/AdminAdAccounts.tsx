@@ -248,7 +248,7 @@ export function AdminAdAccounts() {
 
   const topUpMutation = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke("update-spend-cap", {
+      const { data, error } = await supabase.functions.invoke("spend-cap-update", {
         body: {
           ad_account_id: topUpAccount.id,
           amount: parsedAmount,
