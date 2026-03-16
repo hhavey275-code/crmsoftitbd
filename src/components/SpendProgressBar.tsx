@@ -21,14 +21,14 @@ export function SpendProgressBar({ amountSpent, spendCap }: SpendProgressBarProp
       ? "bg-destructive"
       : ratio >= 0.5
         ? "bg-yellow-500"
-        : "bg-primary";
+        : "bg-blue-500";
 
   return (
     <div className="w-full min-w-[80px]">
-      <div className="text-base font-bold whitespace-nowrap">
+      <div className="text-sm font-semibold whitespace-nowrap">
         ${remaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} left
       </div>
-      <div className="h-1.5 w-full max-w-[80px] rounded-full bg-muted overflow-hidden mt-1">
+      <div className="h-2 w-full rounded-full bg-muted overflow-hidden mt-1">
         <div
           className={`h-full rounded-full transition-all ${barColor}`}
           style={{ width: `${percentage}%` }}
