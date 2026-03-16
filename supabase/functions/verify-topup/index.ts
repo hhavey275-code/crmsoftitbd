@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
 
     // 4. Verify OCR matches submitted data
     const refMatch = ocrRef && payment_reference && ocrRef.toLowerCase() === payment_reference.toLowerCase();
-    const amountMatch = ocrAmount > 0 && bdt_amount && Math.abs(ocrAmount - Number(bdt_amount)) < 1;
+    const amountMatch = ocrAmount > 0 && bdt_amount && (Math.abs(ocrAmount - Number(bdt_amount)) / Number(bdt_amount)) < 0.02;
 
     if (!refMatch || !amountMatch) {
       console.log(`OCR mismatch: ocrRef=${ocrRef} vs submitted=${payment_reference}, ocrAmount=${ocrAmount} vs submitted=${bdt_amount}`);
