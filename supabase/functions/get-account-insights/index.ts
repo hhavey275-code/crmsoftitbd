@@ -151,8 +151,6 @@ Deno.serve(async (req) => {
     // Track amount_spent updates for ad_accounts table
     const amountSpentUpdates: { id: string; amount_spent: number }[] = [];
 
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
     const promises = (accounts ?? []).map(async (account: any) => {
       const rawToken = account.business_managers?.access_token;
       const actId = account.account_id;
