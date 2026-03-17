@@ -310,13 +310,40 @@ export default function ClientDetailPage() {
             </div>
             <StatusBadge status={isActive ? "active" : "inactive"} />
           </div>
-          <Button
-            className="bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-5 font-semibold"
-            onClick={() => { setTopUpDialogOpen(true); setSelectedAccountId(""); setTopUpAmount(""); }}
-          >
-            <ArrowUpCircle className="h-4 w-4 mr-2" />
-            Top Up
-          </Button>
+          <div className="flex items-center gap-2">
+            {isSuperAdmin && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                onClick={async () => {
+                  try {
+                    const res = await supabase.functions.invoke("impersonate-client", {
+                      body: { target_user_id: userId },
+                    });
+                    if (res.error) throw new Error(res.error.message);
+                    if (res.data?.error) throw new Error(res.data.error);
+                    if (res.data?.url) {
+                      window.open(res.data.url, "_blank");
+                      toast.success("Opening client dashboard in new tab...");
+                    }
+                  } catch (err: any) {
+                    toast.error(err.message || "Failed to impersonate");
+                  }
+                }}
+              >
+                <LogIn className="h-3.5 w-3.5 mr-1" />
+                Login as Client
+              </Button>
+            )}
+            <Button
+              className="bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-5 font-semibold"
+              onClick={() => { setTopUpDialogOpen(true); setSelectedAccountId(""); setTopUpAmount(""); }}
+            >
+              <ArrowUpCircle className="h-4 w-4 mr-2" />
+              Top Up
+            </Button>
+          </div>
         </div>
 
         {!isActive && (
