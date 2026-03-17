@@ -37,6 +37,14 @@ async function verifyMetaSpendCap(actId: string, accessToken: string): Promise<n
   }
 }
 
+function getSafeTokenMeta(token: string) {
+  return {
+    length: token.length,
+    prefix: token.slice(0, 4),
+    suffix: token.slice(-4),
+  };
+}
+
 async function rollbackWallet(
   supabase: any,
   walletId: string,
