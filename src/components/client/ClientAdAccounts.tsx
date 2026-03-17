@@ -44,9 +44,11 @@ export function ClientAdAccounts() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [cardFilter, setCardFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [lastMetaUpdate, setLastMetaUpdate] = useState<number>(0);
 
   const isInactive = (profile as any)?.status === "inactive";
   const dueLimit = Number((profile as any)?.due_limit ?? 0);
+  const META_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes
 
   const { data: accounts } = useQuery({
     queryKey: ["client-ad-accounts", user?.id],
@@ -85,8 +87,20 @@ export function ClientAdAccounts() {
     enabled: !!user,
   });
 
+  const checkCooldown = (): boolean => {
+    const now = Date.now();
+    const elapsed = now - lastMetaUpdate;
+    if (elapsed < META_COOLDOWN_MS) {
+      const remainingMin = Math.ceil((META_COOLDOWN_MS - elapsed) / 60000);
+      toast.error(`Please wait ${remainingMin} minute(s) before updating again.`);
+      return false;
+    }
+    return true;
+  };
+
   const refreshAllMutation = useMutation({
     mutationFn: async () => {
+      if (!checkCooldown()) throw new Error("cooldown");
       if (!accounts || accounts.length === 0) return;
       const ids = accounts.map((a: any) => a.id);
       const { data, error } = await supabase.functions.invoke("get-account-insights", {
@@ -96,6 +110,7 @@ export function ClientAdAccounts() {
       return data;
     },
     onSuccess: (data) => {
+      setLastMetaUpdate(Date.now());
       const rl = data?.rate_limited;
       if (rl && rl.length > 0) {
         toast.warning(`⚠️ ${rl.length} account(s) could not be updated due to Meta API rate limits. Please retry after a few minutes.`);
@@ -104,11 +119,14 @@ export function ClientAdAccounts() {
       }
       refetchInsights();
     },
-    onError: (err: any) => toast.error(err.message || "Failed to refresh"),
+    onError: (err: any) => {
+      if (err.message !== "cooldown") toast.error(err.message || "Failed to refresh");
+    },
   });
 
   const refreshSelectedMutation = useMutation({
     mutationFn: async () => {
+      if (!checkCooldown()) throw new Error("cooldown");
       const ids = Array.from(selectedIds);
       if (ids.length === 0) return;
       const { data, error } = await supabase.functions.invoke("get-account-insights", {
@@ -118,6 +136,7 @@ export function ClientAdAccounts() {
       return data;
     },
     onSuccess: (data) => {
+      setLastMetaUpdate(Date.now());
       const rl = data?.rate_limited;
       if (rl && rl.length > 0) {
         toast.warning(`⚠️ ${rl.length} of ${selectedIds.size} account(s) rate-limited. Please retry after a few minutes.`);
@@ -127,7 +146,9 @@ export function ClientAdAccounts() {
       refetchInsights();
       setSelectedIds(new Set());
     },
-    onError: (err: any) => toast.error(err.message || "Failed to refresh"),
+    onError: (err: any) => {
+      if (err.message !== "cooldown") toast.error(err.message || "Failed to refresh");
+    },
   });
 
   const toggleSort = (field: string) => {
