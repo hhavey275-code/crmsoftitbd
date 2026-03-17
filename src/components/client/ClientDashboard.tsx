@@ -77,28 +77,8 @@ export function ClientDashboard() {
     enabled: !!user,
   });
 
-  // Fetch profiles for processed_by display
-  const txProfileIds = [
-    ...new Set(
-      (transactions ?? [])
-        .map((tx: any) => {
-          const pb = tx.processed_by || "";
-          if (pb.startsWith("admin:") || pb.startsWith("client:")) return pb.split(":")[1];
-          return null;
-        })
-        .filter(Boolean)
-    ),
-  ];
 
-  const { data: txProfiles } = useQuery({
-    queryKey: ["tx-profiles-dashboard", txProfileIds.join(",")],
-    queryFn: async () => {
-      if (txProfileIds.length === 0) return [];
-      const { data } = await supabase.from("profiles").select("user_id, full_name, email").in("user_id", txProfileIds);
-      return (data as any[]) ?? [];
-    },
-    enabled: txProfileIds.length > 0,
-  });
+
 
   const totalRemaining = adAccounts?.reduce((sum: number, a: any) => sum + (Number(a.spend_cap) - Number(a.amount_spent)), 0) ?? 0;
 
@@ -208,7 +188,7 @@ export function ClientDashboard() {
                 <TableHead>Description</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Balance After</TableHead>
-                <TableHead>Processed By</TableHead>
+                
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -216,14 +196,8 @@ export function ClientDashboard() {
                 const desc = tx.description || "—";
                 const hasNewline = desc.includes("\n");
                 const [descName, descId] = hasNewline ? desc.split("\n") : [desc, null];
-                const pb = tx.processed_by || "";
-                let processedByLabel = "—";
-                if (pb === "system") processedByLabel = "Auto Approved by System";
-                else if (pb.startsWith("admin:") || pb.startsWith("client:")) {
-                  const id = pb.split(":")[1];
-                  const p = txProfiles?.find((pr: any) => pr.user_id === id);
-                  processedByLabel = p?.full_name || p?.email || "—";
-                }
+                
+
                 return (
                   <TableRow key={tx.id}>
                     <TableCell className="text-muted-foreground whitespace-nowrap">{format(new Date(tx.created_at), "MMM d, yyyy HH:mm")}</TableCell>
@@ -240,12 +214,12 @@ export function ClientDashboard() {
                       {Number(tx.amount) >= 0 ? "+" : ""}${Math.abs(Number(tx.amount)).toLocaleString()}
                     </TableCell>
                     <TableCell className="font-medium">${Number(tx.balance_after ?? 0).toLocaleString()}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{processedByLabel}</TableCell>
+                    
                   </TableRow>
                 );
               })}
               {(!transactions || transactions.length === 0) && (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No transactions yet</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No transactions yet</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
