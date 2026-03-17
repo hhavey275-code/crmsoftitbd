@@ -197,13 +197,7 @@ export function ClientDashboard() {
                 const hasNewline = desc.includes("\n");
                 const [descName, descId] = hasNewline ? desc.split("\n") : [desc, null];
                 const pb = tx.processed_by || "";
-                let processedByLabel = "—";
-                if (pb === "system") processedByLabel = "Auto Approved by System";
-                else if (pb.startsWith("admin:") || pb.startsWith("client:")) {
-                  const id = pb.split(":")[1];
-                  const p = txProfiles?.find((pr: any) => pr.user_id === id);
-                  processedByLabel = p?.full_name || p?.email || "—";
-                }
+
                 return (
                   <TableRow key={tx.id}>
                     <TableCell className="text-muted-foreground whitespace-nowrap">{format(new Date(tx.created_at), "MMM d, yyyy HH:mm")}</TableCell>
