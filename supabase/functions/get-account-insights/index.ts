@@ -146,8 +146,8 @@ Deno.serve(async (req) => {
       balance: 0, cards: [],
     };
 
-    // Track amount_spent updates for ad_accounts table
-    const amountSpentUpdates: { id: string; amount_spent: number }[] = [];
+    // Track amount_spent and spend_cap updates for ad_accounts table
+    const adAccountUpdates: { id: string; amount_spent: number; spend_cap?: number }[] = [];
 
     const promises = (accounts ?? []).map(async (account: any) => {
       const rawToken = account.business_managers?.access_token;
@@ -186,7 +186,7 @@ Deno.serve(async (req) => {
 
         const fetchPromises: Promise<Response>[] = [
           fetch(todayUrl),
-          fetch(`https://graph.facebook.com/v24.0/${actId}?fields=balance,amount_spent,funding_source_details&access_token=${accessToken}`),
+          fetch(`https://graph.facebook.com/v24.0/${actId}?fields=balance,amount_spent,spend_cap,funding_source_details&access_token=${accessToken}`),
           fetchActiveCampaignCount(actId, accessToken).then(c => ({ json: async () => c } as any)),
         ];
         if (yesterdayUrl) {
@@ -226,10 +226,14 @@ Deno.serve(async (req) => {
 
         const balance = accountData?.balance ? parseFloat(accountData.balance) / 100 : 0;
 
-        // Update amount_spent from Meta account data (not from date-specific query)
+        // Update amount_spent and spend_cap from Meta account data (not from date-specific query)
         if (!isSingleDate && !isDateRange && accountData?.amount_spent !== undefined) {
           const metaAmountSpent = parseFloat(accountData.amount_spent) / 100;
-          amountSpentUpdates.push({ id: account.id, amount_spent: metaAmountSpent });
+          const update: { id: string; amount_spent: number; spend_cap?: number } = { id: account.id, amount_spent: metaAmountSpent };
+          if (accountData?.spend_cap !== undefined && accountData.spend_cap !== "") {
+            update.spend_cap = parseFloat(accountData.spend_cap) / 100;
+          }
+          adAccountUpdates.push(update);
         }
 
         const cards: any[] = [];
@@ -288,14 +292,18 @@ Deno.serve(async (req) => {
           .upsert(batch, { onConflict: "ad_account_id" });
       }
 
-      // Update ad_accounts.amount_spent with fresh data from Meta
-      if (amountSpentUpdates.length > 0) {
-        const updateBatches = chunk(amountSpentUpdates, 30);
+      // Update ad_accounts with fresh data from Meta (amount_spent + spend_cap)
+      if (adAccountUpdates.length > 0) {
+        const updateBatches = chunk(adAccountUpdates, 30);
         for (const batch of updateBatches) {
           for (const item of batch) {
+            const updateData: any = { amount_spent: item.amount_spent };
+            if (item.spend_cap !== undefined) {
+              updateData.spend_cap = item.spend_cap;
+            }
             await supabase
               .from("ad_accounts")
-              .update({ amount_spent: item.amount_spent })
+              .update(updateData)
               .eq("id", item.id);
           }
         }
