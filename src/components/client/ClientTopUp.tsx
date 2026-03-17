@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
 import { toast } from "sonner";
-import { ArrowUpCircle, Banknote, DollarSign, MessageSquare, ImageIcon, X } from "lucide-react";
+import { ArrowUpCircle, Banknote, DollarSign, MessageSquare, ImageIcon, X, FileText } from "lucide-react";
 import { format } from "date-fns";
 
 export function ClientTopUp() {
@@ -366,6 +367,7 @@ export function ClientTopUp() {
                 <TableHead>USD</TableHead>
                 <TableHead>Reference</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Invoice</TableHead>
                 <TableHead>Note</TableHead>
               </TableRow>
             </TableHeader>
@@ -377,6 +379,16 @@ export function ClientTopUp() {
                   <TableCell className="font-semibold">${Number(r.amount).toLocaleString()}</TableCell>
                   <TableCell className="text-sm">{r.payment_reference || "—"}</TableCell>
                   <TableCell><StatusBadge status={r.status} /></TableCell>
+                  <TableCell>
+                    {r.status === "approved" ? (
+                      <Button size="sm" variant="ghost" className="gap-1 text-primary hover:underline" asChild>
+                        <Link to={`/invoice/${r.id}`} target="_blank">
+                          <FileText className="h-3.5 w-3.5" />
+                          Invoice
+                        </Link>
+                      </Button>
+                    ) : "—"}
+                  </TableCell>
                   <TableCell className="text-sm max-w-[200px]">
                     {r.admin_note && !r.admin_note.startsWith('Auto-verification:') ? (
                       <span className="flex items-start gap-1 text-muted-foreground">
@@ -388,7 +400,7 @@ export function ClientTopUp() {
                 </TableRow>
               ))}
               {(!myRequests || myRequests.length === 0) && (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No requests yet</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No requests yet</TableCell></TableRow>
               )}
             </TableBody>
           </Table>

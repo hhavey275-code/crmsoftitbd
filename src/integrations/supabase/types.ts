@@ -274,6 +274,47 @@ export type Database = {
           },
         ]
       }
+      invoices: {
+        Row: {
+          amount: number
+          bdt_amount: number | null
+          created_at: string
+          id: string
+          invoice_number: string
+          top_up_request_id: string
+          usd_rate: number | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          bdt_amount?: number | null
+          created_at?: string
+          id?: string
+          invoice_number: string
+          top_up_request_id: string
+          usd_rate?: number | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          bdt_amount?: number | null
+          created_at?: string
+          id?: string
+          invoice_number?: string
+          top_up_request_id?: string
+          usd_rate?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_top_up_request_id_fkey"
+            columns: ["top_up_request_id"]
+            isOneToOne: false
+            referencedRelation: "top_up_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       menu_permissions: {
         Row: {
           created_at: string | null
@@ -661,6 +702,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_invoice_number: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

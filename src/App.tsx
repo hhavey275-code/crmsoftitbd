@@ -13,6 +13,7 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const AdAccountsPage = lazy(() => import("./pages/AdAccountsPage"));
 const AdAccountDetailPage = lazy(() => import("./pages/AdAccountDetailPage"));
 const TopUpPage = lazy(() => import("./pages/TopUpPage"));
+const InvoicePage = lazy(() => import("./pages/InvoicePage"));
 const TransactionsPage = lazy(() => import("./pages/TransactionsPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const BusinessManagersPage = lazy(() => import("./pages/BusinessManagersPage"));
@@ -61,6 +62,7 @@ const App = () => (
               <Route path="/clients/:userId" element={<ProtectedRoute><ClientDetailPage /></ProtectedRoute>} />
               <Route path="/billings" element={<ProtectedRoute><BillingsPage /></ProtectedRoute>} />
               <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+              <Route path="/invoice/:requestId" element={<ProtectedRoute><InvoicePage /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

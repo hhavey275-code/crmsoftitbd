@@ -12,7 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { useState, Fragment, useMemo, useEffect } from "react";
-import { Check, X, Pause, ImageIcon, Radio, ChevronDown, ChevronUp, MessageSquareText, RotateCcw, ClipboardCheck } from "lucide-react";
+import { Check, X, Pause, ImageIcon, Radio, ChevronDown, ChevronUp, MessageSquareText, RotateCcw, ClipboardCheck, FileText } from "lucide-react";
 import { Link } from "react-router-dom";
 
 type ActionType = "approved" | "rejected" | "hold";
@@ -312,6 +312,17 @@ export function AdminTopUp() {
           processed_by: `admin:${user!.id}`,
         } as any);
         if (txError) throw txError;
+
+        // Create invoice
+        const { data: invNumData } = await supabase.rpc("generate_invoice_number" as any);
+        await (supabase as any).from("invoices").insert({
+          top_up_request_id: id,
+          invoice_number: invNumData || `INV-${Date.now()}`,
+          user_id: userId,
+          amount: amount,
+          bdt_amount: actionDialog?.bdtAmount,
+          usd_rate: actionDialog?.usdRate,
+        });
       }
 
       await supabase.from("notifications").insert({
@@ -486,6 +497,13 @@ export function AdminTopUp() {
                           <MessageSquareText className="h-4 w-4" />
                           {expandedSms[r.id] ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                         </Button>
+                        {r.status === "approved" && (
+                          <Button size="sm" variant="ghost" className="hover:text-primary" title="Invoice" asChild>
+                            <Link to={`/invoice/${r.id}`} target="_blank">
+                              <FileText className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
