@@ -23,18 +23,42 @@ async function decryptToken(stored: string, secret: string): Promise<string> {
   } catch { return stored; }
 }
 
-// ====== UNIT HELPERS ======
-// Meta API uses CENTS for spend_cap (both POST and GET).
-// Our DB stores DOLLARS.
-
-function dollarsToCents(usd: number): number {
-  return Math.round(usd * 100);
-}
-
 function centsToDollars(cents: number): number {
   return cents / 100;
 }
 
+const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+// Retry a fetch with exponential backoff on rate limit
+async function metaFetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries = 3,
+): Promise<{ res: Response; data: any }> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const res = await fetch(url, options);
+    let data: any = null;
+    try { data = await res.json(); } catch { data = null; }
+
+    // Check rate limit
+    const isRateLimited =
+      res.status === 429 ||
+      data?.error?.code === 17 ||
+      data?.error?.code === 32 ||
+      data?.error?.code === 4 ||
+      (data?.error?.message && data.error.message.includes("request limit"));
+
+    if (isRateLimited && attempt < maxRetries) {
+      const waitMs = Math.min(2000 * Math.pow(2, attempt), 15000); // 2s, 4s, 8s max 15s
+      console.log(`Rate limited (attempt ${attempt + 1}/${maxRetries + 1}), waiting ${waitMs}ms...`);
+      await delay(waitMs);
+      continue;
+    }
+
+    return { res, data };
+  }
+  throw new Error("Max retries exceeded");
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -115,25 +139,23 @@ Deno.serve(async (req) => {
     });
 
     // ============================================
-    // STEP 1: Single Meta API call (POST in CENTS, verify with GET)
+    // STEP 1: Meta API call with retry on rate limit
     // ============================================
-    let metaErrorMsg = "";
-
     try {
-      const metaRes = await fetch(`https://graph.facebook.com/v24.0/${actId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          spend_cap: String(newSpendCapDollars),
-          access_token: bmToken,
-        }),
-      });
-
-      let metaData: any = null;
-      try { metaData = await metaRes.json(); } catch { metaData = null; }
+      const { res: metaRes, data: metaData } = await metaFetchWithRetry(
+        `https://graph.facebook.com/v24.0/${actId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            spend_cap: String(newSpendCapDollars),
+            access_token: bmToken,
+          }),
+        },
+      );
 
       if (!metaRes.ok || metaData?.error) {
-        metaErrorMsg = metaData?.error?.message || `Meta HTTP ${metaRes.status}`;
+        const metaErrorMsg = metaData?.error?.message || `Meta HTTP ${metaRes.status}`;
         console.warn("Meta POST failed", { actId, status: metaRes.status, message: metaErrorMsg });
         return json({
           error: `Meta API error: ${metaErrorMsg}`,
@@ -144,28 +166,28 @@ Deno.serve(async (req) => {
         }, 400);
       }
 
-      // Verify with GET
-      const verifyRes = await fetch(
-        `https://graph.facebook.com/v24.0/${actId}?fields=spend_cap&access_token=${encodeURIComponent(bmToken)}`
+      // Verify with GET (also with retry)
+      const { data: verifyData } = await metaFetchWithRetry(
+        `https://graph.facebook.com/v24.0/${actId}?fields=spend_cap&access_token=${encodeURIComponent(bmToken)}`,
+        { method: "GET" },
       );
-      const verifyData = await verifyRes.json();
 
       if (verifyData?.spend_cap !== undefined) {
         const verifiedDollars = centsToDollars(Number(verifyData.spend_cap));
         if (Math.abs(verifiedDollars - newSpendCapDollars) < 0.02) {
           console.log(`Meta verified: $${verifiedDollars} (expected $${newSpendCapDollars})`);
         } else {
-          metaErrorMsg = `Verification mismatch: expected $${newSpendCapDollars}, got $${verifiedDollars} (raw=${verifyData.spend_cap})`;
+          const metaErrorMsg = `Verification mismatch: expected $${newSpendCapDollars}, got $${verifiedDollars} (raw=${verifyData.spend_cap})`;
           console.warn(metaErrorMsg);
           return json({ error: metaErrorMsg, wallet_charged: false }, 400);
         }
       } else {
-        metaErrorMsg = "Verification GET failed";
+        const metaErrorMsg = "Verification GET failed";
         console.warn(metaErrorMsg, verifyData);
         return json({ error: metaErrorMsg, wallet_charged: false }, 400);
       }
     } catch (err) {
-      metaErrorMsg = err instanceof Error ? err.message : "Network error";
+      const metaErrorMsg = err instanceof Error ? err.message : "Network error";
       console.warn("Meta network error", metaErrorMsg);
       return json({ error: `Meta API error: ${metaErrorMsg}`, wallet_charged: false }, 500);
     }
