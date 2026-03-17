@@ -158,9 +158,13 @@ export function AdAccountPaymentMethods({ adAccountId, currentCards = [] }: Prop
         </div>
       </CardHeader>
       <CardContent>
-        {currentCards.length > 0 ? (
+        {loadingCards ? (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          </div>
+        ) : accountCards && accountCards.length > 0 ? (
           <div className="space-y-2">
-            {currentCards.map((card, idx) => (
+            {accountCards.map((card, idx) => (
               <div key={card.id || idx} className="flex items-center justify-between p-3 border rounded-lg">
                 <div className="flex items-center gap-3">
                   <CardBrandIcon displayString={card.display_string} />
@@ -181,6 +185,17 @@ export function AdAccountPaymentMethods({ adAccountId, currentCards = [] }: Prop
                     {removeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                   </Button>
                 )}
+              </div>
+            ))}
+          </div>
+        ) : currentCards.length > 0 ? (
+          <div className="space-y-2">
+            {currentCards.map((card, idx) => (
+              <div key={card.id || idx} className="flex items-center justify-between p-3 border rounded-lg">
+                <div className="flex items-center gap-3">
+                  <CardBrandIcon displayString={card.display_string} />
+                  <span className="text-sm font-medium">{card.display_string}</span>
+                </div>
               </div>
             ))}
           </div>
