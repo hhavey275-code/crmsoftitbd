@@ -240,7 +240,7 @@ export function ClientDashboard() {
                       {Number(tx.amount) >= 0 ? "+" : ""}${Math.abs(Number(tx.amount)).toLocaleString()}
                     </TableCell>
                     <TableCell className="font-medium">${Number(tx.balance_after ?? 0).toLocaleString()}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{processedByLabel}</TableCell>
+                    
                   </TableRow>
                 );
               })}
