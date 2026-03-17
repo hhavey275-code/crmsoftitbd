@@ -292,14 +292,18 @@ Deno.serve(async (req) => {
           .upsert(batch, { onConflict: "ad_account_id" });
       }
 
-      // Update ad_accounts.amount_spent with fresh data from Meta
-      if (amountSpentUpdates.length > 0) {
-        const updateBatches = chunk(amountSpentUpdates, 30);
+      // Update ad_accounts with fresh data from Meta (amount_spent + spend_cap)
+      if (adAccountUpdates.length > 0) {
+        const updateBatches = chunk(adAccountUpdates, 30);
         for (const batch of updateBatches) {
           for (const item of batch) {
+            const updateData: any = { amount_spent: item.amount_spent };
+            if (item.spend_cap !== undefined) {
+              updateData.spend_cap = item.spend_cap;
+            }
             await supabase
               .from("ad_accounts")
-              .update({ amount_spent: item.amount_spent })
+              .update(updateData)
               .eq("id", item.id);
           }
         }
