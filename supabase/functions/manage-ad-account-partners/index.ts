@@ -141,20 +141,19 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Remove a payment method from ad account
+    // Remove funding source from ad account (set to none)
     if (action === "remove_funding_source") {
-      const { payment_method_id } = body;
-      if (!payment_method_id) throw new Error("payment_method_id is required");
-
-      const url = `https://graph.facebook.com/v24.0/${actId}/adspaymentmethods/${payment_method_id}?access_token=${bm.access_token}`;
-      const resp = await fetch(url, { method: "DELETE" });
+      // Meta doesn't have a direct DELETE for funding sources
+      // We clear by POSTing with funding_source=0 or empty
+      const url = `https://graph.facebook.com/v24.0/${actId}?funding_source=0&access_token=${bm.access_token}`;
+      const resp = await fetch(url, { method: "POST" });
       const data = await resp.json();
 
       if (data.error) {
-        throw new Error(data.error.message || "Failed to remove payment method");
+        throw new Error(data.error.message || "Failed to remove funding source");
       }
 
-      return new Response(JSON.stringify({ success: true, removed_id: payment_method_id }), {
+      return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
