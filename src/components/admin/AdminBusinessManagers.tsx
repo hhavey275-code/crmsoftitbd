@@ -99,13 +99,21 @@ export function AdminBusinessManagers() {
 
   const addBmMutation = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.from("business_managers").insert({
-        bm_id: bmId,
-        name: bmName,
-        access_token: accessToken,
-      }).select().single();
-      if (error) throw error;
-      return data;
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-bm`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ action: "create", bm_id: bmId, name: bmName, access_token: accessToken }),
+        }
+      );
+      const result = await res.json();
+      if (!res.ok || result.error) throw new Error(result.error || "Failed to create BM");
+      return result.data;
     },
     onSuccess: async (data) => {
       toast.success("Business Manager connected! Syncing ad accounts...");
