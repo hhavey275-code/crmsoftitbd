@@ -232,11 +232,7 @@ Deno.serve(async (req) => {
         // Update amount_spent and spend_cap from Meta account data (not from date-specific query)
         if (!isSingleDate && !isDateRange && accountData?.amount_spent !== undefined) {
           const metaAmountSpent = parseFloat(accountData.amount_spent) / 100;
-          const update: { id: string; amount_spent: number; spend_cap?: number } = { id: account.id, amount_spent: metaAmountSpent };
-          if (accountData?.spend_cap !== undefined && accountData.spend_cap !== "") {
-            update.spend_cap = parseFloat(accountData.spend_cap) / 100;
-          }
-          adAccountUpdates.push(update);
+          adAccountUpdates.push({ id: account.id, amount_spent: metaAmountSpent });
         }
 
         const cards: any[] = [];
