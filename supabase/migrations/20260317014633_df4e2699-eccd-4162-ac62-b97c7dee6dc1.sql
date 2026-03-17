@@ -1,0 +1,1 @@
+ALTER TABLE public.user_ad_accounts ADD CONSTRAINT user_ad_accounts_ad_account_id_unique UNIQUE (ad_account_id);
