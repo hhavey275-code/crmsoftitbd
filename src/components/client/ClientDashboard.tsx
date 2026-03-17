@@ -208,7 +208,7 @@ export function ClientDashboard() {
                 <TableHead>Description</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Balance After</TableHead>
-                <TableHead>Processed By</TableHead>
+                
               </TableRow>
             </TableHeader>
             <TableBody>
