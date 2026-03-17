@@ -576,6 +576,7 @@ export default function ClientDetailPage() {
                     icon={DollarSign}
                     iconBg="bg-emerald-100 dark:bg-emerald-900/50"
                     iconColor="text-emerald-600"
+                    size="sm"
                   />
                   <MetricCard
                     title="Today's Orders"
@@ -584,9 +585,10 @@ export default function ClientDetailPage() {
                     icon={ShoppingCart}
                     iconBg="bg-blue-100 dark:bg-blue-900/50"
                     iconColor="text-blue-600"
+                    size="sm"
                   />
-                  <MetricCard title="Total Top-Up" value={`$${Number(topUpTotal ?? 0).toLocaleString()}`} subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"} icon={TrendingUp} iconBg="bg-orange-100 dark:bg-orange-900/50" iconColor="text-orange-600" />
-                  <MetricCard title="Total Spending" value={`$${(totalSpendingFiltered ?? totalSpending).toLocaleString()}`} subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"} icon={TrendingDown} iconBg="bg-purple-100 dark:bg-purple-900/50" iconColor="text-purple-600" />
+                  <MetricCard title="Total Top-Up" value={`$${Number(topUpTotal ?? 0).toLocaleString()}`} subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"} icon={TrendingUp} iconBg="bg-orange-100 dark:bg-orange-900/50" iconColor="text-orange-600" size="sm" />
+                  <MetricCard title="Total Spending" value={`$${(totalSpendingFiltered ?? totalSpending).toLocaleString()}`} subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"} icon={TrendingDown} iconBg="bg-purple-100 dark:bg-purple-900/50" iconColor="text-purple-600" size="sm" />
                 </div>
               </CardContent>
             </Card>
