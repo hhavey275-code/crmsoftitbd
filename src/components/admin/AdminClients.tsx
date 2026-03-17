@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Users, Search, Clock, CheckCircle, Shield } from "lucide-react";
+import { Users, Search, Clock, CheckCircle, Shield, LogIn } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -93,6 +93,28 @@ export function AdminClients() {
       toast.success("User demoted to Client!");
       queryClient.invalidateQueries({ queryKey: ["all-user-roles"] });
       queryClient.invalidateQueries({ queryKey: ["admin-clients"] });
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const impersonateMutation = useMutation({
+    mutationFn: async (targetUserId: string) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+      
+      const res = await supabase.functions.invoke("impersonate-client", {
+        body: { target_user_id: targetUserId },
+      });
+      
+      if (res.error) throw new Error(res.error.message || "Failed to impersonate");
+      if (res.data?.error) throw new Error(res.data.error);
+      return res.data;
+    },
+    onSuccess: (data) => {
+      if (data?.url) {
+        window.open(data.url, "_blank");
+        toast.success("Opening client dashboard in new tab...");
+      }
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -242,13 +264,25 @@ export function AdminClients() {
                         Menus
                       </Button>
                     </>
-                  )}
-                </div>
-              </TableCell>
-            </TableRow>
-          );
-        })}
-        {items.length === 0 && (
+                   )}
+                   {isSuperAdmin && !isPending && userRole === "client" && (
+                     <Button
+                       size="sm"
+                       variant="outline"
+                       className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                       onClick={() => impersonateMutation.mutate(client.user_id)}
+                       disabled={impersonateMutation.isPending}
+                     >
+                       <LogIn className="h-3.5 w-3.5 mr-1" />
+                       Login
+                     </Button>
+                   )}
+                 </div>
+               </TableCell>
+             </TableRow>
+           );
+         })}
+         {items.length === 0 && (
           <TableRow>
             <TableCell colSpan={isSuperAdmin ? 7 : 6} className="text-center text-muted-foreground py-8">No clients found</TableCell>
           </TableRow>

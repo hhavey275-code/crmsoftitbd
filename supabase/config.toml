@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.manage-ad-account-partners]
 verify_jwt = false
+
+[functions.impersonate-client]
+verify_jwt = false
