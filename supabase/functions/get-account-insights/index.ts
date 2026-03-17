@@ -140,6 +140,7 @@ Deno.serve(async (req) => {
     );
 
     const insights: Record<string, any> = {};
+    const rateLimited: { account_id: string; account_name: string; error_code: number }[] = [];
     const emptyInsight = {
       today_spend: 0, yesterday_spend: 0,
       today_orders: 0, yesterday_orders: 0,
