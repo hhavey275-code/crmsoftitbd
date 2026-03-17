@@ -321,7 +321,7 @@ Deno.serve(async (req) => {
       insights[key].updated_at = now;
     }
 
-    return new Response(JSON.stringify({ insights, rate_limited: rateLimited }), {
+    return new Response(JSON.stringify({ insights, rate_limited: rateLimited, _debug_updates: adAccountUpdates }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err: any) {
