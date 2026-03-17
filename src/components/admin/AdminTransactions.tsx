@@ -25,9 +25,31 @@ export function AdminTransactions() {
     },
   });
 
-  const getClientName = (userId: string) => {
+  const getName = (userId: string) => {
     const p = profiles?.find((pr: any) => pr.user_id === userId);
     return p?.full_name || p?.email || userId.slice(0, 8);
+  };
+
+  const getProcessedBy = (tx: any) => {
+    const pb = tx.processed_by || "";
+    if (pb === "system") return "Auto Approved by System";
+    if (pb.startsWith("admin:")) return getName(pb.split(":")[1]);
+    if (pb.startsWith("client:")) return getName(pb.split(":")[1]);
+    return "—";
+  };
+
+  const renderDescription = (tx: any) => {
+    const desc = tx.description || "—";
+    if (desc.includes("\n")) {
+      const [name, accountId] = desc.split("\n");
+      return (
+        <div>
+          <span>{name}</span>
+          <span className="block text-xs text-muted-foreground">{accountId}</span>
+        </div>
+      );
+    }
+    return desc;
   };
 
   return (
@@ -47,23 +69,25 @@ export function AdminTransactions() {
                 <TableHead>Description</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Balance After</TableHead>
+                <TableHead>Processed By</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {transactions?.map((tx: any) => (
                 <TableRow key={tx.id}>
                   <TableCell className="text-muted-foreground whitespace-nowrap">{format(new Date(tx.created_at), "MMM d, yyyy HH:mm")}</TableCell>
-                  <TableCell className="font-medium">{getClientName(tx.user_id)}</TableCell>
+                  <TableCell className="font-medium">{getName(tx.user_id)}</TableCell>
                   <TableCell className="capitalize">{tx.type.replace(/_/g, " ")}</TableCell>
-                  <TableCell className="text-sm">{tx.description || "—"}</TableCell>
+                  <TableCell className="text-sm">{renderDescription(tx)}</TableCell>
                   <TableCell className={cn("font-semibold", Number(tx.amount) >= 0 ? "text-green-600" : "text-red-600")}>
                     {Number(tx.amount) >= 0 ? "+" : ""}${Math.abs(Number(tx.amount)).toLocaleString()}
                   </TableCell>
                   <TableCell className="font-medium">${Number(tx.balance_after ?? 0).toLocaleString()}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{getProcessedBy(tx)}</TableCell>
                 </TableRow>
               ))}
               {(!transactions || transactions.length === 0) && (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No transactions</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No transactions</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
