@@ -333,10 +333,16 @@ export function ClientDashboard() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="flex justify-between text-sm">
+            <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-muted">
               <span className="text-muted-foreground">Wallet Balance</span>
               <span className="font-semibold">${Number(wallet?.balance ?? 0).toLocaleString()}</span>
             </div>
+            {Number((profile as any)?.due_limit ?? 0) > 0 && (
+              <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+                <span className="text-amber-700 dark:text-amber-400">Due Limit</span>
+                <span className="font-semibold text-amber-700 dark:text-amber-400">${Number((profile as any)?.due_limit ?? 0).toLocaleString()}</span>
+              </div>
+            )}
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Current Spend Cap</span>
               <span className="font-semibold">${Number(topUpAccount?.spend_cap ?? 0).toLocaleString()}</span>

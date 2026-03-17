@@ -70,6 +70,9 @@ Deno.serve(async (req) => {
           const accountId =
             account.account_id || account.id?.replace("act_", "");
 
+          // NOTE: We do NOT sync spend_cap from Meta here. Our system (spend-cap-update function)
+          // is the source of truth for spend_cap. Meta may return 0 for accounts with no cap set,
+          // which would incorrectly reset our local spend_cap values.
           await supabase
             .from("ad_accounts")
             .update({
@@ -79,7 +82,6 @@ Deno.serve(async (req) => {
                   : account.account_status === 2
                   ? "disabled"
                   : "pending",
-              spend_cap: Number(account.spend_cap ?? 0) / 100,
               amount_spent: Number(account.amount_spent ?? 0) / 100,
             })
             .eq("account_id", `act_${accountId}`);

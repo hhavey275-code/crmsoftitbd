@@ -118,6 +118,18 @@ export default function AdAccountDetailPage() {
   });
 
   const handleUpdateFromMeta = async () => {
+    // Rate limit for non-admin users: 15 minutes cooldown
+    if (!isAdmin) {
+      const now = Date.now();
+      const elapsed = now - lastMetaUpdate;
+      const cooldown = 15 * 60 * 1000;
+      if (elapsed < cooldown) {
+        const remainingMin = Math.ceil((cooldown - elapsed) / 60000);
+        toast.error(`Please wait ${remainingMin} minute(s) before updating again.`);
+        return;
+      }
+    }
+
     setUpdatingMeta(true);
     try {
       const { error } = await supabase.functions.invoke("get-account-insights", {
@@ -125,6 +137,7 @@ export default function AdAccountDetailPage() {
       });
       if (error) throw error;
       await queryClient.invalidateQueries({ queryKey: ["ad-account-insights-detail", id] });
+      if (!isAdmin) setLastMetaUpdate(Date.now());
       toast.success("Data updated from Meta");
     } catch (err: any) {
       toast.error(err.message || "Failed to update");
