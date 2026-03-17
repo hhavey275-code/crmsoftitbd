@@ -190,7 +190,7 @@ Deno.serve(async (req) => {
         const fetchPromises: Promise<Response>[] = [
           fetch(todayUrl),
           fetch(`https://graph.facebook.com/v24.0/${actId}?fields=balance,amount_spent,funding_source_details&access_token=${accessToken}`),
-          fetch(`https://graph.facebook.com/v24.0/${actId}/payment_methods?fields=display_string,pm_credit_card_type&access_token=${accessToken}`).catch(() => ({ json: async () => ({ data: [] }) } as any)),
+          fetch(`https://graph.facebook.com/v24.0/${actId}/adspaymentcycle?fields=funding_source{display_string,type,id}&access_token=${accessToken}`).catch(() => ({ json: async () => ({ data: [] }) } as any)),
           fetchActiveCampaignCount(actId, accessToken).then(c => ({ json: async () => c } as any)),
         ];
         if (yesterdayUrl) {
