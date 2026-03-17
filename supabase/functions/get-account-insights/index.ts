@@ -257,7 +257,11 @@ Deno.serve(async (req) => {
           balance,
           cards,
         };
-      } catch {
+      } catch (fetchErr: any) {
+        // Check if it's a rate limit HTTP error
+        if (fetchErr?.status === 429) {
+          rateLimited.push({ account_id: actId, account_name: account.account_name || actId, error_code: 429 });
+        }
         insights[account.id] = { ...emptyInsight };
       }
     });
