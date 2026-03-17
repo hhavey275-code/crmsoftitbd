@@ -386,12 +386,12 @@ export function AdminDashboard() {
                 {topThree.map((spender, i) => {
                   const RankIcon = rankIcons[i];
                   return (
-                    <div key={spender.userId} className="flex items-center gap-4 rounded-lg border p-4 transition-colors hover:bg-muted/50">
+                    <div key={spender.userId} className="flex items-center gap-4 rounded-lg border p-4 transition-colors hover:bg-muted/50 cursor-pointer" onClick={() => navigate(`/clients/${spender.userId}`)}>
                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
                         <RankIcon className={`h-5 w-5 ${rankColors[i]}`} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold truncate">{spender.name}</p>
+                        <p className="font-semibold truncate text-primary hover:underline">{spender.name}</p>
                         <p className="text-xs text-muted-foreground">Rank #{i + 1}</p>
                       </div>
                       <p className="font-bold text-lg">${spender.value.toLocaleString()}</p>
