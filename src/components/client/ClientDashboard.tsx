@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { MetricCard } from "@/components/MetricCard";
 import { SpendProgressBar } from "@/components/SpendProgressBar";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Wallet, MonitorSmartphone, TrendingUp, CalendarIcon, AppWindow, ExternalLink, ArrowUpCircle } from "lucide-react";
+import { Wallet, MonitorSmartphone, TrendingUp, CalendarIcon, AppWindow, ExternalLink, ArrowUpCircle, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ export function ClientDashboard() {
   const navigate = useNavigate();
   const isInactive = (profile as any)?.status === "inactive";
 
+  const [adSearch, setAdSearch] = useState("");
   const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfMonth(new Date()));
   const [dateTo, setDateTo] = useState<Date | undefined>(endOfMonth(new Date()));
 
@@ -176,11 +177,26 @@ export function ClientDashboard() {
 
       {/* Ad Accounts Section */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <CardTitle className="text-lg">My Ad Accounts</CardTitle>
+          <div className="relative w-64">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search accounts..."
+              value={adSearch}
+              onChange={(e) => setAdSearch(e.target.value)}
+              className="w-full rounded-md border border-border bg-background pl-8 pr-3 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
         </CardHeader>
         <CardContent>
-          {adAccounts && adAccounts.length > 0 ? (
+          {(() => {
+            const filtered = (adAccounts ?? []).filter((a: any) => {
+              const q = adSearch.toLowerCase();
+              return !q || a.account_name?.toLowerCase().includes(q) || a.account_id?.toLowerCase().includes(q);
+            });
+            return filtered.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -192,7 +208,7 @@ export function ClientDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {adAccounts.map((account: any) => {
+                {filtered.map((account: any) => {
                   const displayId = account.account_id?.replace("act_", "") ?? "";
                   return (
                     <TableRow key={account.id}>
@@ -235,8 +251,11 @@ export function ClientDashboard() {
               </TableBody>
             </Table>
           ) : (
-            <p className="text-center text-muted-foreground py-8">No ad accounts assigned yet</p>
-          )}
+            <p className="text-center text-muted-foreground py-8">
+              {adSearch ? "No matching accounts found" : "No ad accounts assigned yet"}
+            </p>
+          );
+          })()}
         </CardContent>
       </Card>
     </div>
