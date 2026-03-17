@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
     const { data: roleData } = await supabase
       .from("user_roles")
       .select("role")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .in("role", ["admin", "superadmin"])
       .limit(1);
     if (!roleData || roleData.length === 0) throw new Error("Admin access required");
