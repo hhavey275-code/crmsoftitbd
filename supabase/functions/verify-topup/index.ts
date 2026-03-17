@@ -38,7 +38,8 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: true, message: 'Already processed' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const { payment_reference, bdt_amount, bank_account_id, proof_url, user_id, amount } = request;
+    const { bdt_amount, bank_account_id, proof_url, user_id, amount } = request;
+    const payment_reference = (request.payment_reference || '').trim();
     const bdtNum = Number(bdt_amount);
     const verificationLog: string[] = [];
 
@@ -136,9 +137,10 @@ Deno.serve(async (req) => {
       verificationLog.push(`⚠️ OCR Amount skipped (OCR: ${ocrAmount}, Submitted: ${bdtNum})`);
     }
 
-    // Step 3: Telegram SMS match — window: request time -30min to +10min (Bangladesh timezone)
+    // Step 3: Telegram SMS match — wider window for mobile agents (users may submit hours later)
     const requestTime = new Date(request.created_at);
-    const windowStart = new Date(requestTime.getTime() - 30 * 60 * 1000).toISOString();
+    const windowHoursBack = isMobileAgent ? 6 : 0.5; // 6 hours for bKash/Nagad, 30min for bank
+    const windowStart = new Date(requestTime.getTime() - windowHoursBack * 60 * 60 * 1000).toISOString();
     const windowEnd = new Date(requestTime.getTime() + 10 * 60 * 1000).toISOString();
 
     console.log(`Telegram search window: ${windowStart} → ${windowEnd}`);
