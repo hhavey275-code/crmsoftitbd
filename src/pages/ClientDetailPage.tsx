@@ -607,18 +607,20 @@ export default function ClientDetailPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[40px]">
-                          <Checkbox
-                            checked={adAccounts?.length > 0 && adAccounts?.every((a: any) => unassignSelectedIds.has(a.id))}
-                            onCheckedChange={() => {
-                              if (adAccounts?.every((a: any) => unassignSelectedIds.has(a.id))) {
-                                setUnassignSelectedIds(new Set());
-                              } else {
-                                setUnassignSelectedIds(new Set(adAccounts?.map((a: any) => a.id)));
-                              }
-                            }}
-                          />
-                        </TableHead>
+                        {showUnassignCheckboxes && (
+                          <TableHead className="w-[40px]">
+                            <Checkbox
+                              checked={adAccounts?.length > 0 && adAccounts?.every((a: any) => unassignSelectedIds.has(a.id))}
+                              onCheckedChange={() => {
+                                if (adAccounts?.every((a: any) => unassignSelectedIds.has(a.id))) {
+                                  setUnassignSelectedIds(new Set());
+                                } else {
+                                  setUnassignSelectedIds(new Set(adAccounts?.map((a: any) => a.id)));
+                                }
+                              }}
+                            />
+                          </TableHead>
+                        )}
                         <TableHead>Account</TableHead>
                         <TableHead>Budget</TableHead>
                         <TableHead>Status</TableHead>
@@ -629,19 +631,21 @@ export default function ClientDetailPage() {
                     <TableBody>
                       {adAccounts?.map((acc: any) => (
                         <TableRow key={acc.id}>
-                          <TableCell>
-                            <Checkbox
-                              checked={unassignSelectedIds.has(acc.id)}
-                              onCheckedChange={() => {
-                                setUnassignSelectedIds(prev => {
-                                  const next = new Set(prev);
-                                  if (next.has(acc.id)) next.delete(acc.id);
-                                  else next.add(acc.id);
-                                  return next;
-                                });
-                              }}
-                            />
-                          </TableCell>
+                          {showUnassignCheckboxes && (
+                            <TableCell>
+                              <Checkbox
+                                checked={unassignSelectedIds.has(acc.id)}
+                                onCheckedChange={() => {
+                                  setUnassignSelectedIds(prev => {
+                                    const next = new Set(prev);
+                                    if (next.has(acc.id)) next.delete(acc.id);
+                                    else next.add(acc.id);
+                                    return next;
+                                  });
+                                }}
+                              />
+                            </TableCell>
+                          )}
                           <TableCell>
                             <p className="font-medium">{acc.account_name}</p>
                             <p className="text-xs text-muted-foreground">{acc.account_id}</p>
