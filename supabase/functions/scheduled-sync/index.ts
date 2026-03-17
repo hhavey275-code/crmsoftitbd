@@ -70,9 +70,9 @@ Deno.serve(async (req) => {
           const accountId =
             account.account_id || account.id?.replace("act_", "");
 
-          // Sync spend_cap from Meta only when non-zero to avoid resetting local caps
-          // Meta spend_cap is in currency units (dollars), NOT cents
-          const metaSpendCap = Number(account.spend_cap ?? 0);
+          // Meta spend_cap is in CENTS (minor currency units). Convert to dollars.
+          const metaSpendCapCents = Number(account.spend_cap ?? 0);
+          const metaSpendCapDollars = metaSpendCapCents / 100;
           const updateData: any = {
             status:
               account.account_status === 1
@@ -82,8 +82,9 @@ Deno.serve(async (req) => {
                 : "pending",
             amount_spent: Number(account.amount_spent ?? 0) / 100,
           };
-          if (metaSpendCap > 0) {
-            updateData.spend_cap = metaSpendCap;
+          // Only sync spend_cap if Meta returns a non-zero value to avoid resetting local caps
+          if (metaSpendCapDollars > 0) {
+            updateData.spend_cap = metaSpendCapDollars;
           }
           await supabase
             .from("ad_accounts")

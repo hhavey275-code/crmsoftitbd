@@ -23,18 +23,38 @@ async function decryptToken(stored: string, secret: string): Promise<string> {
   } catch { return stored; }
 }
 
-async function getMetaSpendCap(actId: string, accessToken: string): Promise<number | null> {
+// ====== UNIT CONVERSION HELPERS ======
+// Meta API spend_cap is in CENTS (minor currency units).
+// Our local DB stores in DOLLARS.
+// These helpers make conversions explicit and prevent 100x bugs.
+
+/** Convert USD dollars to Meta cents */
+function toMetaCents(usd: number): number {
+  return Math.round(usd * 100);
+}
+
+/** Convert Meta cents to USD dollars */
+function fromMetaCents(cents: number): number {
+  return cents / 100;
+}
+
+/** GET the current spend_cap from Meta, returned in DOLLARS */
+async function getMetaSpendCapDollars(actId: string, accessToken: string): Promise<number | null> {
   try {
     const res = await fetch(
       `https://graph.facebook.com/v25.0/${actId}?fields=spend_cap&access_token=${encodeURIComponent(accessToken)}`
     );
     const data = await res.json();
     if (data.error || data.spend_cap === undefined) return null;
-    // Meta spend_cap is in currency units (dollars), NOT cents
-    return Number(data.spend_cap);
+    return fromMetaCents(Number(data.spend_cap));
   } catch {
     return null;
   }
+}
+
+/** Check if a Meta error is a rate limit */
+function isRateLimitError(code: number | undefined): boolean {
+  return code === 17 || code === 32 || code === 4;
 }
 
 Deno.serve(async (req) => {
@@ -170,29 +190,34 @@ Deno.serve(async (req) => {
       }
     }
 
-    // --- Calculate new spend cap ---
+    // --- Calculate new spend cap (all in DOLLARS) ---
     const bm = (account as any).business_managers;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const bmToken = await decryptToken(bm.access_token, serviceKey);
-    const oldSpendCap = Number(account.spend_cap);
-    const newSpendCap = oldSpendCap + amount;
+    const oldSpendCapDollars = Number(account.spend_cap);
+    const newSpendCapDollars = oldSpendCapDollars + amount;
 
     const actId = account.account_id.startsWith("act_")
       ? account.account_id
       : `act_${account.account_id}`;
 
     // --- Safety guard ---
-    if (newSpendCap > 100000) {
+    if (newSpendCapDollars > 100000) {
       console.warn("SAFETY WARNING: spend cap exceeding $100k", {
-        actId, oldSpendCap, amount, newSpendCap,
+        actId, oldSpendCapDollars, amount, newSpendCapDollars,
       });
     }
 
-    // Meta spend_cap is in currency units (dollars), NOT cents
+    // Convert to cents for Meta API
+    const newSpendCapCents = toMetaCents(newSpendCapDollars);
+
     console.log("Spend cap update attempt", {
-      actId, bmId: bm.bm_id, oldSpendCap, amount, newSpendCap,
-      metaValueToSend: String(Math.round(newSpendCap * 100)),
-      metaValueDirect: String(newSpendCap),
+      actId,
+      bmId: bm.bm_id,
+      oldSpendCapDollars,
+      amountDollars: amount,
+      newSpendCapDollars,
+      newSpendCapCents_sentToMeta: newSpendCapCents,
     });
 
     // ============================================
@@ -201,13 +226,14 @@ Deno.serve(async (req) => {
     let metaSuccess = false;
     let metaErrorMsg = "";
     let metaErrorCode: number | null = null;
+    let isRateLimit = false;
 
     try {
       const metaRes = await fetch(`https://graph.facebook.com/v25.0/${actId}`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
-          spend_cap: String(newSpendCap),
+          spend_cap: String(newSpendCapCents),
           access_token: bmToken,
         }),
       });
@@ -215,10 +241,19 @@ Deno.serve(async (req) => {
       const metaData = await metaRes.json();
 
       if (!metaData.error) {
-        metaSuccess = true;
+        // POST reported success — now VERIFY with GET
+        const verifiedDollars = await getMetaSpendCapDollars(actId, bmToken);
+        if (verifiedDollars !== null && Math.abs(verifiedDollars - newSpendCapDollars) < 0.02) {
+          metaSuccess = true;
+          console.log(`Meta POST success, verified cap: $${verifiedDollars} (expected $${newSpendCapDollars})`);
+        } else {
+          metaErrorMsg = `Meta POST reported success but verification failed. Expected $${newSpendCapDollars}, got $${verifiedDollars}`;
+          console.warn(metaErrorMsg);
+        }
       } else {
         metaErrorMsg = metaData.error.message || "Unknown Meta error";
         metaErrorCode = typeof metaData.error.code === "number" ? metaData.error.code : null;
+        isRateLimit = isRateLimitError(metaData.error.code);
         console.warn("Meta spend cap POST failed", {
           actId, bmId: bm.bm_id, message: metaErrorMsg,
           code: metaData.error.code, subcode: metaData.error.error_subcode,
@@ -229,29 +264,29 @@ Deno.serve(async (req) => {
       console.warn("Meta spend cap request network error", { actId, message: metaErrorMsg });
     }
 
-    // --- If POST reported error, verify actual state ---
+    // --- If Meta failed, return error immediately. NO wallet deduction. ---
     if (!metaSuccess) {
-      console.log(`Meta POST failed, verifying actual spend cap on Meta...`);
-      const actualCap = await getMetaSpendCap(actId, bmToken);
+      console.log(`Meta update FAILED for ${actId}. Wallet NOT touched. Returning error.`);
 
-      if (actualCap !== null && actualCap >= newSpendCap) {
-        console.log(`Verification: Meta cap IS ${actualCap} (>= ${newSpendCap}). Treating as success.`);
-        metaSuccess = true;
-      } else {
-        console.log(`Verification: Meta cap is ${actualCap}. NOT updated. Returning error.`);
-        // NO wallet deduction happened, so NO rollback needed
-        return new Response(
-          JSON.stringify({
-            error: `Meta API error: ${metaErrorMsg}`,
-            verified: actualCap !== null,
-            meta_error_code: metaErrorCode,
-            ad_account_id: actId,
-            business_manager_id: bm?.bm_id ?? null,
-            hint: "Grant this token owner ad account admin/manage permission for the target ad account.",
-          }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+      const errorResponse: any = {
+        error: isRateLimit
+          ? "Meta API rate limit reached. Top-up was NOT processed and your wallet was NOT charged. Please try again in a few minutes."
+          : `Meta API error: ${metaErrorMsg}`,
+        meta_error_code: metaErrorCode,
+        is_rate_limit: isRateLimit,
+        ad_account_id: actId,
+        business_manager_id: bm?.bm_id ?? null,
+        wallet_charged: false,
+      };
+
+      if (!isRateLimit) {
+        errorResponse.hint = "Grant this token owner ad account admin/manage permission for the target ad account.";
       }
+
+      return new Response(
+        JSON.stringify(errorResponse),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // ============================================
@@ -267,7 +302,6 @@ Deno.serve(async (req) => {
         .single();
 
       if (walletErr || !wallet) {
-        // Meta updated but wallet not found — log critical error but don't fail
         console.error("CRITICAL: Meta updated but wallet not found!", { actId, walletUserId });
         return new Response(
           JSON.stringify({ error: "Wallet not found. Meta spend cap was updated but wallet deduction failed. Contact admin." }),
@@ -299,16 +333,16 @@ Deno.serve(async (req) => {
     // ============================================
     await supabase
       .from("ad_accounts")
-      .update({ spend_cap: newSpendCap })
+      .update({ spend_cap: newSpendCapDollars })
       .eq("id", ad_account_id);
 
-    console.log("Spend cap update SUCCESS", { actId, oldSpendCap, newSpendCap });
+    console.log("Spend cap update SUCCESS", { actId, oldSpendCapDollars, newSpendCapDollars });
 
     return new Response(
       JSON.stringify({
         success: true,
-        old_spend_cap: oldSpendCap,
-        new_spend_cap: newSpendCap,
+        old_spend_cap: oldSpendCapDollars,
+        new_spend_cap: newSpendCapDollars,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
