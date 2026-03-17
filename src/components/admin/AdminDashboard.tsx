@@ -272,6 +272,29 @@ export function AdminDashboard() {
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start" side="bottom">
+                {isMobile ? (
+                  <div className="p-3 space-y-3">
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Presets</p>
+                      <RadioGroup value={selectedPreset} onValueChange={handlePresetChange}>
+                        {DATE_PRESETS.map((preset) => (
+                          <div key={preset.label} className="flex items-center space-x-2">
+                            <RadioGroupItem value={preset.label} id={`preset-${preset.label}`} className="h-3.5 w-3.5" />
+                            <Label htmlFor={`preset-${preset.label}`} className="text-sm cursor-pointer font-normal">{preset.label}</Label>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    </div>
+                    <Calendar
+                      mode="range"
+                      selected={dateRange}
+                      onSelect={(range) => { setDateRange(range); setSelectedPreset(""); }}
+                      numberOfMonths={1}
+                      disabled={(d) => d > new Date()}
+                      className="pointer-events-auto"
+                    />
+                  </div>
+                ) : (
                 <div className="flex pointer-events-auto">
                   {/* Preset sidebar */}
                   <div className="border-r p-3 space-y-1 min-w-[150px]">
@@ -302,6 +325,7 @@ export function AdminDashboard() {
                     />
                   </div>
                 </div>
+                )}
                 {/* Bottom bar */}
                 <div className="flex items-center justify-between border-t px-4 py-3">
                   <div className="text-sm text-muted-foreground">
