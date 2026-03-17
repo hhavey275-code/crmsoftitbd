@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { ArrowLeft, Pencil, Check, X, ExternalLink, User, RefreshCw, Megaphone, DollarSign, ShoppingCart, MessageSquare } from "lucide-react";
 import { AdAccountPartners } from "@/components/admin/AdAccountPartners";
+import { AdAccountPaymentMethods } from "@/components/admin/AdAccountPaymentMethods";
 
 export default function AdAccountDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -324,6 +325,14 @@ export default function AdAccountDetailPage() {
                 </Select>
               </CardContent>
             </Card>
+          )}
+
+          {/* Payment Methods (Admin only) */}
+          {isAdmin && id && (
+            <AdAccountPaymentMethods
+              adAccountId={id}
+              cards={insights?.cards as Array<{ display_string: string; id?: string }> | null}
+            />
           )}
 
           {/* Partner BMs (Admin only) */}
