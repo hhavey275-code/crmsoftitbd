@@ -45,6 +45,8 @@ export function AdminBusinessManagers() {
   // Edit BM state
   const [editOpen, setEditOpen] = useState(false);
   const [editBmId, setEditBmId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editMetaId, setEditMetaId] = useState("");
   const [editAccessToken, setEditAccessToken] = useState("");
   const [deleteBmId, setDeleteBmId] = useState<string | null>(null);
 
