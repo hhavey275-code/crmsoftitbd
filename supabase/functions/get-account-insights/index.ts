@@ -231,7 +231,9 @@ Deno.serve(async (req) => {
         // Update amount_spent and spend_cap from Meta account data (not from date-specific query)
         if (!isSingleDate && !isDateRange && accountData?.amount_spent !== undefined) {
           const metaAmountSpent = parseFloat(accountData.amount_spent) / 100;
-          const metaSpendCap = accountData?.spend_cap ? parseFloat(accountData.spend_cap) / 100 : 0;
+          const rawSpendCap = accountData?.spend_cap;
+          const metaSpendCap = rawSpendCap ? parseFloat(rawSpendCap) / 100 : 0;
+          console.log(`[DEBUG] Account ${actId}: Meta spend_cap raw="${rawSpendCap}", parsed=$${metaSpendCap}, Meta amount_spent=$${metaAmountSpent}`);
           const update: any = { id: account.id, amount_spent: metaAmountSpent };
           // Only sync spend_cap if Meta returns a non-zero value to avoid resetting local caps
           if (metaSpendCap > 0) {
