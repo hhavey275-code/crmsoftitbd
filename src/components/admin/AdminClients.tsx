@@ -264,13 +264,25 @@ export function AdminClients() {
                         Menus
                       </Button>
                     </>
-                  )}
-                </div>
-              </TableCell>
-            </TableRow>
-          );
-        })}
-        {items.length === 0 && (
+                   )}
+                   {isSuperAdmin && !isPending && userRole === "client" && (
+                     <Button
+                       size="sm"
+                       variant="outline"
+                       className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                       onClick={() => impersonateMutation.mutate(client.user_id)}
+                       disabled={impersonateMutation.isPending}
+                     >
+                       <LogIn className="h-3.5 w-3.5 mr-1" />
+                       Login
+                     </Button>
+                   )}
+                 </div>
+               </TableCell>
+             </TableRow>
+           );
+         })}
+         {items.length === 0 && (
           <TableRow>
             <TableCell colSpan={isSuperAdmin ? 7 : 6} className="text-center text-muted-foreground py-8">No clients found</TableCell>
           </TableRow>
