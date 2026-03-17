@@ -265,7 +265,7 @@ Deno.serve(async (req) => {
     // --- If POST failed/errored, verify actual spend cap before rollback ---
     if (!metaSuccess) {
       console.log(`Meta POST failed (${metaErrorMsg}), verifying actual spend cap...`);
-      const actualSpendCap = await verifyMetaSpendCap(actId, bm.access_token);
+      const actualSpendCap = await verifyMetaSpendCap(actId, bmToken);
 
       if (actualSpendCap !== null && actualSpendCap >= newSpendCap) {
         // Meta actually updated successfully despite the error response
