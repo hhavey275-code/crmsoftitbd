@@ -176,6 +176,29 @@ export default function ClientDetailPage() {
     enabled: !!userId,
   });
 
+  // Fetch admin profiles for processed_by display
+  const adminProfileIds = [
+    ...new Set(
+      (transactions ?? [])
+        .map((tx: any) => {
+          const pb = tx.processed_by || "";
+          if (pb.startsWith("admin:")) return pb.split(":")[1];
+          return null;
+        })
+        .filter(Boolean)
+    ),
+  ];
+
+  const { data: allProfiles } = useQuery({
+    queryKey: ["admin-profiles-for-tx", adminProfileIds.join(",")],
+    queryFn: async () => {
+      if (adminProfileIds.length === 0) return [];
+      const { data } = await supabase.from("profiles").select("user_id, full_name, email").in("user_id", adminProfileIds);
+      return (data as any[]) ?? [];
+    },
+    enabled: adminProfileIds.length > 0,
+  });
+
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: ["client-detail-profile", userId] });
     queryClient.invalidateQueries({ queryKey: ["client-detail-wallet", userId] });
