@@ -23,53 +23,16 @@ async function decryptToken(stored: string, secret: string): Promise<string> {
   } catch { return stored; }
 }
 
-async function verifyMetaSpendCap(actId: string, accessToken: string): Promise<number | null> {
+async function getMetaSpendCap(actId: string, accessToken: string): Promise<number | null> {
   try {
     const res = await fetch(
-      `https://graph.facebook.com/v24.0/${actId}?fields=spend_cap&access_token=${encodeURIComponent(accessToken)}`
+      `https://graph.facebook.com/v25.0/${actId}?fields=spend_cap&access_token=${encodeURIComponent(accessToken)}`
     );
     const data = await res.json();
     if (data.error || data.spend_cap === undefined) return null;
-    // Meta returns spend_cap in cents as a string
     return Number(data.spend_cap) / 100;
   } catch {
     return null;
-  }
-}
-
-function getSafeTokenMeta(token: string) {
-  return {
-    length: token.length,
-    prefix: token.slice(0, 4),
-    suffix: token.slice(-4),
-  };
-}
-
-async function rollbackWallet(
-  supabase: any,
-  walletId: string,
-  amount: number,
-  adAccountId: string,
-  walletUserId: string
-) {
-  const { data: wallet } = await supabase
-    .from("wallets")
-    .select("id, balance")
-    .eq("id", walletId)
-    .single();
-  if (wallet) {
-    await supabase
-      .from("wallets")
-      .update({ balance: Number(wallet.balance) + amount })
-      .eq("id", wallet.id);
-    await supabase
-      .from("transactions")
-      .delete()
-      .eq("reference_id", adAccountId)
-      .eq("user_id", walletUserId)
-      .eq("amount", -amount)
-      .order("created_at", { ascending: false })
-      .limit(1);
   }
 }
 
@@ -97,7 +60,6 @@ Deno.serve(async (req) => {
 
     const { data: claimsData, error: claimsError } = await supabaseUser.auth.getClaims(token);
     if (claimsError || !claimsData?.claims) {
-      console.error("getClaims error:", claimsError);
       return new Response(JSON.stringify({ error: "Unauthorized - invalid token" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -111,7 +73,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // --- Role check: admin OR superadmin ---
+    // --- Role check ---
     const { data: userRole } = await supabase
       .from("user_roles")
       .select("role")
@@ -173,10 +135,134 @@ Deno.serve(async (req) => {
       );
     }
 
-    // --- Wallet deduction ---
+    // --- Check wallet balance BEFORE Meta call (but don't deduct yet) ---
     const shouldDeductWallet = !!deduct_wallet && !!target_user_id;
     const walletUserId = target_user_id || userId;
-    let walletId: string | null = null;
+
+    if (shouldDeductWallet && !isAdmin) {
+      const { data: wallet } = await supabase
+        .from("wallets")
+        .select("id, balance")
+        .eq("user_id", walletUserId)
+        .single();
+
+      if (!wallet) {
+        return new Response(
+          JSON.stringify({ error: "Wallet not found for user" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("due_limit")
+        .eq("user_id", walletUserId)
+        .single();
+
+      const dueLimit = Number(prof?.due_limit ?? 0);
+      const effectiveBalance = Number(wallet.balance) + dueLimit;
+      if (effectiveBalance < amount) {
+        return new Response(
+          JSON.stringify({ error: "Insufficient wallet balance" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // --- Calculate new spend cap ---
+    const bm = (account as any).business_managers;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const bmToken = await decryptToken(bm.access_token, serviceKey);
+    const oldSpendCap = Number(account.spend_cap);
+    const newSpendCap = oldSpendCap + amount;
+    const newSpendCapCents = Math.round(newSpendCap * 100);
+
+    const actId = account.account_id.startsWith("act_")
+      ? account.account_id
+      : `act_${account.account_id}`;
+
+    // --- Safety guard ---
+    if (newSpendCap > 100000) {
+      console.warn("SAFETY WARNING: spend cap exceeding $100k", {
+        actId,
+        oldSpendCap,
+        amount,
+        newSpendCap,
+        newSpendCapCents,
+      });
+    }
+
+    console.log("Spend cap update attempt", {
+      actId,
+      bmId: bm.bm_id,
+      oldSpendCap,
+      amount,
+      newSpendCap,
+      newSpendCapCents,
+    });
+
+    // ============================================
+    // STEP 1: Call Meta API FIRST (before wallet)
+    // ============================================
+    let metaSuccess = false;
+    let metaErrorMsg = "";
+    let metaErrorCode: number | null = null;
+
+    try {
+      const metaRes = await fetch(`https://graph.facebook.com/v25.0/${actId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          spend_cap: String(newSpendCapCents),
+          access_token: bmToken,
+        }),
+      });
+
+      const metaData = await metaRes.json();
+
+      if (!metaData.error) {
+        metaSuccess = true;
+      } else {
+        metaErrorMsg = metaData.error.message || "Unknown Meta error";
+        metaErrorCode = typeof metaData.error.code === "number" ? metaData.error.code : null;
+        console.warn("Meta spend cap POST failed", {
+          actId, bmId: bm.bm_id, message: metaErrorMsg,
+          code: metaData.error.code, subcode: metaData.error.error_subcode,
+        });
+      }
+    } catch (err) {
+      metaErrorMsg = err instanceof Error ? err.message : "Network error calling Meta API";
+      console.warn("Meta spend cap request network error", { actId, message: metaErrorMsg });
+    }
+
+    // --- If POST reported error, verify actual state ---
+    if (!metaSuccess) {
+      console.log(`Meta POST failed, verifying actual spend cap on Meta...`);
+      const actualCap = await getMetaSpendCap(actId, bmToken);
+
+      if (actualCap !== null && actualCap >= newSpendCap) {
+        console.log(`Verification: Meta cap IS ${actualCap} (>= ${newSpendCap}). Treating as success.`);
+        metaSuccess = true;
+      } else {
+        console.log(`Verification: Meta cap is ${actualCap}. NOT updated. Returning error.`);
+        // NO wallet deduction happened, so NO rollback needed
+        return new Response(
+          JSON.stringify({
+            error: `Meta API error: ${metaErrorMsg}`,
+            verified: actualCap !== null,
+            meta_error_code: metaErrorCode,
+            ad_account_id: actId,
+            business_manager_id: bm?.bm_id ?? null,
+            hint: "Grant this token owner ad account admin/manage permission for the target ad account.",
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // ============================================
+    // STEP 2: Meta succeeded — now deduct wallet
+    // ============================================
     let newBalance: number | null = null;
 
     if (shouldDeductWallet) {
@@ -187,43 +273,20 @@ Deno.serve(async (req) => {
         .single();
 
       if (walletErr || !wallet) {
+        // Meta updated but wallet not found — log critical error but don't fail
+        console.error("CRITICAL: Meta updated but wallet not found!", { actId, walletUserId });
         return new Response(
-          JSON.stringify({ error: "Wallet not found for user" }),
-          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      if (!isAdmin) {
-        const { data: prof } = await supabase
-          .from("profiles")
-          .select("due_limit")
-          .eq("user_id", walletUserId)
-          .single();
-
-        const dueLimit = Number(prof?.due_limit ?? 0);
-        const effectiveBalance = Number(wallet.balance) + dueLimit;
-        if (effectiveBalance < amount) {
-          return new Response(
-            JSON.stringify({ error: "Insufficient wallet balance" }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-      }
-
-      newBalance = Number(wallet.balance) - amount;
-      walletId = wallet.id;
-
-      const { error: updateErr } = await supabase
-        .from("wallets")
-        .update({ balance: newBalance })
-        .eq("id", wallet.id);
-
-      if (updateErr) {
-        return new Response(
-          JSON.stringify({ error: "Failed to deduct wallet" }),
+          JSON.stringify({ error: "Wallet not found. Meta spend cap was updated but wallet deduction failed. Contact admin." }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+
+      newBalance = Number(wallet.balance) - amount;
+
+      await supabase
+        .from("wallets")
+        .update({ balance: newBalance })
+        .eq("id", wallet.id);
 
       const cleanAccountId = account.account_id.replace(/^act_/, '');
       await supabase.from("transactions").insert({
@@ -237,94 +300,15 @@ Deno.serve(async (req) => {
       });
     }
 
-    // --- Meta API v24.0 spend cap update ---
-    const bm = (account as any).business_managers;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const bmToken = await decryptToken(bm.access_token, serviceKey);
-    const tokenMeta = getSafeTokenMeta(bmToken);
-    const oldSpendCap = Number(account.spend_cap);
-    const newSpendCap = oldSpendCap + amount;
-
-    const actId = account.account_id.startsWith("act_")
-      ? account.account_id
-      : `act_${account.account_id}`;
-
-    let metaSuccess = false;
-    let metaErrorMsg = "";
-    let metaErrorCode: number | null = null;
-
-    try {
-      const metaRes = await fetch(`https://graph.facebook.com/v24.0/${actId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          spend_cap: String(Math.round(newSpendCap * 100)),
-          access_token: bmToken,
-        }),
-      });
-
-      const metaData = await metaRes.json();
-
-      if (!metaData.error) {
-        metaSuccess = true;
-      } else {
-        metaErrorMsg = metaData.error.message || "Unknown Meta error";
-        metaErrorCode = typeof metaData.error.code === "number" ? metaData.error.code : null;
-        console.warn("Meta spend cap update denied", {
-          actId,
-          bmId: bm?.bm_id,
-          message: metaErrorMsg,
-          code: metaData.error.code,
-          subcode: metaData.error.error_subcode,
-          tokenMeta,
-        });
-      }
-    } catch (err) {
-      // Network timeout or fetch failure
-      metaErrorMsg = err instanceof Error ? err.message : "Network error calling Meta API";
-      console.warn("Meta spend cap request failed before response", {
-        actId,
-        bmId: bm?.bm_id,
-        message: metaErrorMsg,
-        tokenMeta,
-      });
-    }
-
-    // --- If POST failed/errored, verify actual spend cap before rollback ---
-    if (!metaSuccess) {
-      console.log(`Meta POST failed (${metaErrorMsg}), verifying actual spend cap...`);
-      const actualSpendCap = await verifyMetaSpendCap(actId, bmToken);
-
-      if (actualSpendCap !== null && actualSpendCap >= newSpendCap) {
-        // Meta actually updated successfully despite the error response
-        console.log(`Verification: spend cap IS updated on Meta (${actualSpendCap}). Treating as success.`);
-        metaSuccess = true;
-      } else {
-        // Confirmed not updated, proceed with rollback
-        console.log(`Verification: spend cap NOT updated (actual: ${actualSpendCap}). Rolling back.`);
-        if (shouldDeductWallet && walletId) {
-          await rollbackWallet(supabase, walletId, amount, ad_account_id, walletUserId);
-        }
-
-        return new Response(
-          JSON.stringify({
-            error: `Meta API error: ${metaErrorMsg}`,
-            verified: actualSpendCap !== null,
-            meta_error_code: metaErrorCode,
-            ad_account_id: actId,
-            business_manager_id: bm?.bm_id ?? null,
-            hint: "Grant this token owner ad account admin/manage permission for the target ad account.",
-          }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    }
-
-    // --- Update DB spend cap ---
+    // ============================================
+    // STEP 3: Update DB spend cap
+    // ============================================
     await supabase
       .from("ad_accounts")
       .update({ spend_cap: newSpendCap })
       .eq("id", ad_account_id);
+
+    console.log("Spend cap update SUCCESS", { actId, oldSpendCap, newSpendCap });
 
     return new Response(
       JSON.stringify({

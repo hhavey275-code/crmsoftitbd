@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
     for (const bm of bms ?? []) {
       try {
         const accessToken = await decryptToken(bm.access_token, serviceKey);
-        const metaUrl = `https://graph.facebook.com/v21.0/${bm.bm_id}/owned_ad_accounts?fields=id,name,account_id,account_status,spend_cap,amount_spent&access_token=${accessToken}&limit=100`;
+        const metaUrl = `https://graph.facebook.com/v25.0/${bm.bm_id}/owned_ad_accounts?fields=id,name,account_id,account_status,spend_cap,amount_spent&access_token=${accessToken}&limit=100`;
 
         const metaRes = await fetch(metaUrl);
         const metaData = await metaRes.json();
