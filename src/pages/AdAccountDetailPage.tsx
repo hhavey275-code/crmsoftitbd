@@ -28,6 +28,7 @@ export default function AdAccountDetailPage() {
   const [newName, setNewName] = useState("");
   const [updatingMeta, setUpdatingMeta] = useState(false);
   const [clientSearch, setClientSearch] = useState("");
+  const [lastMetaUpdate, setLastMetaUpdate] = useState<number>(0);
 
   const { data: account, isLoading } = useQuery({
     queryKey: ["ad-account-detail", id],
