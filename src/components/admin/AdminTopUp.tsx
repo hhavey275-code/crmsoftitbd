@@ -441,7 +441,7 @@ export function AdminTopUp() {
                       <StatusBadge status={r.status} />
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {r.reviewerProfile ? r.reviewerProfile.full_name || r.reviewerProfile.email : "—"}
+                      {r.reviewed_by === 'system' ? "Auto Approved by System" : r.reviewerProfile ? r.reviewerProfile.full_name || r.reviewerProfile.email : "—"}
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
