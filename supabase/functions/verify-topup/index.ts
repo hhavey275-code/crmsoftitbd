@@ -251,6 +251,17 @@ Deno.serve(async (req) => {
     });
     if (txErr) throw txErr;
 
+    // Create invoice
+    const { data: invNum } = await supabase.rpc('generate_invoice_number');
+    await supabase.from('invoices').insert({
+      top_up_request_id: request_id,
+      invoice_number: invNum || `INV-${Date.now()}`,
+      user_id,
+      amount: Number(amount),
+      bdt_amount: bdtNum,
+      usd_rate: Number(request.usd_rate || 0),
+    });
+
     // Notify client
     await supabase.from('notifications').insert({
       user_id,
