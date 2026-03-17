@@ -77,6 +77,29 @@ export function ClientDashboard() {
     enabled: !!user,
   });
 
+  // Fetch profiles for processed_by display
+  const txProfileIds = [
+    ...new Set(
+      (transactions ?? [])
+        .map((tx: any) => {
+          const pb = tx.processed_by || "";
+          if (pb.startsWith("admin:") || pb.startsWith("client:")) return pb.split(":")[1];
+          return null;
+        })
+        .filter(Boolean)
+    ),
+  ];
+
+  const { data: txProfiles } = useQuery({
+    queryKey: ["tx-profiles-dashboard", txProfileIds.join(",")],
+    queryFn: async () => {
+      if (txProfileIds.length === 0) return [];
+      const { data } = await supabase.from("profiles").select("user_id, full_name, email").in("user_id", txProfileIds);
+      return (data as any[]) ?? [];
+    },
+    enabled: txProfileIds.length > 0,
+  });
+
   const totalRemaining = adAccounts?.reduce((sum: number, a: any) => sum + (Number(a.spend_cap) - Number(a.amount_spent)), 0) ?? 0;
 
   const greeting = () => {
