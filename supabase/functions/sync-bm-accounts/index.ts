@@ -183,7 +183,8 @@ Deno.serve(async (req) => {
             : account.account_status === 2
             ? "disabled"
             : "pending",
-        spend_cap: Number(account.spend_cap ?? 0) / 100,
+        // Meta spend_cap is in currency units (dollars), NOT cents
+        spend_cap: Number(account.spend_cap ?? 0),
         amount_spent: Number(account.amount_spent ?? 0) / 100,
       };
     });

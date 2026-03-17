@@ -206,7 +206,7 @@ Deno.serve(async (req) => {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
-          spend_cap: String(newSpendCapCents),
+          spend_cap: String(Math.round(newSpendCap * 100)),
           access_token: bmToken,
         }),
       });
