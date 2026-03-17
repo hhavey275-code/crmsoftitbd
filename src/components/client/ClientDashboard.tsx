@@ -177,11 +177,26 @@ export function ClientDashboard() {
 
       {/* Ad Accounts Section */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <CardTitle className="text-lg">My Ad Accounts</CardTitle>
+          <div className="relative w-64">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search accounts..."
+              value={adSearch}
+              onChange={(e) => setAdSearch(e.target.value)}
+              className="w-full rounded-md border border-border bg-background pl-8 pr-3 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
         </CardHeader>
         <CardContent>
-          {adAccounts && adAccounts.length > 0 ? (
+          {(() => {
+            const filtered = (adAccounts ?? []).filter((a: any) => {
+              const q = adSearch.toLowerCase();
+              return !q || a.account_name?.toLowerCase().includes(q) || a.account_id?.toLowerCase().includes(q);
+            });
+            return filtered.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
