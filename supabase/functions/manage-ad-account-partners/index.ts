@@ -105,64 +105,109 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get ALL payment methods attached to this ad account
+    // Get payment methods attached to this ad account (default + backup if Meta exposes them)
     if (action === "list_account_cards") {
       const cards: any[] = [];
       const seenIds = new Set<string>();
 
-      const addCard = (id: string, displayString: string, type?: string, extra?: any) => {
-        if (!id || seenIds.has(id)) return;
-        seenIds.add(id);
+      const addCard = (candidate: any, source: string) => {
+        if (!candidate) return;
+
+        const cardId = String(
+          candidate.id || candidate.payment_method_id || candidate.funding_source || candidate.credential_id || ""
+        ).trim();
+        if (!cardId || seenIds.has(cardId)) return;
+
+        const cc = candidate.pm_credit_card || {};
+        const display =
+          candidate.display_string ||
+          cc.display_string ||
+          candidate.funding_source_details?.display_string ||
+          (cardId ? `Card ...${cardId.slice(-4)}` : "Unknown card");
+
+        seenIds.add(cardId);
         cards.push({
-          id,
-          display_string: displayString || `Card ...${id.slice(-4)}`,
-          type: type || "unknown",
-          ...extra,
+          id: cardId,
+          display_string: String(display),
+          type: String(candidate.type || cc.card_type || candidate.funding_source_type || "unknown"),
+          exp_month: candidate.exp_month ?? cc.exp_month ?? undefined,
+          exp_year: candidate.exp_year ?? cc.exp_year ?? undefined,
+          is_primary: Boolean(candidate.is_primary || candidate.primary || false),
+          source,
         });
       };
 
-      // Method 1: adspaymentmethods edge - returns ALL payment methods (default + backup)
-      try {
-        const resp = await fetch(
-          `https://graph.facebook.com/v24.0/${actId}/adspaymentmethods?fields=pm_credit_card_type,display_string,funding_source_type,exp_month,exp_year&access_token=${bmToken}`
-        );
-        const data = await resp.json();
-        console.log(`adspaymentmethods for ${actId}:`, JSON.stringify(data));
-        if (data.data && Array.isArray(data.data)) {
-          for (const pm of data.data) {
-            addCard(
-              pm.id || "",
-              pm.display_string || "",
-              pm.pm_credit_card_type || pm.funding_source_type?.toString() || "unknown",
-              {
-                exp_month: pm.exp_month,
-                exp_year: pm.exp_year,
-              }
-            );
-          }
+      const parseCardArray = (items: any[], source: string) => {
+        if (!Array.isArray(items)) return;
+        for (const item of items) {
+          addCard(item, source);
+          if (item?.funding_source_details) addCard(item.funding_source_details, `${source}:funding_source_details`);
         }
-      } catch (e) {
-        console.error("adspaymentmethods edge failed:", e);
-      }
+      };
 
-      // Method 2: Fallback to funding_source_details if method 1 returned nothing
-      if (cards.length === 0) {
-        try {
-          const resp = await fetch(
-            `https://graph.facebook.com/v24.0/${actId}?fields=funding_source,funding_source_details&access_token=${bmToken}`
-          );
-          const data = await resp.json();
-          if (data.funding_source_details) {
-            addCard(
-              data.funding_source || data.funding_source_details.id || "",
-              data.funding_source_details.display_string || "Unknown card",
-              data.funding_source_details.type?.toString() || "unknown"
-            );
+      const parsePayload = (payload: any, source: string) => {
+        if (!payload || payload.error) return;
+
+        parseCardArray(payload.data, source);
+
+        parseCardArray(payload.all_payment_methods?.data, `${source}:all_payment_methods`);
+        parseCardArray(payload.payment_methods?.data, `${source}:payment_methods`);
+
+        const paymentCycleData = payload.adspaymentcycle?.data;
+        if (Array.isArray(paymentCycleData)) {
+          for (const cycle of paymentCycleData) {
+            if (cycle?.funding_source_details) {
+              addCard(cycle.funding_source_details, `${source}:adspaymentcycle`);
+            }
           }
-        } catch (e) {
-          console.error("funding_source_details fallback failed:", e);
         }
-      }
+
+        if (payload.funding_source_details) {
+          addCard(
+            {
+              id: payload.funding_source || payload.funding_source_details.id,
+              ...payload.funding_source_details,
+              is_primary: true,
+            },
+            `${source}:funding_source_details`
+          );
+        }
+      };
+
+      const fetchJson = async (url: string, source: string) => {
+        try {
+          const resp = await fetch(url);
+          const data = await resp.json();
+          if (data?.error) {
+            console.log(`${source} for ${actId} error:`, JSON.stringify(data.error));
+          }
+          return data;
+        } catch (e: any) {
+          console.error(`${source} for ${actId} failed:`, e?.message || e);
+          return null;
+        }
+      };
+
+      const [allPaymentMethodsEdge, paymentMethodsEdge, accountDetails] = await Promise.all([
+        fetchJson(
+          `https://graph.facebook.com/v24.0/${actId}/all_payment_methods?fields=id,display_string,type,is_primary,funding_source_type,exp_month,exp_year,pm_credit_card&access_token=${bmToken}`,
+          "all_payment_methods"
+        ),
+        fetchJson(
+          `https://graph.facebook.com/v24.0/${actId}/payment_methods?fields=id,display_string,type,is_primary,funding_source_type,exp_month,exp_year,pm_credit_card&access_token=${bmToken}`,
+          "payment_methods"
+        ),
+        fetchJson(
+          `https://graph.facebook.com/v24.0/${actId}?fields=funding_source,funding_source_details,all_payment_methods{id,display_string,type,is_primary,exp_month,exp_year,pm_credit_card},payment_methods{id,display_string,type,is_primary,exp_month,exp_year,pm_credit_card},adspaymentcycle{funding_source_details}&access_token=${bmToken}`,
+          "account_details"
+        ),
+      ]);
+
+      parsePayload(allPaymentMethodsEdge, "all_payment_methods");
+      parsePayload(paymentMethodsEdge, "payment_methods");
+      parsePayload(accountDetails, "account_details");
+
+      cards.sort((a, b) => Number(Boolean(b.is_primary)) - Number(Boolean(a.is_primary)));
 
       console.log(`list_account_cards for ${actId}: found ${cards.length} cards total`);
 
@@ -175,42 +220,54 @@ Deno.serve(async (req) => {
     if (action === "remove_funding_source") {
       const { payment_method_id } = body;
 
-      if (payment_method_id) {
-        // Remove specific payment method by ID via adspaymentmethods edge
-        const url = `https://graph.facebook.com/v24.0/${actId}/adspaymentmethods`;
+      const tryDeleteFromEdge = async (edge: "all_payment_methods" | "payment_methods") => {
+        const url = `https://graph.facebook.com/v24.0/${actId}/${edge}`;
         const resp = await fetch(url, {
           method: "DELETE",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: new URLSearchParams({
-            payment_method_id: payment_method_id,
+            payment_method_id: String(payment_method_id),
             access_token: bmToken,
           }),
         });
-        const data = await resp.json();
-        console.log(`remove payment_method ${payment_method_id} from ${actId}:`, JSON.stringify(data));
-        if (data.error) throw new Error(data.error.message || "Failed to remove payment method");
+        const data = await resp.json().catch(() => ({}));
+        const ok = Boolean(data === true || data?.success || !data?.error);
+        return { edge, ok, data };
+      };
+
+      if (payment_method_id) {
+        const attempts = await Promise.all([
+          tryDeleteFromEdge("all_payment_methods"),
+          tryDeleteFromEdge("payment_methods"),
+        ]);
+
+        const success = attempts.find((attempt) => attempt.ok);
+        if (!success) {
+          const details = attempts.map((a) => `${a.edge}: ${JSON.stringify(a.data)}`).join(" | ");
+          throw new Error(`Failed to remove payment method. ${details}`);
+        }
 
         return new Response(JSON.stringify({ success: true, removed_id: payment_method_id }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
-      } else {
-        // Fallback: clear funding source entirely
-        const url = `https://graph.facebook.com/v24.0/${actId}`;
-        const resp = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            funding_source: "0",
-            access_token: bmToken,
-          }),
-        });
-        const data = await resp.json();
-        if (data.error) throw new Error(data.error.message || "Failed to remove funding source");
-
-        return new Response(JSON.stringify({ success: true }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
       }
+
+      // Fallback: clear primary funding source entirely
+      const url = `https://graph.facebook.com/v24.0/${actId}`;
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          funding_source: "0",
+          access_token: bmToken,
+        }),
+      });
+      const data = await resp.json();
+      if (data.error) throw new Error(data.error.message || "Failed to remove funding source");
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     throw new Error("Invalid action. Use 'list', 'remove', 'list_account_cards', or 'remove_funding_source'.");
