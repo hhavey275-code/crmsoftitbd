@@ -140,7 +140,7 @@ export function ClientDashboard() {
       queryClient.invalidateQueries({ queryKey: ["client-wallet"] });
       queryClient.invalidateQueries({ queryKey: ["client-ad-accounts"] });
     } catch (err: any) {
-      toast.error(err.message || "Something went wrong");
+      toast.error(friendlyEdgeError(err));
     } finally {
       setTopUpLoading(false);
     }

@@ -283,7 +283,7 @@ export default function ClientDetailPage() {
       setTopUpAmount("");
       invalidateAll();
     },
-    onError: (err: any) => toast.error(err.message),
+    onError: (err: any) => toast.error(friendlyEdgeError(err)),
   });
 
   const activeAccounts = adAccounts?.filter((a: any) => a.status === "active") ?? [];

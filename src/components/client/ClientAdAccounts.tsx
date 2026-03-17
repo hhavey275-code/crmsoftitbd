@@ -257,7 +257,7 @@ export function ClientAdAccounts() {
       queryClient.invalidateQueries({ queryKey: ["client-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["client-dashboard-transactions"] });
     },
-    onError: (err: any) => toast.error(err.message),
+    onError: (err: any) => toast.error(friendlyEdgeError(err)),
   });
 
   const lastUpdated = useMemo(() => {
