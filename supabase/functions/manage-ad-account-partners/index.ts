@@ -16,7 +16,6 @@ Deno.serve(async (req) => {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Verify auth using getClaims
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) throw new Error("No authorization header");
     const token = authHeader.replace("Bearer ", "");
@@ -30,7 +29,6 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    // Check admin
     const { data: roleData } = await supabase
       .from("user_roles")
       .select("role")
@@ -42,7 +40,6 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { action, ad_account_id } = body;
 
-    // Get ad account with its BM
     const { data: account, error: accErr } = await supabase
       .from("ad_accounts")
       .select("*, business_managers(id, name, access_token, bm_id)")
@@ -58,7 +55,6 @@ Deno.serve(async (req) => {
       : `act_${account.account_id}`;
 
     if (action === "list") {
-      // Fetch partner agencies from Meta
       const url = `https://graph.facebook.com/v24.0/${actId}/agencies?fields=id,name&access_token=${bm.access_token}`;
       const resp = await fetch(url);
       const data = await resp.json();
@@ -81,7 +77,6 @@ Deno.serve(async (req) => {
       const { partner_bm_id } = body;
       if (!partner_bm_id) throw new Error("partner_bm_id is required");
 
-      // Remove partner agency from ad account
       const url = `https://graph.facebook.com/v24.0/${actId}/agencies?business=${partner_bm_id}&access_token=${bm.access_token}`;
       const resp = await fetch(url, { method: "DELETE" });
       const data = await resp.json();
@@ -95,7 +90,63 @@ Deno.serve(async (req) => {
       });
     }
 
-    throw new Error("Invalid action. Use 'list' or 'remove'.");
+    // List BM's available funding sources
+    if (action === "list_funding_sources") {
+      const url = `https://graph.facebook.com/v24.0/${bm.bm_id}/payment_methods.list?fields=id,display_string,type,account_id&access_token=${bm.access_token}`;
+      const resp = await fetch(url);
+      const data = await resp.json();
+
+      if (data.error) {
+        // Fallback: try funding_source_details
+        const fallbackUrl = `https://graph.facebook.com/v24.0/${bm.bm_id}?fields=funding_source_details{id,display_string,type}&access_token=${bm.access_token}`;
+        const fallbackResp = await fetch(fallbackUrl);
+        const fallbackData = await fallbackResp.json();
+
+        if (fallbackData.error) {
+          throw new Error(fallbackData.error.message || "Failed to fetch funding sources");
+        }
+
+        const sources = (fallbackData.funding_source_details?.data || []).map((s: any) => ({
+          id: s.id,
+          display_string: s.display_string || s.id,
+          type: s.type || "unknown",
+        }));
+
+        return new Response(JSON.stringify({ funding_sources: sources }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const sources = (data.data || []).map((s: any) => ({
+        id: s.id,
+        display_string: s.display_string || s.id,
+        type: s.type || "unknown",
+      }));
+
+      return new Response(JSON.stringify({ funding_sources: sources }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Attach a funding source to an ad account
+    if (action === "add_funding_source") {
+      const { funding_source_id } = body;
+      if (!funding_source_id) throw new Error("funding_source_id is required");
+
+      const url = `https://graph.facebook.com/v24.0/${actId}?funding_source=${funding_source_id}&access_token=${bm.access_token}`;
+      const resp = await fetch(url, { method: "POST" });
+      const data = await resp.json();
+
+      if (data.error) {
+        throw new Error(data.error.message || "Failed to add funding source");
+      }
+
+      return new Response(JSON.stringify({ success: true, funding_source_id }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    throw new Error("Invalid action. Use 'list', 'remove', 'list_funding_sources', or 'add_funding_source'.");
   } catch (err: any) {
     console.error("manage-ad-account-partners error:", err);
     return new Response(JSON.stringify({ error: err.message }), {
