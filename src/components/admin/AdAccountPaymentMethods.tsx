@@ -67,9 +67,9 @@ export function AdAccountPaymentMethods({ adAccountId, currentCards = [] }: Prop
                   <CardBrandIcon displayString={card.display_string} />
                   <div>
                     <span className="text-sm font-medium">{card.display_string}</span>
-                    {'exp_month' in card && card.exp_month && card.exp_year && (
+                    {'exp_month' in card && (card as any).exp_month && (card as any).exp_year && (
                       <span className="text-xs text-muted-foreground ml-2">
-                        Expires {card.exp_month}/{card.exp_year}
+                        Expires {(card as any).exp_month}/{(card as any).exp_year}
                       </span>
                     )}
                   </div>
