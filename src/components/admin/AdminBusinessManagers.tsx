@@ -220,18 +220,29 @@ export function AdminBusinessManagers() {
   const newAccountsCount = syncedAccounts.filter((a) => !existingAccountIds.has(a.account_id)).length;
   const alreadyImportedCount = syncedAccounts.filter((a) => existingAccountIds.has(a.account_id)).length;
 
-  const updateTokenMutation = useMutation({
-    mutationFn: async ({ id, token }: { id: string; token: string }) => {
-      const { error } = await supabase
-        .from("business_managers")
-        .update({ access_token: token })
-        .eq("id", id);
-      if (error) throw error;
+  const updateBmMutation = useMutation({
+    mutationFn: async ({ id, name, bm_id, access_token }: { id: string; name?: string; bm_id?: string; access_token?: string }) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-bm`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ action: "update", id, name, bm_id, access_token }),
+        }
+      );
+      const result = await res.json();
+      if (!res.ok || result.error) throw new Error(result.error || "Failed to update BM");
     },
     onSuccess: () => {
-      toast.success("Access token updated");
+      toast.success("Business Manager updated");
       setEditOpen(false);
       setEditBmId(null);
+      setEditName("");
+      setEditMetaId("");
       setEditAccessToken("");
       queryClient.invalidateQueries({ queryKey: ["admin-business-managers"] });
     },
