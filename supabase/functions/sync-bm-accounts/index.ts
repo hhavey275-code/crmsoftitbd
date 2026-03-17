@@ -93,6 +93,14 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Validate bm_id is a numeric Meta ID
+    if (!/^\d+$/.test(bm.bm_id)) {
+      return new Response(
+        JSON.stringify({ error: `Invalid BM ID "${bm.bm_id}" — must be a numeric Meta Business Manager ID (e.g. 687551173144972). Please update this BM's ID.` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const fields = "id,name,account_id,account_status,spend_cap,amount_spent,business_name";
     const baseUrl = `https://graph.facebook.com/v24.0/${bm.bm_id}`;
 
