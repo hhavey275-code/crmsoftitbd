@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
       const { partner_bm_id } = body;
       if (!partner_bm_id) throw new Error("partner_bm_id is required");
 
-      const url = `https://graph.facebook.com/v24.0/${actId}/agencies?business=${partner_bm_id}&access_token=${bm.access_token}`;
+      const url = `https://graph.facebook.com/v24.0/${actId}/agencies?business=${partner_bm_id}&access_token=${bmToken}`;
       const resp = await fetch(url, { method: "DELETE" });
       const data = await resp.json();
 
