@@ -167,6 +167,12 @@ export default function Auth() {
                 <Label htmlFor="email">Email</Label>
                 <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" required />
               </div>
+              {!isLogin && (
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+880 1XXXXXXXXX" required />
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <Input
@@ -181,6 +187,12 @@ export default function Auth() {
                   minLength={6}
                 />
               </div>
+              {!isLogin && (
+                <div className="space-y-2">
+                  <Label htmlFor="businessAddress">Business / Residential Address</Label>
+                  <Input id="businessAddress" value={businessAddress} onChange={(e) => setBusinessAddress(e.target.value)} placeholder="123 Main St, City, Country" required />
+                </div>
+              )}
               {!isLogin && (
                 <div className="space-y-2">
                   <Label htmlFor="monthlySpend">Monthly Approx. Spending (USD)</Label>
