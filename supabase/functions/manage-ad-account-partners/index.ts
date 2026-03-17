@@ -114,28 +114,41 @@ Deno.serve(async (req) => {
       const sources: any[] = [];
       const seenIds = new Set<string>();
 
-      // Fetch all ad accounts under this BM to collect all unique funding sources
-      const url = `https://graph.facebook.com/v24.0/${bm.bm_id}/owned_ad_accounts?fields=id,name,funding_source,funding_source_details&limit=200&access_token=${bmToken}`;
-      const resp = await fetch(url);
-      const data = await resp.json();
-
-      if (data.error) {
-        throw new Error(data.error.message || "Failed to fetch funding sources");
-      }
-
-      for (const acc of (data.data || [])) {
-        const fsId = acc.funding_source;
-        if (fsId && !seenIds.has(fsId)) {
-          seenIds.add(fsId);
-          const fsd = acc.funding_source_details || {};
-          sources.push({
-            id: fsId,
-            display_string: fsd.display_string || `Funding source ${fsId}`,
-            type: fsd.type?.toString() || "unknown",
-            from_account: acc.name || acc.id,
-          });
+      const collectFundingSources = async (initialUrl: string) => {
+        let url: string | null = initialUrl;
+        while (url) {
+          const resp = await fetch(url);
+          const data = await resp.json();
+          if (data.error) {
+            console.error("Meta API error:", data.error);
+            break;
+          }
+          for (const acc of (data.data || [])) {
+            const fsId = acc.funding_source;
+            if (fsId && !seenIds.has(fsId)) {
+              seenIds.add(fsId);
+              const fsd = acc.funding_source_details || {};
+              sources.push({
+                id: fsId,
+                display_string: fsd.display_string || `Funding source ${fsId}`,
+                type: fsd.type?.toString() || "unknown",
+                from_account: acc.name || acc.id,
+              });
+            }
+          }
+          url = data.paging?.next || null;
         }
-      }
+      };
+
+      // Fetch from both owned and client ad accounts
+      await Promise.all([
+        collectFundingSources(
+          `https://graph.facebook.com/v24.0/${bm.bm_id}/owned_ad_accounts?fields=id,name,funding_source,funding_source_details&limit=200&access_token=${bmToken}`
+        ),
+        collectFundingSources(
+          `https://graph.facebook.com/v24.0/${bm.bm_id}/client_ad_accounts?fields=id,name,funding_source,funding_source_details&limit=200&access_token=${bmToken}`
+        ),
+      ]);
 
       return new Response(JSON.stringify({ funding_sources: sources }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
