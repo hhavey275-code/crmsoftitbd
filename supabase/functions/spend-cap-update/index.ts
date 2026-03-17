@@ -176,7 +176,6 @@ Deno.serve(async (req) => {
     const bmToken = await decryptToken(bm.access_token, serviceKey);
     const oldSpendCap = Number(account.spend_cap);
     const newSpendCap = oldSpendCap + amount;
-    const newSpendCapCents = Math.round(newSpendCap * 100);
 
     const actId = account.account_id.startsWith("act_")
       ? account.account_id
@@ -185,21 +184,14 @@ Deno.serve(async (req) => {
     // --- Safety guard ---
     if (newSpendCap > 100000) {
       console.warn("SAFETY WARNING: spend cap exceeding $100k", {
-        actId,
-        oldSpendCap,
-        amount,
-        newSpendCap,
-        newSpendCapCents,
+        actId, oldSpendCap, amount, newSpendCap,
       });
     }
 
+    // Meta spend_cap is in currency units (dollars), NOT cents
     console.log("Spend cap update attempt", {
-      actId,
-      bmId: bm.bm_id,
-      oldSpendCap,
-      amount,
-      newSpendCap,
-      newSpendCapCents,
+      actId, bmId: bm.bm_id, oldSpendCap, amount, newSpendCap,
+      metaValueToSend: String(Math.round(newSpendCap * 100)),
     });
 
     // ============================================
