@@ -212,6 +212,18 @@ Deno.serve(async (req) => {
           activeCampaigns = await responses[2].json();
         }
 
+        // Check for Meta API rate limit errors
+        const checkRateLimit = (data: any): number | null => {
+          if (data?.error?.code === 17 || data?.error?.code === 32 || data?.error?.code === 4) return data.error.code;
+          return null;
+        };
+        const rlCode = checkRateLimit(todayData) || checkRateLimit(yesterdayData) || checkRateLimit(accountData);
+        if (rlCode) {
+          rateLimited.push({ account_id: actId, account_name: account.account_name || actId, error_code: rlCode });
+          insights[account.id] = { ...emptyInsight };
+          return;
+        }
+
         const todaySpend = todayData?.data?.[0]?.spend ? parseFloat(todayData.data[0].spend) : 0;
         const yesterdaySpend = yesterdayData?.data?.[0]?.spend ? parseFloat(yesterdayData.data[0].spend) : 0;
 
