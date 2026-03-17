@@ -97,24 +97,7 @@ Deno.serve(async (req) => {
       const data = await resp.json();
 
       if (data.error) {
-        // Fallback: try funding_source_details
-        const fallbackUrl = `https://graph.facebook.com/v24.0/${bm.bm_id}?fields=funding_source_details{id,display_string,type}&access_token=${bm.access_token}`;
-        const fallbackResp = await fetch(fallbackUrl);
-        const fallbackData = await fallbackResp.json();
-
-        if (fallbackData.error) {
-          throw new Error(fallbackData.error.message || "Failed to fetch funding sources");
-        }
-
-        const sources = (fallbackData.funding_source_details?.data || []).map((s: any) => ({
-          id: s.id,
-          display_string: s.display_string || s.id,
-          type: s.type || "unknown",
-        }));
-
-        return new Response(JSON.stringify({ funding_sources: sources }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        throw new Error(data.error.message || "Failed to fetch funding sources");
       }
 
       const sources = (data.data || []).map((s: any) => ({
