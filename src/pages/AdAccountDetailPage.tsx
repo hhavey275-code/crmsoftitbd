@@ -331,10 +331,10 @@ export default function AdAccountDetailPage() {
           {isAdmin && id && (
             <AdAccountPaymentMethods
               adAccountId={id}
-              currentCard={
-                Array.isArray(insights?.cards) && insights.cards.length > 0
-                  ? (insights.cards[0] as { id?: string; display_string: string })
-                  : null
+              currentCards={
+                Array.isArray(insights?.cards)
+                  ? (insights.cards as { id?: string; display_string: string }[])
+                  : []
               }
             />
           )}
