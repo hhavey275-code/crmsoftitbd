@@ -539,8 +539,8 @@ export function AdminBusinessManagers() {
                   onClick={(e) => { e.stopPropagation(); syncMutation.mutate(bm.id); }}
                   disabled={syncMutation.isPending}
                 >
-                  <RefreshCw className={`mr-1 h-3 w-3 ${syncMutation.isPending ? "animate-spin" : ""}`} />
-                  Sync
+                  <RefreshCw className={`mr-1 h-3 w-3 ${syncingBmId === bm.id && syncMutation.isPending ? "animate-spin" : ""}`} />
+                  {syncingBmId === bm.id && syncMutation.isPending ? "Syncing..." : "Sync"}
                 </Button>
               </div>
             </div>
