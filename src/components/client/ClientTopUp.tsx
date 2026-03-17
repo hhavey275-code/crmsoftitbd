@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export function ClientTopUp() {
+  const isMobile = useIsMobile();
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
   const [bdtAmount, setBdtAmount] = useState("");
