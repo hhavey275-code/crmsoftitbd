@@ -385,6 +385,31 @@ export function AdminBusinessManagers() {
     }
   };
 
+  const encryptExistingMutation = useMutation({
+    mutationFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-bm`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ action: "encrypt_existing" }),
+        }
+      );
+      const result = await res.json();
+      if (!res.ok || result.error) throw new Error(result.error || "Failed");
+      return result;
+    },
+    onSuccess: (result) => {
+      toast.success(`${result.encrypted} token(s) encrypted successfully`);
+      queryClient.invalidateQueries({ queryKey: ["admin-business-managers"] });
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
