@@ -225,7 +225,7 @@ Deno.serve(async (req) => {
         type: "ad_topup",
         description: `${account.account_name}\n${cleanAccountId}`,
         reference_id: ad_account_id,
-        processed_by: isAdmin ? `admin:${user.id}` : `client:${walletUserId}`,
+        processed_by: isAdmin ? `admin:${userId}` : `client:${walletUserId}`,
       });
     }
 
