@@ -186,7 +186,6 @@ export function ClientDashboard() {
                 <TableRow>
                   <TableHead>Account</TableHead>
                   <TableHead>Account ID</TableHead>
-                  <TableHead>BM Name</TableHead>
                   <TableHead>Spend</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Action</TableHead>
@@ -216,7 +215,6 @@ export function ClientDashboard() {
                           <ExternalLink className="h-3 w-3" />
                         </a>
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{account.business_name || "—"}</TableCell>
                       <TableCell>
                         <SpendProgressBar amountSpent={Number(account.amount_spent)} spendCap={Number(account.spend_cap)} />
                       </TableCell>
@@ -224,8 +222,7 @@ export function ClientDashboard() {
                       <TableCell className="text-right">
                         <Button
                           size="sm"
-                          variant="outline"
-                          className="gap-1"
+                          className="gap-1 bg-primary hover:bg-primary/90 text-primary-foreground"
                           onClick={() => navigate("/top-up", { state: { adAccountId: account.id } })}
                         >
                           <ArrowUpCircle className="h-3.5 w-3.5" />
