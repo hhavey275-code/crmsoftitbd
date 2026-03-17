@@ -280,7 +280,7 @@ export function AdminAdAccounts() {
       queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["admin-all-wallets"] });
     },
-    onError: (err: any) => toast.error(err.message),
+    onError: (err: any) => toast.error(friendlyEdgeError(err)),
   });
 
   const lastUpdated = useMemo(() => {
