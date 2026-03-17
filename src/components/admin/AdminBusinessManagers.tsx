@@ -33,6 +33,7 @@ export function AdminBusinessManagers() {
   const [accessToken, setAccessToken] = useState("");
   const [expandedBm, setExpandedBm] = useState<string | null>(null);
   const [showLogs, setShowLogs] = useState<string | null>(null);
+  const [syncingBmId, setSyncingBmId] = useState<string | null>(null);
 
   // Selective import state
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -132,6 +133,7 @@ export function AdminBusinessManagers() {
 
   const syncMutation = useMutation({
     mutationFn: async (businessManagerId: string) => {
+      setSyncingBmId(businessManagerId);
       const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-bm-accounts`,
@@ -169,7 +171,8 @@ export function AdminBusinessManagers() {
       queryClient.invalidateQueries({ queryKey: ["admin-business-managers"] });
       queryClient.invalidateQueries({ queryKey: ["admin-sync-logs"] });
     },
-    onError: (err: any) => toast.error(err.message),
+    onError: (err: any) => { toast.error(err.message); setSyncingBmId(null); },
+    onSettled: () => setSyncingBmId(null),
   });
 
   const importMutation = useMutation({
@@ -536,8 +539,8 @@ export function AdminBusinessManagers() {
                   onClick={(e) => { e.stopPropagation(); syncMutation.mutate(bm.id); }}
                   disabled={syncMutation.isPending}
                 >
-                  <RefreshCw className={`mr-1 h-3 w-3 ${syncMutation.isPending ? "animate-spin" : ""}`} />
-                  Sync
+                  <RefreshCw className={`mr-1 h-3 w-3 ${syncingBmId === bm.id && syncMutation.isPending ? "animate-spin" : ""}`} />
+                  {syncingBmId === bm.id && syncMutation.isPending ? "Syncing..." : "Sync"}
                 </Button>
               </div>
             </div>
