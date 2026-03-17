@@ -3,9 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { MetricCard } from "@/components/MetricCard";
-import { Wallet, MonitorSmartphone, TrendingUp, CalendarIcon } from "lucide-react";
+import { SpendProgressBar } from "@/components/SpendProgressBar";
+import { StatusBadge } from "@/components/StatusBadge";
+import { Wallet, MonitorSmartphone, TrendingUp, CalendarIcon, AppWindow, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -63,23 +64,6 @@ export function ClientDashboard() {
     enabled: !!user,
   });
 
-  const { data: transactions } = useQuery({
-    queryKey: ["client-dashboard-transactions", user?.id],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("transactions")
-        .select("*")
-        .eq("user_id", user!.id)
-        .order("created_at", { ascending: false })
-        .limit(20);
-      return (data as any[]) ?? [];
-    },
-    enabled: !!user,
-  });
-
-
-
-
   const totalRemaining = adAccounts?.reduce((sum: number, a: any) => sum + (Number(a.spend_cap) - Number(a.amount_spent)), 0) ?? 0;
 
   const greeting = () => {
@@ -88,6 +72,11 @@ export function ClientDashboard() {
     if (hour < 17) return "Good afternoon";
     if (hour < 21) return "Good evening";
     return "Good night";
+  };
+
+  const getAdsManagerUrl = (accountId: string) => {
+    const cleanId = accountId.replace("act_", "");
+    return `https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${cleanId}&nav_source=flyout_menu`;
   };
 
   return (
@@ -112,39 +101,47 @@ export function ClientDashboard() {
         </Card>
       )}
 
-      {/* Quick Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard
-          title="Wallet Balance"
-          value={`$${Number(wallet?.balance ?? 0).toLocaleString()}`}
-          icon={Wallet}
-          iconBg="bg-violet-50 dark:bg-violet-900/30"
-          iconColor="text-violet-600"
-        />
-        <MetricCard
-          title="Total Ad Accounts"
-          value={adAccounts?.length ?? 0}
-          icon={MonitorSmartphone}
-          iconBg="bg-amber-50 dark:bg-amber-900/30"
-          iconColor="text-amber-600"
-        />
-        <MetricCard
-          title="Total Remaining Balance"
-          value={`$${totalRemaining.toLocaleString()}`}
-          subtitle="Across all ad accounts"
-          icon={Wallet}
-          iconBg="bg-rose-50 dark:bg-rose-900/30"
-          iconColor="text-rose-600"
-        />
-        <MetricCard
-          title="Total Top-Up"
-          value={`$${Number(topUpTotal ?? 0).toLocaleString()}`}
-          subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"}
-          icon={TrendingUp}
-          iconBg="bg-emerald-50 dark:bg-emerald-900/30"
-          iconColor="text-emerald-600"
-        />
-      </div>
+      {/* Metric Cards in Premium White Container */}
+      <Card className="bg-white dark:bg-card border border-border/40 shadow-[0_2px_12px_rgba(0,0,0,0.04),0_8px_32px_rgba(0,0,0,0.06)] rounded-xl">
+        <CardContent className="p-6">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <MetricCard
+              title="Wallet Balance"
+              value={`$${Number(wallet?.balance ?? 0).toLocaleString()}`}
+              icon={Wallet}
+              iconBg="bg-violet-50 dark:bg-violet-900/30"
+              iconColor="text-violet-600"
+              className="border-0 shadow-none bg-violet-50/40 dark:bg-violet-900/10"
+            />
+            <MetricCard
+              title="Total Ad Accounts"
+              value={adAccounts?.length ?? 0}
+              icon={MonitorSmartphone}
+              iconBg="bg-amber-50 dark:bg-amber-900/30"
+              iconColor="text-amber-600"
+              className="border-0 shadow-none bg-amber-50/40 dark:bg-amber-900/10"
+            />
+            <MetricCard
+              title="Total Remaining Balance"
+              value={`$${totalRemaining.toLocaleString()}`}
+              subtitle="Across all ad accounts"
+              icon={Wallet}
+              iconBg="bg-rose-50 dark:bg-rose-900/30"
+              iconColor="text-rose-600"
+              className="border-0 shadow-none bg-rose-50/40 dark:bg-rose-900/10"
+            />
+            <MetricCard
+              title="Total Top-Up"
+              value={`$${Number(topUpTotal ?? 0).toLocaleString()}`}
+              subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"}
+              icon={TrendingUp}
+              iconBg="bg-emerald-50 dark:bg-emerald-900/30"
+              iconColor="text-emerald-600"
+              className="border-0 shadow-none bg-emerald-50/40 dark:bg-emerald-900/10"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Date Range for Total Top-Up */}
       <div className="flex flex-wrap items-center gap-2">
@@ -174,55 +171,50 @@ export function ClientDashboard() {
         </Popover>
       </div>
 
-      {/* Transaction History */}
+      {/* Ad Accounts Section */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Recent Transactions</CardTitle>
+          <CardTitle className="text-lg">My Ad Accounts</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Balance After</TableHead>
-                
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {transactions?.map((tx: any) => {
-                const desc = tx.description || "—";
-                const hasNewline = desc.includes("\n");
-                const [descName, descId] = hasNewline ? desc.split("\n") : [desc, null];
-                
-
+          {adAccounts && adAccounts.length > 0 ? (
+            <div className="space-y-3">
+              {adAccounts.map((account: any) => {
+                const displayId = account.account_id?.replace("act_", "") ?? "";
                 return (
-                  <TableRow key={tx.id}>
-                    <TableCell className="text-muted-foreground whitespace-nowrap">{format(new Date(tx.created_at), "MMM d, yyyy HH:mm")}</TableCell>
-                    <TableCell className="capitalize font-medium">{tx.type.replace(/_/g, " ")}</TableCell>
-                    <TableCell className="text-sm">
-                      {hasNewline ? (
-                        <div>
-                          <span>{descName}</span>
-                          <span className="block text-xs text-muted-foreground">{descId}</span>
-                        </div>
-                      ) : desc}
-                    </TableCell>
-                    <TableCell className={cn("font-semibold", Number(tx.amount) >= 0 ? "text-green-600" : "text-red-600")}>
-                      {Number(tx.amount) >= 0 ? "+" : ""}${Math.abs(Number(tx.amount)).toLocaleString()}
-                    </TableCell>
-                    <TableCell className="font-medium">${Number(tx.balance_after ?? 0).toLocaleString()}</TableCell>
-                    
-                  </TableRow>
+                  <div
+                    key={account.id}
+                    className="flex items-center gap-4 p-4 rounded-lg border border-border/50 bg-muted/20 hover:bg-muted/40 transition-colors"
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                      <AppWindow className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-primary truncate">{account.account_name}</p>
+                      <a
+                        href={getAdsManagerUrl(account.account_id)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        {displayId}
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                      {account.business_name && (
+                        <p className="text-xs text-muted-foreground">{account.business_name}</p>
+                      )}
+                    </div>
+                    <div className="hidden sm:block w-32">
+                      <SpendProgressBar amountSpent={Number(account.amount_spent)} spendCap={Number(account.spend_cap)} />
+                    </div>
+                    <StatusBadge status={account.status} />
+                  </div>
                 );
               })}
-              {(!transactions || transactions.length === 0) && (
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No transactions yet</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
+            </div>
+          ) : (
+            <p className="text-center text-muted-foreground py-8">No ad accounts assigned yet</p>
+          )}
         </CardContent>
       </Card>
     </div>
