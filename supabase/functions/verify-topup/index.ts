@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
                 content: [
                   {
                     type: 'text',
-                    text: 'Extract the transaction reference number and the payment amount (in BDT) from this payment screenshot. Return ONLY a JSON object like: {"ref": "ABC123", "amount": 10000}. If you cannot find a value, use empty string for ref and 0 for amount. No explanation, just JSON.',
+                    text: 'Extract the transaction reference number and the BASE payment amount (in BDT) from this payment screenshot. IMPORTANT: If the screenshot shows a breakdown like "৳1,300.00 + ৳16.25" or "amount + charge", extract ONLY the base amount (1300), NOT the total including charges/fees/VAT. The base amount is the actual money sent, excluding any service charge, VAT, or bank fee. For bKash/Nagad screenshots, look for the principal amount before fees. For bank transfer screenshots, extract the transfer amount excluding service charge and VAT. Return ONLY a JSON object like: {"ref": "ABC123", "amount": 1300}. If you cannot find a value, use empty string for ref and 0 for amount. No explanation, just JSON.',
                   },
                   {
                     type: 'image_url',
