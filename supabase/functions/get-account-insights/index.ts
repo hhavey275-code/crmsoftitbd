@@ -241,26 +241,26 @@ Deno.serve(async (req) => {
         const cards: any[] = [];
         const seenCardIds = new Set<string>();
         
-        // Try all_payment_methods first (returns multiple cards)
-        const allPm = accountData?.all_payment_methods?.data;
-        if (Array.isArray(allPm) && allPm.length > 0) {
-          for (const pm of allPm) {
-            const pmId = pm.funding_source_id || pm.id;
+        // Try payment_methods endpoint first (returns multiple cards)
+        const pmList = paymentMethodsData?.data;
+        if (Array.isArray(pmList) && pmList.length > 0) {
+          for (const pm of pmList) {
+            const pmId = pm.id;
             if (pmId && !seenCardIds.has(pmId)) {
               seenCardIds.add(pmId);
               cards.push({
                 id: pmId,
                 display_string: pm.display_string || `Card ending ${pmId?.slice(-4) || '****'}`,
-                type: pm.pm_credit_card_type ?? pm.type,
+                type: pm.pm_credit_card_type ?? 1,
               });
             }
           }
         }
         
-        // Fallback to funding_source_details if all_payment_methods didn't return anything
+        // Fallback to funding_source_details if payment_methods didn't return anything
         if (cards.length === 0) {
           const fsd = accountData?.funding_source_details;
-          if (fsd) {
+          if (fsd && !seenCardIds.has(fsd.id)) {
             cards.push({
               id: fsd.id,
               display_string: fsd.display_string || `Card ending ${fsd.id?.slice(-4) || '****'}`,
