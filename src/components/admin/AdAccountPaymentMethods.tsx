@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CardBrandIcon } from "@/components/CardBrandIcon";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { CreditCard, Loader2, Trash2 } from "lucide-react";
 
@@ -22,14 +23,14 @@ export function AdAccountPaymentMethods({ adAccountId, currentCards = [] }: Prop
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      return (data?.cards ?? []) as { id: string; display_string: string; type: string }[];
+      return (data?.cards ?? []) as { id: string; display_string: string; type: string; exp_month?: number; exp_year?: number }[];
     },
   });
 
   const removeMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (paymentMethodId: string) => {
       const { data, error } = await supabase.functions.invoke("manage-ad-account-partners", {
-        body: { action: "remove_funding_source", ad_account_id: adAccountId },
+        body: { action: "remove_funding_source", ad_account_id: adAccountId, payment_method_id: paymentMethodId },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -64,7 +65,20 @@ export function AdAccountPaymentMethods({ adAccountId, currentCards = [] }: Prop
               <div key={card.id || idx} className="flex items-center justify-between p-3 border rounded-lg">
                 <div className="flex items-center gap-3">
                   <CardBrandIcon displayString={card.display_string} />
-                  <span className="text-sm font-medium">{card.display_string}</span>
+                  <div>
+                    <span className="text-sm font-medium">{card.display_string}</span>
+                    {'exp_month' in card && card.exp_month && card.exp_year && (
+                      <span className="text-xs text-muted-foreground ml-2">
+                        Expires {card.exp_month}/{card.exp_year}
+                      </span>
+                    )}
+                  </div>
+                  {idx === 0 && displayCards.length > 1 && (
+                    <Badge variant="outline" className="text-xs">Default</Badge>
+                  )}
+                  {idx > 0 && (
+                    <Badge variant="secondary" className="text-xs">Backup</Badge>
+                  )}
                 </div>
                 <Button
                   size="icon"
@@ -72,7 +86,7 @@ export function AdAccountPaymentMethods({ adAccountId, currentCards = [] }: Prop
                   className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                   onClick={() => {
                     if (confirm("Remove this payment method from the ad account?")) {
-                      removeMutation.mutate();
+                      removeMutation.mutate(card.id || "");
                     }
                   }}
                   disabled={removeMutation.isPending}
