@@ -54,7 +54,24 @@ async function getMetaSpendCapDollars(actId: string, accessToken: string): Promi
 
 /** Check if a Meta error is a rate limit */
 function isRateLimitError(code: number | undefined): boolean {
-  return code === 17 || code === 32 || code === 4;
+  return code === 17 || code === 32 || code === 4 || code === 429;
+}
+
+function parseRetryAfterMs(headerValue: string | null): number | null {
+  if (!headerValue) return null;
+
+  const asSeconds = Number(headerValue);
+  if (Number.isFinite(asSeconds) && asSeconds > 0) {
+    return Math.round(asSeconds * 1000);
+  }
+
+  const asDateMs = Date.parse(headerValue);
+  if (!Number.isNaN(asDateMs)) {
+    const delta = asDateMs - Date.now();
+    return delta > 0 ? delta : null;
+  }
+
+  return null;
 }
 
 Deno.serve(async (req) => {
@@ -226,22 +243,17 @@ Deno.serve(async (req) => {
     let metaErrorMsg = "";
     let metaErrorCode: number | null = null;
     let isRateLimit = false;
-    const MAX_RETRIES = 3;
+    let retryAfterSeconds: number | null = null;
+    const MAX_RETRIES = 4;
 
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       metaSuccess = false;
       metaErrorMsg = "";
       metaErrorCode = null;
       isRateLimit = false;
+      retryAfterSeconds = null;
 
       try {
-        if (attempt > 0) {
-          // Exponential backoff: 2s, 4s + jitter
-          const waitMs = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
-          console.log(`Rate limit retry ${attempt}/${MAX_RETRIES}, waiting ${Math.round(waitMs)}ms...`);
-          await new Promise(resolve => setTimeout(resolve, waitMs));
-        }
-
         const metaRes = await fetch(`https://graph.facebook.com/v25.0/${actId}`, {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -251,9 +263,14 @@ Deno.serve(async (req) => {
           }),
         });
 
-        const metaData = await metaRes.json();
+        let metaData: any = null;
+        try {
+          metaData = await metaRes.json();
+        } catch {
+          metaData = null;
+        }
 
-        if (!metaData.error) {
+        if (metaRes.ok && !metaData?.error) {
           // POST reported success — now VERIFY with GET
           const verifiedDollars = await getMetaSpendCapDollars(actId, bmToken);
           if (verifiedDollars !== null && Math.abs(verifiedDollars - newSpendCapDollars) < 0.02) {
@@ -263,23 +280,43 @@ Deno.serve(async (req) => {
             metaErrorMsg = `Meta POST reported success but verification failed. Expected $${newSpendCapDollars}, got $${verifiedDollars}`;
             console.warn(metaErrorMsg);
           }
-          break; // Don't retry on non-rate-limit responses
-        } else {
-          metaErrorMsg = metaData.error.message || "Unknown Meta error";
-          metaErrorCode = typeof metaData.error.code === "number" ? metaData.error.code : null;
-          isRateLimit = isRateLimitError(metaData.error.code);
-          console.warn(`Meta spend cap POST failed (attempt ${attempt + 1})`, {
-            actId, bmId: bm.bm_id, message: metaErrorMsg,
-            code: metaData.error.code, subcode: metaData.error.error_subcode,
-          });
-
-          if (!isRateLimit) break; // Only retry on rate limits
-          // Rate limit — continue to next retry attempt
+          break;
         }
+
+        metaErrorMsg = metaData?.error?.message || `Meta HTTP ${metaRes.status}`;
+        metaErrorCode = typeof metaData?.error?.code === "number"
+          ? metaData.error.code
+          : (metaRes.status === 429 ? 429 : null);
+        isRateLimit = isRateLimitError(metaErrorCode ?? undefined) || metaRes.status === 429;
+
+        const retryAfterMs = parseRetryAfterMs(metaRes.headers.get("retry-after"));
+        if (retryAfterMs) {
+          retryAfterSeconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
+        }
+
+        console.warn(`Meta spend cap POST failed (attempt ${attempt + 1})`, {
+          actId,
+          bmId: bm.bm_id,
+          status: metaRes.status,
+          message: metaErrorMsg,
+          code: metaErrorCode,
+          subcode: metaData?.error?.error_subcode,
+          retryAfterSeconds,
+        });
+
+        const hasMoreAttempts = attempt < MAX_RETRIES - 1;
+        if (isRateLimit && hasMoreAttempts) {
+          const waitMs = retryAfterMs ?? (Math.pow(2, attempt + 1) * 1000 + Math.random() * 1000);
+          console.log(`Rate limit retry ${attempt + 1}/${MAX_RETRIES}, waiting ${Math.round(waitMs)}ms...`);
+          await new Promise((resolve) => setTimeout(resolve, waitMs));
+          continue;
+        }
+
+        break;
       } catch (err) {
         metaErrorMsg = err instanceof Error ? err.message : "Network error calling Meta API";
         console.warn("Meta spend cap request network error", { actId, message: metaErrorMsg });
-        break; // Don't retry on network errors
+        break;
       }
     }
 
@@ -298,13 +335,17 @@ Deno.serve(async (req) => {
         wallet_charged: false,
       };
 
+      if (isRateLimit && retryAfterSeconds) {
+        errorResponse.retry_after_seconds = retryAfterSeconds;
+      }
+
       if (!isRateLimit) {
         errorResponse.hint = "Grant this token owner ad account admin/manage permission for the target ad account.";
       }
 
       return new Response(
         JSON.stringify(errorResponse),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: isRateLimit ? 429 : 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 

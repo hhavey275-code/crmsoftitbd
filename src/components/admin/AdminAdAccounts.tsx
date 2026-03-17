@@ -19,6 +19,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { CardBrandIcon } from "@/components/CardBrandIcon";
+import { friendlyEdgeError } from "@/lib/utils";
 
 const PAGE_SIZE = 20;
 
@@ -279,7 +280,7 @@ export function AdminAdAccounts() {
       queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["admin-all-wallets"] });
     },
-    onError: (err: any) => toast.error(err.message),
+    onError: (err: any) => toast.error(friendlyEdgeError(err)),
   });
 
   const lastUpdated = useMemo(() => {
