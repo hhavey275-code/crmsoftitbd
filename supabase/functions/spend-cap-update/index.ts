@@ -54,7 +54,24 @@ async function getMetaSpendCapDollars(actId: string, accessToken: string): Promi
 
 /** Check if a Meta error is a rate limit */
 function isRateLimitError(code: number | undefined): boolean {
-  return code === 17 || code === 32 || code === 4;
+  return code === 17 || code === 32 || code === 4 || code === 429;
+}
+
+function parseRetryAfterMs(headerValue: string | null): number | null {
+  if (!headerValue) return null;
+
+  const asSeconds = Number(headerValue);
+  if (Number.isFinite(asSeconds) && asSeconds > 0) {
+    return Math.round(asSeconds * 1000);
+  }
+
+  const asDateMs = Date.parse(headerValue);
+  if (!Number.isNaN(asDateMs)) {
+    const delta = asDateMs - Date.now();
+    return delta > 0 ? delta : null;
+  }
+
+  return null;
 }
 
 Deno.serve(async (req) => {
