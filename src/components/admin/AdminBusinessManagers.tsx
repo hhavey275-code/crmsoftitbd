@@ -464,6 +464,8 @@ export function AdminBusinessManagers() {
                   onClick={(e) => {
                     e.stopPropagation();
                     setEditBmId(bm.id);
+                    setEditName(bm.name);
+                    setEditMetaId(bm.bm_id);
                     setEditAccessToken("");
                     setEditOpen(true);
                   }}
