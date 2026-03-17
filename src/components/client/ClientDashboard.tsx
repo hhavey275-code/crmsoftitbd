@@ -185,22 +185,42 @@ export function ClientDashboard() {
                 <TableHead>Description</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Balance After</TableHead>
+                <TableHead>Processed By</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {transactions?.map((tx: any) => (
-                <TableRow key={tx.id}>
-                  <TableCell className="text-muted-foreground whitespace-nowrap">{format(new Date(tx.created_at), "MMM d, yyyy HH:mm")}</TableCell>
-                  <TableCell className="capitalize font-medium">{tx.type.replace(/_/g, " ")}</TableCell>
-                  <TableCell className="text-sm">{tx.description || "—"}</TableCell>
-                  <TableCell className={cn("font-semibold", Number(tx.amount) >= 0 ? "text-green-600" : "text-red-600")}>
-                    {Number(tx.amount) >= 0 ? "+" : ""}${Math.abs(Number(tx.amount)).toLocaleString()}
-                  </TableCell>
-                  <TableCell className="font-medium">${Number(tx.balance_after ?? 0).toLocaleString()}</TableCell>
-                </TableRow>
-              ))}
+              {transactions?.map((tx: any) => {
+                const desc = tx.description || "—";
+                const hasNewline = desc.includes("\n");
+                const [descName, descId] = hasNewline ? desc.split("\n") : [desc, null];
+                const pb = tx.processed_by || "";
+                let processedByLabel = "—";
+                if (pb === "system") processedByLabel = "Auto Approved by System";
+                else if (pb.startsWith("admin:") || pb.startsWith("client:")) {
+                  processedByLabel = pb.split(":")[1]?.slice(0, 8) || "—";
+                }
+                return (
+                  <TableRow key={tx.id}>
+                    <TableCell className="text-muted-foreground whitespace-nowrap">{format(new Date(tx.created_at), "MMM d, yyyy HH:mm")}</TableCell>
+                    <TableCell className="capitalize font-medium">{tx.type.replace(/_/g, " ")}</TableCell>
+                    <TableCell className="text-sm">
+                      {hasNewline ? (
+                        <div>
+                          <span>{descName}</span>
+                          <span className="block text-xs text-muted-foreground">{descId}</span>
+                        </div>
+                      ) : desc}
+                    </TableCell>
+                    <TableCell className={cn("font-semibold", Number(tx.amount) >= 0 ? "text-green-600" : "text-red-600")}>
+                      {Number(tx.amount) >= 0 ? "+" : ""}${Math.abs(Number(tx.amount)).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="font-medium">${Number(tx.balance_after ?? 0).toLocaleString()}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{processedByLabel}</TableCell>
+                  </TableRow>
+                );
+              })}
               {(!transactions || transactions.length === 0) && (
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No transactions yet</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No transactions yet</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
