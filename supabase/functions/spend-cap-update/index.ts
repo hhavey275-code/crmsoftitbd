@@ -107,7 +107,7 @@ Deno.serve(async (req) => {
     const { data: userRole } = await supabase
       .from("user_roles")
       .select("role")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .single();
 
     const isAdmin = userRole?.role === "admin" || userRole?.role === "superadmin";
