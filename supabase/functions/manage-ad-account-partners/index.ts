@@ -148,7 +148,7 @@ Deno.serve(async (req) => {
       const { funding_source_id } = body;
       if (!funding_source_id) throw new Error("funding_source_id is required");
 
-      const url = `https://graph.facebook.com/v24.0/${actId}?funding_source=${funding_source_id}&access_token=${bm.access_token}`;
+      const url = `https://graph.facebook.com/v24.0/${actId}?funding_source=${funding_source_id}&access_token=${bmToken}`;
       const resp = await fetch(url, { method: "POST" });
       const data = await resp.json();
 
