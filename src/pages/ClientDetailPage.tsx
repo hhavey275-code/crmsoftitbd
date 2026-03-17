@@ -58,6 +58,8 @@ export default function ClientDetailPage() {
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [assignSelectedIds, setAssignSelectedIds] = useState<Set<string>>(new Set());
   const [unassignSelectedIds, setUnassignSelectedIds] = useState<Set<string>>(new Set());
+  const [showUnassignCheckboxes, setShowUnassignCheckboxes] = useState(false);
+  const [assignSearch, setAssignSearch] = useState("");
 
   const { data: profile } = useQuery({
     queryKey: ["client-detail-profile", userId],
