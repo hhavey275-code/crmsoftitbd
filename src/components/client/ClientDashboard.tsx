@@ -208,7 +208,7 @@ export function ClientDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {adAccounts.map((account: any) => {
+                {filtered.map((account: any) => {
                   const displayId = account.account_id?.replace("act_", "") ?? "";
                   return (
                     <TableRow key={account.id}>
