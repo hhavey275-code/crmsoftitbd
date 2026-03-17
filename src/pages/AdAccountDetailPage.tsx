@@ -325,6 +325,9 @@ export default function AdAccountDetailPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* Partner BMs (Admin only) */}
+          {isAdmin && id && <AdAccountPartners adAccountId={id} />}
         </div>
       </div>
     </DashboardLayout>
