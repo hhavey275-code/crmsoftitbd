@@ -121,15 +121,15 @@ Deno.serve(async (req) => {
     const fields = "id,name,account_id,account_status,spend_cap,amount_spent,business_name";
     const baseUrl = `https://graph.facebook.com/v24.0/${bm.bm_id}`;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const token = await decryptToken(bm.access_token, serviceKey);
+    const bmAccessToken = await decryptToken(bm.access_token, serviceKey);
 
     // Fetch owned + client ad accounts in parallel
     const [ownedResult, clientResult] = await Promise.allSettled([
       fetchAllPages(
-        `${baseUrl}/owned_ad_accounts?fields=${fields}&access_token=${token}&limit=100`
+        `${baseUrl}/owned_ad_accounts?fields=${fields}&access_token=${bmAccessToken}&limit=100`
       ),
       fetchAllPages(
-        `${baseUrl}/client_ad_accounts?fields=${fields}&access_token=${token}&limit=100`
+        `${baseUrl}/client_ad_accounts?fields=${fields}&access_token=${bmAccessToken}&limit=100`
       ),
     ]);
 
