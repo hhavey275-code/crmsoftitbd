@@ -109,6 +109,8 @@ Deno.serve(async (req) => {
     }
 
     const bm = (account as any).business_managers;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const bmToken = await decryptToken(bm.access_token, serviceKey);
 
     const actId = account.account_id.startsWith("act_")
       ? account.account_id
@@ -122,7 +124,7 @@ Deno.serve(async (req) => {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
           name: new_name.trim(),
-          access_token: bm.access_token,
+          access_token: bmToken,
         }),
       }
     );
