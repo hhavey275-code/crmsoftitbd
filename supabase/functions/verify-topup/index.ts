@@ -38,7 +38,8 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: true, message: 'Already processed' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const { payment_reference, bdt_amount, bank_account_id, proof_url, user_id, amount } = request;
+    const { bdt_amount, bank_account_id, proof_url, user_id, amount } = request;
+    const payment_reference = (request.payment_reference || '').trim();
     const bdtNum = Number(bdt_amount);
     const verificationLog: string[] = [];
 
