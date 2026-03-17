@@ -392,14 +392,14 @@ export function AdminDashboard() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
+          <CardHeader className="pb-2 md:pb-4">
+            <CardTitle className="text-base md:text-lg flex items-center gap-2 flex-wrap">
               <Trophy className="h-5 w-5 text-yellow-500" />
-              Top High Spenders
-              <span className="ml-auto flex items-center gap-2">
+              Top Spenders
+              <span className="ml-auto">
                 <Button variant="outline" size="sm" onClick={handleUpdateFromMeta} disabled={metaLoading} className="text-xs">
                   <RefreshCw className={`h-3 w-3 mr-1 ${metaLoading ? "animate-spin" : ""}`} />
-                  {metaLoading ? "Updating..." : "Update from Meta"}
+                  {metaLoading ? "..." : "Meta"}
                 </Button>
               </span>
             </CardTitle>
