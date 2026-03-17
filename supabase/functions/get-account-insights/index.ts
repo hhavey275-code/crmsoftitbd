@@ -30,6 +30,8 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return chunks;
 }
 
+const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
+
 async function batchSelect(supabase: any, table: string, column: string, ids: string[], selectStr: string) {
   const batches = chunk(ids, 30);
   const results: any[] = [];
@@ -47,9 +49,7 @@ async function batchSelect(supabase: any, table: string, column: string, ids: st
 function extractOrders(data: any) {
   const actions = data?.data?.[0]?.actions;
   if (!actions) return 0;
-  const purchaseTypes = [
-    "purchase",
-  ];
+  const purchaseTypes = ["purchase"];
   let total = 0;
   for (const a of actions) {
     if (purchaseTypes.includes(a.action_type)) {
@@ -89,6 +89,156 @@ async function fetchActiveCampaignCount(actId: string, accessToken: string): Pro
     return 0;
   }
 }
+
+// Check for Meta API rate limit errors
+function checkRateLimit(data: any): number | null {
+  if (data?.error?.code === 17 || data?.error?.code === 32 || data?.error?.code === 4) return data.error.code;
+  return null;
+}
+
+// Process a single account's Meta API calls
+async function processAccount(
+  account: any,
+  serviceKey: string,
+  date?: string,
+  date_from?: string,
+  date_to?: string,
+): Promise<{
+  id: string;
+  insight: any;
+  rateLimit?: { account_id: string; account_name: string; error_code: number };
+  adAccountUpdate?: { id: string; amount_spent: number; spend_cap?: number };
+}> {
+  const emptyInsight = {
+    today_spend: 0, yesterday_spend: 0,
+    today_orders: 0, yesterday_orders: 0,
+    active_campaigns: 0,
+    today_messages: 0, yesterday_messages: 0,
+    balance: 0, cards: [],
+  };
+
+  const rawToken = account.business_managers?.access_token;
+  const actId = account.account_id;
+
+  if (!rawToken) {
+    return { id: account.id, insight: { ...emptyInsight } };
+  }
+
+  const accessToken = await decryptToken(rawToken, serviceKey);
+
+  try {
+    const isDateRange = date_from && date_to;
+    const isSingleDate = date && !isDateRange;
+
+    let todayUrl: string;
+    let yesterdayUrl: string;
+
+    if (isDateRange) {
+      todayUrl = `https://graph.facebook.com/v24.0/${actId}/insights?fields=spend,actions&time_range={"since":"${date_from}","until":"${date_to}"}&access_token=${accessToken}`;
+      yesterdayUrl = "";
+    } else if (isSingleDate) {
+      todayUrl = `https://graph.facebook.com/v24.0/${actId}/insights?fields=spend,actions&time_range={"since":"${date}","until":"${date}"}&access_token=${accessToken}`;
+      const d = new Date(date);
+      d.setDate(d.getDate() - 1);
+      const prevDate = d.toISOString().split("T")[0];
+      yesterdayUrl = `https://graph.facebook.com/v24.0/${actId}/insights?fields=spend,actions&time_range={"since":"${prevDate}","until":"${prevDate}"}&access_token=${accessToken}`;
+    } else {
+      todayUrl = `https://graph.facebook.com/v24.0/${actId}/insights?fields=spend,actions&date_preset=today&access_token=${accessToken}`;
+      yesterdayUrl = `https://graph.facebook.com/v24.0/${actId}/insights?fields=spend,actions&date_preset=yesterday&access_token=${accessToken}`;
+    }
+
+    const fetchPromises: Promise<Response>[] = [
+      fetch(todayUrl),
+      fetch(`https://graph.facebook.com/v24.0/${actId}?fields=balance,amount_spent,spend_cap,funding_source_details&access_token=${accessToken}`),
+      fetchActiveCampaignCount(actId, accessToken).then(c => ({ json: async () => c } as any)),
+    ];
+    if (yesterdayUrl) {
+      fetchPromises.splice(1, 0, fetch(yesterdayUrl));
+    }
+
+    const responses = await Promise.all(fetchPromises);
+
+    let todayData: any, yesterdayData: any, accountData: any, activeCampaigns: number;
+
+    if (yesterdayUrl) {
+      todayData = await responses[0].json();
+      yesterdayData = await responses[1].json();
+      accountData = await responses[2].json();
+      activeCampaigns = await responses[3].json();
+    } else {
+      todayData = await responses[0].json();
+      yesterdayData = { data: [] };
+      accountData = await responses[1].json();
+      activeCampaigns = await responses[2].json();
+    }
+
+    const rlCode = checkRateLimit(todayData) || checkRateLimit(yesterdayData) || checkRateLimit(accountData);
+    if (rlCode) {
+      return {
+        id: account.id,
+        insight: { ...emptyInsight },
+        rateLimit: { account_id: actId, account_name: account.account_name || actId, error_code: rlCode },
+      };
+    }
+
+    const todaySpend = todayData?.data?.[0]?.spend ? parseFloat(todayData.data[0].spend) : 0;
+    const yesterdaySpend = yesterdayData?.data?.[0]?.spend ? parseFloat(yesterdayData.data[0].spend) : 0;
+    const balance = accountData?.balance ? parseFloat(accountData.balance) / 100 : 0;
+
+    let adAccountUpdate: any = undefined;
+    if (!isSingleDate && !isDateRange && accountData?.amount_spent !== undefined) {
+      const metaAmountSpent = parseFloat(accountData.amount_spent) / 100;
+      const rawSpendCap = accountData?.spend_cap;
+      const metaSpendCap = rawSpendCap ? parseFloat(rawSpendCap) / 100 : 0;
+      adAccountUpdate = { id: account.id, amount_spent: metaAmountSpent };
+      if (metaSpendCap > 0) {
+        adAccountUpdate.spend_cap = metaSpendCap;
+      }
+    }
+
+    const cards: any[] = [];
+    const fsd = accountData?.funding_source_details;
+    if (fsd) {
+      cards.push({
+        id: fsd.id,
+        display_string: fsd.display_string || `Card ending ${fsd.id?.slice(-4) || '****'}`,
+        type: fsd.type,
+      });
+    }
+
+    return {
+      id: account.id,
+      insight: {
+        today_spend: todaySpend,
+        yesterday_spend: yesterdaySpend,
+        date_spend: (isSingleDate || isDateRange) ? todaySpend : undefined,
+        today_orders: extractOrders(todayData),
+        yesterday_orders: extractOrders(yesterdayData),
+        active_campaigns: activeCampaigns,
+        today_messages: extractMessages(todayData),
+        yesterday_messages: extractMessages(yesterdayData),
+        balance,
+        cards,
+      },
+      adAccountUpdate,
+    };
+  } catch (fetchErr: any) {
+    if (fetchErr?.status === 429) {
+      return {
+        id: account.id,
+        insight: { ...emptyInsight },
+        rateLimit: { account_id: actId, account_name: account.account_name || actId, error_code: 429 },
+      };
+    }
+    return { id: account.id, insight: { ...emptyInsight } };
+  }
+}
+
+// ====== MAIN ======
+// Process accounts in small batches (5 at a time) with 300ms delay between batches
+// to avoid Meta API rate limits. Each account makes 3-4 API calls, so batch of 5 = ~20 calls.
+const META_BATCH_SIZE = 5;
+const META_BATCH_DELAY_MS = 300;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -130,7 +280,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // source === "meta"
+    // source === "meta" — fetch from Meta API in controlled batches
     const accounts = await batchSelect(
       supabase, "ad_accounts", "id", ad_account_ids,
       "id, account_id, amount_spent, spend_cap, business_manager_id, business_managers(access_token)"
@@ -138,142 +288,52 @@ Deno.serve(async (req) => {
 
     const insights: Record<string, any> = {};
     const rateLimited: { account_id: string; account_name: string; error_code: number }[] = [];
-    const emptyInsight = {
-      today_spend: 0, yesterday_spend: 0,
-      today_orders: 0, yesterday_orders: 0,
-      active_campaigns: 0,
-      today_messages: 0, yesterday_messages: 0,
-      balance: 0, cards: [],
-    };
-
-    // Track amount_spent and spend_cap updates for ad_accounts table
-    // NOTE: We only sync spend_cap from Meta when it's > 0. Meta returns 0 for accounts
-    // with no cap set, which would incorrectly reset our local spend_cap values.
     const adAccountUpdates: { id: string; amount_spent: number; spend_cap?: number }[] = [];
 
-    const promises = (accounts ?? []).map(async (account: any) => {
-      const rawToken = account.business_managers?.access_token;
-      const actId = account.account_id;
+    // Process in small batches with delay to avoid Meta rate limits
+    const accountBatches = chunk(accounts ?? [], META_BATCH_SIZE);
+    let hitRateLimit = false;
 
-      if (!rawToken) {
-        insights[account.id] = { ...emptyInsight };
-        return;
+    console.log(`Processing ${accounts?.length ?? 0} accounts in ${accountBatches.length} batches of ${META_BATCH_SIZE}`);
+
+    for (let i = 0; i < accountBatches.length; i++) {
+      const batch = accountBatches[i];
+
+      // If we already hit a rate limit, skip remaining Meta calls and return empty
+      if (hitRateLimit) {
+        for (const account of batch) {
+          insights[account.id] = {
+            today_spend: 0, yesterday_spend: 0,
+            today_orders: 0, yesterday_orders: 0,
+            active_campaigns: 0,
+            today_messages: 0, yesterday_messages: 0,
+            balance: 0, cards: [],
+          };
+        }
+        continue;
       }
 
-      const accessToken = await decryptToken(rawToken, serviceKey);
+      // Process batch concurrently (small batch = safe)
+      const results = await Promise.all(
+        batch.map((account: any) => processAccount(account, serviceKey, date, date_from, date_to))
+      );
 
-      try {
-        // Determine if this is a date range query or single date query
-        const isDateRange = date_from && date_to;
-        const isSingleDate = date && !isDateRange;
-
-        let todayUrl: string;
-        let yesterdayUrl: string;
-
-        if (isDateRange) {
-          // Date range: fetch spend for the range
-          todayUrl = `https://graph.facebook.com/v24.0/${actId}/insights?fields=spend,actions&time_range={"since":"${date_from}","until":"${date_to}"}&access_token=${accessToken}`;
-          // No meaningful "yesterday" for range, skip
-          yesterdayUrl = "";
-        } else if (isSingleDate) {
-          todayUrl = `https://graph.facebook.com/v24.0/${actId}/insights?fields=spend,actions&time_range={"since":"${date}","until":"${date}"}&access_token=${accessToken}`;
-          const d = new Date(date);
-          d.setDate(d.getDate() - 1);
-          const prevDate = d.toISOString().split("T")[0];
-          yesterdayUrl = `https://graph.facebook.com/v24.0/${actId}/insights?fields=spend,actions&time_range={"since":"${prevDate}","until":"${prevDate}"}&access_token=${accessToken}`;
-        } else {
-          todayUrl = `https://graph.facebook.com/v24.0/${actId}/insights?fields=spend,actions&date_preset=today&access_token=${accessToken}`;
-          yesterdayUrl = `https://graph.facebook.com/v24.0/${actId}/insights?fields=spend,actions&date_preset=yesterday&access_token=${accessToken}`;
+      for (const result of results) {
+        insights[result.id] = result.insight;
+        if (result.rateLimit) {
+          rateLimited.push(result.rateLimit);
+          hitRateLimit = true;
         }
-
-        const fetchPromises: Promise<Response>[] = [
-          fetch(todayUrl),
-          fetch(`https://graph.facebook.com/v24.0/${actId}?fields=balance,amount_spent,spend_cap,funding_source_details&access_token=${accessToken}`),
-          fetchActiveCampaignCount(actId, accessToken).then(c => ({ json: async () => c } as any)),
-        ];
-        if (yesterdayUrl) {
-          fetchPromises.splice(1, 0, fetch(yesterdayUrl));
+        if (result.adAccountUpdate) {
+          adAccountUpdates.push(result.adAccountUpdate);
         }
-
-        const responses = await Promise.all(fetchPromises);
-        
-        let todayData: any, yesterdayData: any, accountData: any, activeCampaigns: number;
-        
-        if (yesterdayUrl) {
-          todayData = await responses[0].json();
-          yesterdayData = await responses[1].json();
-          accountData = await responses[2].json();
-          activeCampaigns = await responses[3].json();
-        } else {
-          todayData = await responses[0].json();
-          yesterdayData = { data: [] };
-          accountData = await responses[1].json();
-          activeCampaigns = await responses[2].json();
-        }
-
-        // Check for Meta API rate limit errors
-        const checkRateLimit = (data: any): number | null => {
-          if (data?.error?.code === 17 || data?.error?.code === 32 || data?.error?.code === 4) return data.error.code;
-          return null;
-        };
-        const rlCode = checkRateLimit(todayData) || checkRateLimit(yesterdayData) || checkRateLimit(accountData);
-        if (rlCode) {
-          rateLimited.push({ account_id: actId, account_name: account.account_name || actId, error_code: rlCode });
-          insights[account.id] = { ...emptyInsight };
-          return;
-        }
-
-        const todaySpend = todayData?.data?.[0]?.spend ? parseFloat(todayData.data[0].spend) : 0;
-        const yesterdaySpend = yesterdayData?.data?.[0]?.spend ? parseFloat(yesterdayData.data[0].spend) : 0;
-
-        const balance = accountData?.balance ? parseFloat(accountData.balance) / 100 : 0;
-
-        // Update amount_spent and spend_cap from Meta account data (not from date-specific query)
-        if (!isSingleDate && !isDateRange && accountData?.amount_spent !== undefined) {
-          const metaAmountSpent = parseFloat(accountData.amount_spent) / 100;
-          const rawSpendCap = accountData?.spend_cap;
-          const metaSpendCap = rawSpendCap ? parseFloat(rawSpendCap) / 100 : 0;
-          console.log(`[DEBUG] Account ${actId}: Meta spend_cap raw="${rawSpendCap}", parsed=$${metaSpendCap}, Meta amount_spent=$${metaAmountSpent}`);
-          const update: any = { id: account.id, amount_spent: metaAmountSpent };
-          // Only sync spend_cap if Meta returns a non-zero value to avoid resetting local caps
-          if (metaSpendCap > 0) {
-            update.spend_cap = metaSpendCap;
-          }
-          adAccountUpdates.push(update);
-        }
-
-        const cards: any[] = [];
-        const fsd = accountData?.funding_source_details;
-        if (fsd) {
-          cards.push({
-            id: fsd.id,
-            display_string: fsd.display_string || `Card ending ${fsd.id?.slice(-4) || '****'}`,
-            type: fsd.type,
-          });
-        }
-
-        insights[account.id] = {
-          today_spend: todaySpend,
-          yesterday_spend: yesterdaySpend,
-          date_spend: (isSingleDate || isDateRange) ? todaySpend : undefined,
-          today_orders: extractOrders(todayData),
-          yesterday_orders: extractOrders(yesterdayData),
-          active_campaigns: activeCampaigns,
-          today_messages: extractMessages(todayData),
-          yesterday_messages: extractMessages(yesterdayData),
-          balance,
-          cards,
-        };
-      } catch (fetchErr: any) {
-        // Check if it's a rate limit HTTP error
-        if (fetchErr?.status === 429) {
-          rateLimited.push({ account_id: actId, account_name: account.account_name || actId, error_code: 429 });
-        }
-        insights[account.id] = { ...emptyInsight };
       }
-    });
 
-    await Promise.all(promises);
+      // Add delay between batches (skip after last batch)
+      if (i < accountBatches.length - 1 && !hitRateLimit) {
+        await delay(META_BATCH_DELAY_MS);
+      }
+    }
 
     // Upsert all insights into DB (only for non-date queries)
     if (!date && !date_from && !date_to) {
@@ -298,7 +358,6 @@ Deno.serve(async (req) => {
           .upsert(batch, { onConflict: "ad_account_id" });
       }
 
-      // Update ad_accounts with fresh data from Meta (amount_spent + spend_cap)
       if (adAccountUpdates.length > 0) {
         const updateBatches = chunk(adAccountUpdates, 30);
         for (const batch of updateBatches) {
@@ -307,10 +366,7 @@ Deno.serve(async (req) => {
             if (item.spend_cap !== undefined) {
               updateData.spend_cap = item.spend_cap;
             }
-            await supabase
-              .from("ad_accounts")
-              .update(updateData)
-              .eq("id", item.id);
+            await supabase.from("ad_accounts").update(updateData).eq("id", item.id);
           }
         }
       }

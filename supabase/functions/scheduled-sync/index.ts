@@ -23,6 +23,25 @@ async function decryptToken(stored: string, secret: string): Promise<string> {
   } catch { return stored; }
 }
 
+const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+// Fetch all pages with delay between pages
+async function fetchAllPages(url: string): Promise<any[]> {
+  const results: any[] = [];
+  let nextUrl: string | null = url;
+  while (nextUrl) {
+    const res = await fetch(nextUrl);
+    const data = await res.json();
+    if (data.error) {
+      throw new Error(data.error.message);
+    }
+    results.push(...(data.data ?? []));
+    nextUrl = data.paging?.next ?? null;
+    if (nextUrl) await delay(300); // delay between pages
+  }
+  return results;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -34,7 +53,6 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Get all active BMs
     const { data: bms, error: bmsError } = await supabase
       .from("business_managers")
       .select("*")
@@ -43,34 +61,22 @@ Deno.serve(async (req) => {
     if (bmsError) throw bmsError;
 
     let totalSynced = 0;
-
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     for (const bm of bms ?? []) {
       try {
         const accessToken = await decryptToken(bm.access_token, serviceKey);
-        const metaUrl = `https://graph.facebook.com/v25.0/${bm.bm_id}/owned_ad_accounts?fields=id,name,account_id,account_status,spend_cap,amount_spent&access_token=${accessToken}&limit=100`;
 
-        const metaRes = await fetch(metaUrl);
-        const metaData = await metaRes.json();
+        // Use fetchAllPages with pagination support
+        const accounts = await fetchAllPages(
+          `https://graph.facebook.com/v25.0/${bm.bm_id}/owned_ad_accounts?fields=id,name,account_id,account_status,spend_cap,amount_spent&access_token=${accessToken}&limit=100`
+        );
 
-        if (metaData.error) {
-          console.error(`Meta API error for BM ${bm.bm_id}:`, metaData.error.message);
-          // Mark BM as inactive if token expired
-          if (metaData.error.code === 190) {
-            await supabase
-              .from("business_managers")
-              .update({ status: "inactive" })
-              .eq("id", bm.id);
-          }
-          continue;
-        }
+        // Process accounts in batches of 10 with delay
+        for (let i = 0; i < accounts.length; i++) {
+          const account = accounts[i];
+          const accountId = account.account_id || account.id?.replace("act_", "");
 
-        for (const account of metaData.data ?? []) {
-          const accountId =
-            account.account_id || account.id?.replace("act_", "");
-
-          // Meta spend_cap is in CENTS (minor currency units). Convert to dollars.
           const metaSpendCapCents = Number(account.spend_cap ?? 0);
           const metaSpendCapDollars = metaSpendCapCents / 100;
           const updateData: any = {
@@ -82,7 +88,6 @@ Deno.serve(async (req) => {
                 : "pending",
             amount_spent: Number(account.amount_spent ?? 0) / 100,
           };
-          // Only sync spend_cap if Meta returns a non-zero value to avoid resetting local caps
           if (metaSpendCapDollars > 0) {
             updateData.spend_cap = metaSpendCapDollars;
           }
@@ -92,10 +97,25 @@ Deno.serve(async (req) => {
             .eq("account_id", `act_${accountId}`);
 
           totalSynced++;
+
+          // Add small delay every 10 accounts
+          if (i > 0 && i % 10 === 0) {
+            await delay(200);
+          }
         }
       } catch (bmErr) {
         console.error(`Error syncing BM ${bm.bm_id}:`, bmErr);
+        // Mark BM as inactive if token expired
+        if (bmErr instanceof Error && bmErr.message?.includes("expired")) {
+          await supabase
+            .from("business_managers")
+            .update({ status: "inactive" })
+            .eq("id", bm.id);
+        }
       }
+
+      // Delay between BMs
+      await delay(500);
     }
 
     return new Response(
