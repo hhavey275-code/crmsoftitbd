@@ -29,7 +29,29 @@ function centsToDollars(cents: number): number {
 
 const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-// Retry a fetch with exponential backoff on rate limit
+function isMetaRateLimited(status: number, data: any): boolean {
+  const message = String(data?.error?.message ?? "").toLowerCase();
+  return (
+    status === 429 ||
+    data?.error?.code === 17 ||
+    data?.error?.code === 32 ||
+    data?.error?.code === 4 ||
+    message.includes("user request limit reached") ||
+    message.includes("request limit")
+  );
+}
+
+function getRetryDelayMs(attempt: number, retryAfterHeader: string | null): number {
+  const retryAfterSeconds = Number(retryAfterHeader);
+  if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+    return Math.min(retryAfterSeconds * 1000, 120000);
+  }
+
+  const backoffMs = [5000, 15000, 30000, 60000];
+  return backoffMs[Math.min(attempt, backoffMs.length - 1)];
+}
+
+// Retry a fetch with slower backoff on Meta rate limit
 async function metaFetchWithRetry(
   url: string,
   options: RequestInit,
@@ -40,24 +62,23 @@ async function metaFetchWithRetry(
     let data: any = null;
     try { data = await res.json(); } catch { data = null; }
 
-    // Check rate limit
-    const isRateLimited =
-      res.status === 429 ||
-      data?.error?.code === 17 ||
-      data?.error?.code === 32 ||
-      data?.error?.code === 4 ||
-      (data?.error?.message && data.error.message.includes("request limit"));
+    const rateLimited = isMetaRateLimited(res.status, data);
 
-    if (isRateLimited && attempt < maxRetries) {
-      const waitMs = Math.min(2000 * Math.pow(2, attempt), 15000); // 2s, 4s, 8s max 15s
+    if (rateLimited && attempt < maxRetries) {
+      const waitMs = getRetryDelayMs(attempt, res.headers.get("retry-after"));
       console.log(`Rate limited (attempt ${attempt + 1}/${maxRetries + 1}), waiting ${waitMs}ms...`);
       await delay(waitMs);
       continue;
     }
 
+    if (rateLimited) {
+      throw new Error("META_RATE_LIMIT_RETRY_EXHAUSTED");
+    }
+
     return { res, data };
   }
-  throw new Error("Max retries exceeded");
+
+  throw new Error("META_FETCH_RETRY_EXHAUSTED");
 }
 
 Deno.serve(async (req) => {
@@ -156,7 +177,20 @@ Deno.serve(async (req) => {
 
       if (!metaRes.ok || metaData?.error) {
         const metaErrorMsg = metaData?.error?.message || `Meta HTTP ${metaRes.status}`;
+        const rateLimited = isMetaRateLimited(metaRes.status, metaData);
         console.warn("Meta POST failed", { actId, status: metaRes.status, message: metaErrorMsg });
+
+        if (rateLimited) {
+          return json({
+            error: "Meta API is busy (rate limit reached). Please try again in 2-3 minutes.",
+            code: "META_RATE_LIMIT",
+            ad_account_id: actId,
+            business_manager_id: bm?.bm_id ?? null,
+            wallet_charged: false,
+            retry_after_seconds: 180,
+          }, 429);
+        }
+
         return json({
           error: `Meta API error: ${metaErrorMsg}`,
           ad_account_id: actId,
@@ -167,10 +201,29 @@ Deno.serve(async (req) => {
       }
 
       // Verify with GET (also with retry)
-      const { data: verifyData } = await metaFetchWithRetry(
+      const { res: verifyRes, data: verifyData } = await metaFetchWithRetry(
         `https://graph.facebook.com/v24.0/${actId}?fields=spend_cap&access_token=${encodeURIComponent(bmToken)}`,
         { method: "GET" },
       );
+
+      if (!verifyRes.ok || verifyData?.error) {
+        const verifyErrorMsg = verifyData?.error?.message || `Meta verify HTTP ${verifyRes.status}`;
+        const verifyRateLimited = isMetaRateLimited(verifyRes.status, verifyData);
+        console.warn("Meta verification failed", { actId, status: verifyRes.status, message: verifyErrorMsg });
+
+        if (verifyRateLimited) {
+          return json({
+            error: "Meta verification is temporarily rate limited. Please retry in 2-3 minutes.",
+            code: "META_RATE_LIMIT",
+            ad_account_id: actId,
+            business_manager_id: bm?.bm_id ?? null,
+            wallet_charged: false,
+            retry_after_seconds: 180,
+          }, 429);
+        }
+
+        return json({ error: `Meta verification error: ${verifyErrorMsg}`, wallet_charged: false }, 400);
+      }
 
       if (verifyData?.spend_cap !== undefined) {
         const verifiedDollars = centsToDollars(Number(verifyData.spend_cap));
@@ -189,6 +242,16 @@ Deno.serve(async (req) => {
     } catch (err) {
       const metaErrorMsg = err instanceof Error ? err.message : "Network error";
       console.warn("Meta network error", metaErrorMsg);
+
+      if (metaErrorMsg === "META_RATE_LIMIT_RETRY_EXHAUSTED") {
+        return json({
+          error: "Meta API rate limit is still active. Please retry in 2-3 minutes.",
+          code: "META_RATE_LIMIT",
+          wallet_charged: false,
+          retry_after_seconds: 180,
+        }, 429);
+      }
+
       return json({ error: `Meta API error: ${metaErrorMsg}`, wallet_charged: false }, 500);
     }
 
