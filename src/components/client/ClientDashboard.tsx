@@ -222,7 +222,7 @@ export function ClientDashboard() {
                       <TableCell className="text-right">
                         <Button
                           size="sm"
-                          className="gap-1 bg-primary hover:bg-primary/90 text-primary-foreground"
+                          className="gap-1.5 bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs tracking-wide"
                           onClick={() => navigate("/top-up", { state: { adAccountId: account.id } })}
                         >
                           <ArrowUpCircle className="h-3.5 w-3.5" />
