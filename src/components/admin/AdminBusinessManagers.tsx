@@ -133,6 +133,7 @@ export function AdminBusinessManagers() {
 
   const syncMutation = useMutation({
     mutationFn: async (businessManagerId: string) => {
+      setSyncingBmId(businessManagerId);
       const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-bm-accounts`,
