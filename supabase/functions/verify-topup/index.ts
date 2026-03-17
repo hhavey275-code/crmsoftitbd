@@ -250,7 +250,7 @@ Deno.serve(async (req) => {
       .update({ 
         status: 'approved', 
         admin_note: logText,
-        reviewed_by: 'system'
+        reviewed_by: null
       })
       .eq('id', request_id);
     if (updateErr) throw updateErr;
