@@ -415,6 +415,15 @@ export function AdminBusinessManagers() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Business Managers</h1>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => encryptExistingMutation.mutate()}
+            disabled={encryptExistingMutation.isPending}
+          >
+            <ShieldCheck className="mr-1 h-4 w-4" />
+            {encryptExistingMutation.isPending ? "Encrypting..." : "Encrypt Tokens"}
+          </Button>
           {bms && bms.length > 0 && (
             <Button
               variant="outline"
