@@ -644,6 +644,7 @@ export default function ClientDetailPage() {
                       <TableHead>Ad Account</TableHead>
                       <TableHead>Amount</TableHead>
                       <TableHead>Balance After</TableHead>
+                      <TableHead>Processed By</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -651,16 +652,36 @@ export default function ClientDetailPage() {
                       const linkedAccount = tx.reference_id && tx.type === "ad_topup"
                         ? adAccounts?.find((a: any) => a.id === tx.reference_id)
                         : null;
+                      const desc = tx.description || "—";
+                      const hasNewline = desc.includes("\n");
+                      const [descName, descId] = hasNewline ? desc.split("\n") : [desc, null];
+                      const pb = tx.processed_by || "";
+                      let processedByLabel = "—";
+                      if (pb === "system") processedByLabel = "Auto Approved by System";
+                      else if (pb.startsWith("admin:")) {
+                        const adminId = pb.split(":")[1];
+                        const adminProf = allProfiles?.find((p: any) => p.user_id === adminId);
+                        processedByLabel = adminProf?.full_name || adminProf?.email || adminId.slice(0, 8);
+                      } else if (pb.startsWith("client:")) {
+                        processedByLabel = profile?.full_name || profile?.email || "Client";
+                      }
                       return (
                         <TableRow key={tx.id}>
                           <TableCell className="text-muted-foreground whitespace-nowrap">{format(new Date(tx.created_at), "MMM d, yyyy HH:mm")}</TableCell>
                           <TableCell className="capitalize font-medium">{tx.type.replace(/_/g, " ")}</TableCell>
-                          <TableCell className="text-sm">{tx.description || "—"}</TableCell>
+                          <TableCell className="text-sm">
+                            {hasNewline ? (
+                              <div>
+                                <span>{descName}</span>
+                                <span className="block text-xs text-muted-foreground">{descId}</span>
+                              </div>
+                            ) : desc}
+                          </TableCell>
                           <TableCell className="text-sm">
                             {linkedAccount ? (
                               <div>
                                 <p className="font-medium">{linkedAccount.account_name}</p>
-                                <p className="text-[11px] text-muted-foreground font-mono">{linkedAccount.account_id}</p>
+                                <p className="text-[11px] text-muted-foreground font-mono">{linkedAccount.account_id.replace(/^act_/, "")}</p>
                               </div>
                             ) : (
                               <span className="text-muted-foreground">—</span>
@@ -670,11 +691,12 @@ export default function ClientDetailPage() {
                             {Number(tx.amount) >= 0 ? "+" : ""}${Math.abs(Number(tx.amount)).toLocaleString()}
                           </TableCell>
                           <TableCell className="font-medium">${Number(tx.balance_after ?? 0).toLocaleString()}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{processedByLabel}</TableCell>
                         </TableRow>
                       );
                     })}
                     {(!transactions || transactions.length === 0) && (
-                      <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No transactions yet</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No transactions yet</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
