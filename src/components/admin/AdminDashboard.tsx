@@ -15,6 +15,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import type { DateRange } from "react-day-picker";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const DATE_PRESETS = [
   { label: "Today", getValue: () => ({ from: new Date(), to: new Date() }) },
@@ -37,6 +38,7 @@ const DATE_SPEND_SESSION_KEY = "admin-dashboard-date-spend";
 export function AdminDashboard() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [metaLoading, setMetaLoading] = useState(false);
   const [dailySpendLoading, setDailySpendLoading] = useState(false);
 
@@ -244,22 +246,22 @@ export function AdminDashboard() {
   const rankColors = ["text-yellow-500", "text-blue-500", "text-orange-500"];
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Admin Dashboard</h1>
+    <div className="space-y-4 md:space-y-6">
+      <h1 className="text-xl md:text-2xl font-bold">Admin Dashboard</h1>
 
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-3">
-        <MetricCard title="Total Clients" value={profiles?.length ?? 0} icon={Users} iconBg="bg-blue-50 dark:bg-blue-900/30" iconColor="text-blue-600" />
-        <MetricCard title="Platform Balance" value={`$${totalBalance.toLocaleString()}`} icon={Wallet} iconBg="bg-emerald-50 dark:bg-emerald-900/30" iconColor="text-emerald-600" />
-        <MetricCard title="Pending Top-Ups" value={pendingRequests?.length ?? 0} icon={Clock} iconBg="bg-amber-50 dark:bg-amber-900/30" iconColor="text-amber-600" />
-        <MetricCard title="Active Ad Accounts" value={activeAccounts.length} icon={Activity} iconBg="bg-teal-50 dark:bg-teal-900/30" iconColor="text-teal-600" />
-        <MetricCard title="Disabled Ad Accounts" value={disabledAccounts.length} icon={Ban} iconBg="bg-red-50 dark:bg-red-900/30" iconColor="text-red-500" />
-        <MetricCard title="Remaining Limit" value={`$${remainingLimit.toLocaleString()}`} icon={TrendingUp} iconBg="bg-violet-50 dark:bg-violet-900/30" iconColor="text-violet-600" />
+      <div className="grid gap-3 md:gap-4 grid-cols-2 lg:grid-cols-3">
+        <MetricCard title="Total Clients" value={profiles?.length ?? 0} icon={Users} iconBg="bg-blue-50 dark:bg-blue-900/30" iconColor="text-blue-600" size={isMobile ? "sm" : "default"} />
+        <MetricCard title="Platform Balance" value={`$${totalBalance.toLocaleString()}`} icon={Wallet} iconBg="bg-emerald-50 dark:bg-emerald-900/30" iconColor="text-emerald-600" size={isMobile ? "sm" : "default"} />
+        <MetricCard title="Pending Top-Ups" value={pendingRequests?.length ?? 0} icon={Clock} iconBg="bg-amber-50 dark:bg-amber-900/30" iconColor="text-amber-600" size={isMobile ? "sm" : "default"} />
+        <MetricCard title="Active Accounts" value={activeAccounts.length} icon={Activity} iconBg="bg-teal-50 dark:bg-teal-900/30" iconColor="text-teal-600" size={isMobile ? "sm" : "default"} />
+        <MetricCard title="Disabled Accounts" value={disabledAccounts.length} icon={Ban} iconBg="bg-red-50 dark:bg-red-900/30" iconColor="text-red-500" size={isMobile ? "sm" : "default"} />
+        <MetricCard title="Remaining Limit" value={`$${remainingLimit.toLocaleString()}`} icon={TrendingUp} iconBg="bg-violet-50 dark:bg-violet-900/30" iconColor="text-violet-600" size={isMobile ? "sm" : "default"} />
       </div>
 
       {/* Spend Overview - Single Card */}
       <Card>
-        <CardContent className="py-4">
-          <div className="flex items-center gap-3 flex-wrap">
+        <CardContent className="py-3 md:py-4">
+          <div className="flex flex-col md:flex-row md:items-center gap-3 flex-wrap">
             <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className={cn("justify-start text-left font-normal gap-2", !dateRange?.from && "text-muted-foreground")}>
@@ -270,6 +272,29 @@ export function AdminDashboard() {
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start" side="bottom">
+                {isMobile ? (
+                  <div className="p-3 space-y-3">
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Presets</p>
+                      <RadioGroup value={selectedPreset} onValueChange={handlePresetChange}>
+                        {DATE_PRESETS.map((preset) => (
+                          <div key={preset.label} className="flex items-center space-x-2">
+                            <RadioGroupItem value={preset.label} id={`preset-${preset.label}`} className="h-3.5 w-3.5" />
+                            <Label htmlFor={`preset-${preset.label}`} className="text-sm cursor-pointer font-normal">{preset.label}</Label>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    </div>
+                    <Calendar
+                      mode="range"
+                      selected={dateRange}
+                      onSelect={(range) => { setDateRange(range); setSelectedPreset(""); }}
+                      numberOfMonths={1}
+                      disabled={(d) => d > new Date()}
+                      className="pointer-events-auto"
+                    />
+                  </div>
+                ) : (
                 <div className="flex pointer-events-auto">
                   {/* Preset sidebar */}
                   <div className="border-r p-3 space-y-1 min-w-[150px]">
@@ -300,6 +325,7 @@ export function AdminDashboard() {
                     />
                   </div>
                 </div>
+                )}
                 {/* Bottom bar */}
                 <div className="flex items-center justify-between border-t px-4 py-3">
                   <div className="text-sm text-muted-foreground">
@@ -339,7 +365,7 @@ export function AdminDashboard() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 md:gap-6 grid-cols-1 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Client Spend Distribution</CardTitle>
@@ -348,10 +374,10 @@ export function AdminDashboard() {
             {spenderChart.length === 0 ? (
               <p className="text-sm text-muted-foreground py-8 text-center">No spending data yet</p>
             ) : (
-              <div className="h-[300px]">
+              <div className="h-[250px] md:h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={spenderChart} cx="50%" cy="50%" innerRadius={60} outerRadius={110} paddingAngle={3} dataKey="value" nameKey="name">
+                    <Pie data={spenderChart} cx="50%" cy="50%" innerRadius={isMobile ? 40 : 60} outerRadius={isMobile ? 80 : 110} paddingAngle={3} dataKey="value" nameKey="name">
                       {spenderChart.map((_, index) => (
                         <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                       ))}
@@ -366,14 +392,14 @@ export function AdminDashboard() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
+          <CardHeader className="pb-2 md:pb-4">
+            <CardTitle className="text-base md:text-lg flex items-center gap-2 flex-wrap">
               <Trophy className="h-5 w-5 text-yellow-500" />
-              Top High Spenders
-              <span className="ml-auto flex items-center gap-2">
+              Top Spenders
+              <span className="ml-auto">
                 <Button variant="outline" size="sm" onClick={handleUpdateFromMeta} disabled={metaLoading} className="text-xs">
                   <RefreshCw className={`h-3 w-3 mr-1 ${metaLoading ? "animate-spin" : ""}`} />
-                  {metaLoading ? "Updating..." : "Update from Meta"}
+                  {metaLoading ? "..." : "Meta"}
                 </Button>
               </span>
             </CardTitle>
@@ -386,15 +412,15 @@ export function AdminDashboard() {
                 {topThree.map((spender, i) => {
                   const RankIcon = rankIcons[i];
                   return (
-                    <div key={spender.userId} className="flex items-center gap-4 rounded-lg border p-4 transition-colors hover:bg-muted/50 cursor-pointer" onClick={() => navigate(`/clients/${spender.userId}`)}>
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-                        <RankIcon className={`h-5 w-5 ${rankColors[i]}`} />
+                    <div key={spender.userId} className="flex items-center gap-3 md:gap-4 rounded-lg border p-3 md:p-4 transition-colors hover:bg-muted/50 cursor-pointer" onClick={() => navigate(`/clients/${spender.userId}`)}>
+                      <div className="flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-full bg-muted flex-shrink-0">
+                        <RankIcon className={`h-4 w-4 md:h-5 md:w-5 ${rankColors[i]}`} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold truncate hover:underline">{spender.name}</p>
-                        <p className="text-xs text-muted-foreground">Rank #{i + 1}</p>
+                        <p className="font-semibold text-sm md:text-base truncate hover:underline">{spender.name}</p>
+                        <p className="text-xs text-muted-foreground">#{i + 1}</p>
                       </div>
-                      <p className="font-bold text-lg">${spender.value.toLocaleString()}</p>
+                      <p className="font-bold text-sm md:text-lg">${spender.value.toLocaleString()}</p>
                     </div>
                   );
                 })}
