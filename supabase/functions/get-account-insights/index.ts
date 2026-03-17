@@ -151,14 +151,18 @@ Deno.serve(async (req) => {
     // Track amount_spent updates for ad_accounts table
     const amountSpentUpdates: { id: string; amount_spent: number }[] = [];
 
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
     const promises = (accounts ?? []).map(async (account: any) => {
-      const accessToken = account.business_managers?.access_token;
+      const rawToken = account.business_managers?.access_token;
       const actId = account.account_id;
 
-      if (!accessToken) {
+      if (!rawToken) {
         insights[account.id] = { ...emptyInsight };
         return;
       }
+
+      const accessToken = await decryptToken(rawToken, serviceKey);
 
       try {
         // Determine if this is a date range query or single date query

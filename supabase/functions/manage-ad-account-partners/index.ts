@@ -67,6 +67,9 @@ Deno.serve(async (req) => {
     const bm = (account as any).business_managers;
     if (!bm) throw new Error("No business manager linked to this ad account");
 
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const bmToken = await decryptToken(bm.access_token, serviceKey);
+
     const actId = account.account_id.startsWith("act_")
       ? account.account_id
       : `act_${account.account_id}`;
