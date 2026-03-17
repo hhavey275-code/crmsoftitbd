@@ -55,6 +55,18 @@ export function ClientDashboard() {
     enabled: !!user,
   });
 
+  // Realtime subscription to ad_accounts changes for live remaining balance
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel("client-dashboard-ad-accounts")
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "ad_accounts" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["client-ad-accounts", user.id] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user, queryClient]);
+
   const { data: topUpTotal } = useQuery({
     queryKey: ["client-topup-total", user?.id, dateFrom?.toISOString(), dateTo?.toISOString()],
     queryFn: async () => {
@@ -75,7 +87,7 @@ export function ClientDashboard() {
     enabled: !!user,
   });
 
-  const totalRemaining = adAccounts?.reduce((sum: number, a: any) => sum + (Number(a.spend_cap) - Number(a.amount_spent)), 0) ?? 0;
+  const totalRemaining = adAccounts?.reduce((sum: number, a: any) => sum + Math.max(0, Number(a.spend_cap) - Number(a.amount_spent)), 0) ?? 0;
 
   const greeting = () => {
     const hour = new Date().getHours();
