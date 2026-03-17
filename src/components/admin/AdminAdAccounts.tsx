@@ -14,7 +14,9 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ArrowUpCircle, ExternalLink, Wallet, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, AppWindow, Search, ListChecks, Trash2, ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
+import { ArrowUpCircle, ExternalLink, Wallet, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, AppWindow, Search, ListChecks, Trash2, ChevronLeft, ChevronRight, MoreHorizontal, Check, ChevronsUpDown } from "lucide-react";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { CardBrandIcon } from "@/components/CardBrandIcon";
 
@@ -690,26 +692,41 @@ export function AdminAdAccounts() {
           </DialogHeader>
           <div className="py-4 space-y-3">
             <Label>Client</Label>
-            <Input
-              placeholder="Search client by name or email..."
-              value={clientSearch}
-              onChange={(e) => setClientSearch(e.target.value)}
-              className="h-9"
-            />
-            <Select value={assignClientId} onValueChange={setAssignClientId}>
-              <SelectTrigger className="mt-1.5"><SelectValue placeholder="Select a client" /></SelectTrigger>
-              <SelectContent>
-                {clients
-                  ?.filter((c: any) => {
-                    if (!clientSearch) return true;
-                    const q = clientSearch.toLowerCase();
-                    return (c.full_name?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q));
-                  })
-                  .map((c: any) => (
-                    <SelectItem key={c.user_id} value={c.user_id}>{c.full_name || c.email}</SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                  {assignClientId
+                    ? clients?.find((c: any) => c.user_id === assignClientId)?.full_name ||
+                      clients?.find((c: any) => c.user_id === assignClientId)?.email ||
+                      "Selected"
+                    : "Select a client..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[350px] p-0">
+                <Command>
+                  <CommandInput placeholder="Search client by name or email..." />
+                  <CommandList>
+                    <CommandEmpty>No client found.</CommandEmpty>
+                    <CommandGroup>
+                      {clients?.map((c: any) => (
+                        <CommandItem
+                          key={c.user_id}
+                          value={`${c.full_name || ""} ${c.email || ""}`}
+                          onSelect={() => setAssignClientId(c.user_id)}
+                        >
+                          <Check className={`mr-2 h-4 w-4 ${assignClientId === c.user_id ? "opacity-100" : "opacity-0"}`} />
+                          <div className="flex flex-col">
+                            <span>{c.full_name || c.email}</span>
+                            {c.full_name && c.email && <span className="text-xs text-muted-foreground">{c.email}</span>}
+                          </div>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAssignDialog(false)}>Cancel</Button>
