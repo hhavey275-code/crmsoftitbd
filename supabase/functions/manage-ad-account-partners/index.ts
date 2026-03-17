@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
       : `act_${account.account_id}`;
 
     if (action === "list") {
-      const url = `https://graph.facebook.com/v24.0/${actId}/agencies?fields=id,name&access_token=${bm.access_token}`;
+      const url = `https://graph.facebook.com/v24.0/${actId}/agencies?fields=id,name&access_token=${bmToken}`;
       const resp = await fetch(url);
       const data = await resp.json();
 
