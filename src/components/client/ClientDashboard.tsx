@@ -196,7 +196,7 @@ export function ClientDashboard() {
                 const desc = tx.description || "—";
                 const hasNewline = desc.includes("\n");
                 const [descName, descId] = hasNewline ? desc.split("\n") : [desc, null];
-                const pb = tx.processed_by || "";
+                
 
                 return (
                   <TableRow key={tx.id}>
