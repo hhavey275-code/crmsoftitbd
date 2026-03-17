@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
       const seenIds = new Set<string>();
 
       // Fetch all ad accounts under this BM to collect all unique funding sources
-      const url = `https://graph.facebook.com/v24.0/${bm.bm_id}/owned_ad_accounts?fields=id,name,funding_source,funding_source_details&limit=200&access_token=${bm.access_token}`;
+      const url = `https://graph.facebook.com/v24.0/${bm.bm_id}/owned_ad_accounts?fields=id,name,funding_source,funding_source_details&limit=200&access_token=${bmToken}`;
       const resp = await fetch(url);
       const data = await resp.json();
 
