@@ -312,6 +312,17 @@ export function AdminTopUp() {
           processed_by: `admin:${user!.id}`,
         } as any);
         if (txError) throw txError;
+
+        // Create invoice
+        const { data: invNumData } = await supabase.rpc("generate_invoice_number" as any);
+        await (supabase as any).from("invoices").insert({
+          top_up_request_id: id,
+          invoice_number: invNumData || `INV-${Date.now()}`,
+          user_id: userId,
+          amount: amount,
+          bdt_amount: actionDialog?.bdtAmount,
+          usd_rate: actionDialog?.usdRate,
+        });
       }
 
       await supabase.from("notifications").insert({
