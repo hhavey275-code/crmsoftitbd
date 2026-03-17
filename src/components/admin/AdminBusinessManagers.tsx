@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, RefreshCw, Building2, ChevronDown, ChevronRight, Clock, AlertCircle, CheckCircle2, Search, Pencil, Trash2 } from "lucide-react";
+import { Plus, RefreshCw, Building2, ChevronDown, ChevronRight, Clock, AlertCircle, CheckCircle2, Search, Pencil, Trash2, ShieldCheck } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
@@ -45,6 +45,8 @@ export function AdminBusinessManagers() {
   // Edit BM state
   const [editOpen, setEditOpen] = useState(false);
   const [editBmId, setEditBmId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editMetaId, setEditMetaId] = useState("");
   const [editAccessToken, setEditAccessToken] = useState("");
   const [deleteBmId, setDeleteBmId] = useState<string | null>(null);
 
@@ -97,13 +99,21 @@ export function AdminBusinessManagers() {
 
   const addBmMutation = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.from("business_managers").insert({
-        bm_id: bmId,
-        name: bmName,
-        access_token: accessToken,
-      }).select().single();
-      if (error) throw error;
-      return data;
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-bm`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ action: "create", bm_id: bmId, name: bmName, access_token: accessToken }),
+        }
+      );
+      const result = await res.json();
+      if (!res.ok || result.error) throw new Error(result.error || "Failed to create BM");
+      return result.data;
     },
     onSuccess: async (data) => {
       toast.success("Business Manager connected! Syncing ad accounts...");
@@ -210,18 +220,29 @@ export function AdminBusinessManagers() {
   const newAccountsCount = syncedAccounts.filter((a) => !existingAccountIds.has(a.account_id)).length;
   const alreadyImportedCount = syncedAccounts.filter((a) => existingAccountIds.has(a.account_id)).length;
 
-  const updateTokenMutation = useMutation({
-    mutationFn: async ({ id, token }: { id: string; token: string }) => {
-      const { error } = await supabase
-        .from("business_managers")
-        .update({ access_token: token })
-        .eq("id", id);
-      if (error) throw error;
+  const updateBmMutation = useMutation({
+    mutationFn: async ({ id, name, bm_id, access_token }: { id: string; name?: string; bm_id?: string; access_token?: string }) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-bm`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ action: "update", id, name, bm_id, access_token }),
+        }
+      );
+      const result = await res.json();
+      if (!res.ok || result.error) throw new Error(result.error || "Failed to update BM");
     },
     onSuccess: () => {
-      toast.success("Access token updated");
+      toast.success("Business Manager updated");
       setEditOpen(false);
       setEditBmId(null);
+      setEditName("");
+      setEditMetaId("");
       setEditAccessToken("");
       queryClient.invalidateQueries({ queryKey: ["admin-business-managers"] });
     },
@@ -364,11 +385,45 @@ export function AdminBusinessManagers() {
     }
   };
 
+  const encryptExistingMutation = useMutation({
+    mutationFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-bm`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ action: "encrypt_existing" }),
+        }
+      );
+      const result = await res.json();
+      if (!res.ok || result.error) throw new Error(result.error || "Failed");
+      return result;
+    },
+    onSuccess: (result) => {
+      toast.success(`${result.encrypted} token(s) encrypted successfully`);
+      queryClient.invalidateQueries({ queryKey: ["admin-business-managers"] });
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Business Managers</h1>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => encryptExistingMutation.mutate()}
+            disabled={encryptExistingMutation.isPending}
+          >
+            <ShieldCheck className="mr-1 h-4 w-4" />
+            {encryptExistingMutation.isPending ? "Encrypting..." : "Encrypt Tokens"}
+          </Button>
           {bms && bms.length > 0 && (
             <Button
               variant="outline"
@@ -443,6 +498,8 @@ export function AdminBusinessManagers() {
                   onClick={(e) => {
                     e.stopPropagation();
                     setEditBmId(bm.id);
+                    setEditName(bm.name);
+                    setEditMetaId(bm.bm_id);
                     setEditAccessToken("");
                     setEditOpen(true);
                   }}
@@ -684,30 +741,52 @@ export function AdminBusinessManagers() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Access Token Dialog */}
+      {/* Edit BM Dialog */}
       <Dialog open={editOpen} onOpenChange={(v) => { setEditOpen(v); if (!v) setEditBmId(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Update Access Token</DialogTitle>
+            <DialogTitle>Edit Business Manager</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>New Access Token</Label>
+              <Label>Name</Label>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Business Manager Name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Business Manager ID</Label>
+              <Input
+                value={editMetaId}
+                onChange={(e) => setEditMetaId(e.target.value)}
+                placeholder="123456789012345"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Access Token <span className="text-xs text-muted-foreground">(leave empty to keep current)</span></Label>
               <Input
                 type="password"
                 value={editAccessToken}
                 onChange={(e) => setEditAccessToken(e.target.value)}
-                placeholder="EAA..."
+                placeholder="EAA... (encrypted at rest)"
               />
+              <p className="text-xs text-muted-foreground">🔒 Token is encrypted with AES-256-GCM before storing</p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
             <Button
-              onClick={() => editBmId && updateTokenMutation.mutate({ id: editBmId, token: editAccessToken })}
-              disabled={!editAccessToken || updateTokenMutation.isPending}
+              onClick={() => editBmId && updateBmMutation.mutate({
+                id: editBmId,
+                name: editName || undefined,
+                bm_id: editMetaId || undefined,
+                access_token: editAccessToken || undefined,
+              })}
+              disabled={updateBmMutation.isPending}
             >
-              {updateTokenMutation.isPending ? "Updating..." : "Update Token"}
+              {updateBmMutation.isPending ? "Updating..." : "Update"}
             </Button>
           </DialogFooter>
         </DialogContent>

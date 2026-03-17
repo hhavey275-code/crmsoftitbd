@@ -6,6 +6,23 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+async function decryptToken(stored: string, secret: string): Promise<string> {
+  if (!stored.startsWith("enc:")) return stored;
+  try {
+    const enc = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(secret), "PBKDF2", false, ["deriveKey"]);
+    const key = await crypto.subtle.deriveKey(
+      { name: "PBKDF2", salt: enc.encode("bm-token-enc-v1"), iterations: 100000, hash: "SHA-256" },
+      keyMaterial, { name: "AES-GCM", length: 256 }, false, ["decrypt"]
+    );
+    const combined = Uint8Array.from(atob(stored.slice(4)), c => c.charCodeAt(0));
+    const iv = combined.slice(0, 12);
+    const data = combined.slice(12);
+    const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, data);
+    return new TextDecoder().decode(decrypted);
+  } catch { return stored; }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -50,12 +67,15 @@ Deno.serve(async (req) => {
     const bm = (account as any).business_managers;
     if (!bm) throw new Error("No business manager linked to this ad account");
 
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const bmToken = await decryptToken(bm.access_token, serviceKey);
+
     const actId = account.account_id.startsWith("act_")
       ? account.account_id
       : `act_${account.account_id}`;
 
     if (action === "list") {
-      const url = `https://graph.facebook.com/v24.0/${actId}/agencies?fields=id,name&access_token=${bm.access_token}`;
+      const url = `https://graph.facebook.com/v24.0/${actId}/agencies?fields=id,name&access_token=${bmToken}`;
       const resp = await fetch(url);
       const data = await resp.json();
 
@@ -77,7 +97,7 @@ Deno.serve(async (req) => {
       const { partner_bm_id } = body;
       if (!partner_bm_id) throw new Error("partner_bm_id is required");
 
-      const url = `https://graph.facebook.com/v24.0/${actId}/agencies?business=${partner_bm_id}&access_token=${bm.access_token}`;
+      const url = `https://graph.facebook.com/v24.0/${actId}/agencies?business=${partner_bm_id}&access_token=${bmToken}`;
       const resp = await fetch(url, { method: "DELETE" });
       const data = await resp.json();
 
@@ -96,7 +116,7 @@ Deno.serve(async (req) => {
       const seenIds = new Set<string>();
 
       // Fetch all ad accounts under this BM to collect all unique funding sources
-      const url = `https://graph.facebook.com/v24.0/${bm.bm_id}/owned_ad_accounts?fields=id,name,funding_source,funding_source_details&limit=200&access_token=${bm.access_token}`;
+      const url = `https://graph.facebook.com/v24.0/${bm.bm_id}/owned_ad_accounts?fields=id,name,funding_source,funding_source_details&limit=200&access_token=${bmToken}`;
       const resp = await fetch(url);
       const data = await resp.json();
 
@@ -128,7 +148,7 @@ Deno.serve(async (req) => {
       const { funding_source_id } = body;
       if (!funding_source_id) throw new Error("funding_source_id is required");
 
-      const url = `https://graph.facebook.com/v24.0/${actId}?funding_source=${funding_source_id}&access_token=${bm.access_token}`;
+      const url = `https://graph.facebook.com/v24.0/${actId}?funding_source=${funding_source_id}&access_token=${bmToken}`;
       const resp = await fetch(url, { method: "POST" });
       const data = await resp.json();
 
@@ -145,7 +165,7 @@ Deno.serve(async (req) => {
     if (action === "remove_funding_source") {
       // Meta doesn't have a direct DELETE for funding sources
       // We clear by POSTing with funding_source=0 or empty
-      const url = `https://graph.facebook.com/v24.0/${actId}?funding_source=0&access_token=${bm.access_token}`;
+      const url = `https://graph.facebook.com/v24.0/${actId}?funding_source=0&access_token=${bmToken}`;
       const resp = await fetch(url, { method: "POST" });
       const data = await resp.json();
 

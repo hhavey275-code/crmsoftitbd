@@ -6,6 +6,23 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+async function decryptToken(stored: string, secret: string): Promise<string> {
+  if (!stored.startsWith("enc:")) return stored;
+  try {
+    const enc = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(secret), "PBKDF2", false, ["deriveKey"]);
+    const key = await crypto.subtle.deriveKey(
+      { name: "PBKDF2", salt: enc.encode("bm-token-enc-v1"), iterations: 100000, hash: "SHA-256" },
+      keyMaterial, { name: "AES-GCM", length: 256 }, false, ["decrypt"]
+    );
+    const combined = Uint8Array.from(atob(stored.slice(4)), c => c.charCodeAt(0));
+    const iv = combined.slice(0, 12);
+    const data = combined.slice(12);
+    const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, data);
+    return new TextDecoder().decode(decrypted);
+  } catch { return stored; }
+}
+
 async function fetchAllPages(url: string): Promise<any[]> {
   const results: any[] = [];
   let nextUrl: string | null = url;
@@ -103,14 +120,16 @@ Deno.serve(async (req) => {
 
     const fields = "id,name,account_id,account_status,spend_cap,amount_spent,business_name";
     const baseUrl = `https://graph.facebook.com/v24.0/${bm.bm_id}`;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const token = await decryptToken(bm.access_token, serviceKey);
 
     // Fetch owned + client ad accounts in parallel
     const [ownedResult, clientResult] = await Promise.allSettled([
       fetchAllPages(
-        `${baseUrl}/owned_ad_accounts?fields=${fields}&access_token=${bm.access_token}&limit=100`
+        `${baseUrl}/owned_ad_accounts?fields=${fields}&access_token=${token}&limit=100`
       ),
       fetchAllPages(
-        `${baseUrl}/client_ad_accounts?fields=${fields}&access_token=${bm.access_token}&limit=100`
+        `${baseUrl}/client_ad_accounts?fields=${fields}&access_token=${token}&limit=100`
       ),
     ]);
 

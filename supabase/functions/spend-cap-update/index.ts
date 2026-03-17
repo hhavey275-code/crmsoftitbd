@@ -6,6 +6,23 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+async function decryptToken(stored: string, secret: string): Promise<string> {
+  if (!stored.startsWith("enc:")) return stored;
+  try {
+    const enc = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(secret), "PBKDF2", false, ["deriveKey"]);
+    const key = await crypto.subtle.deriveKey(
+      { name: "PBKDF2", salt: enc.encode("bm-token-enc-v1"), iterations: 100000, hash: "SHA-256" },
+      keyMaterial, { name: "AES-GCM", length: 256 }, false, ["decrypt"]
+    );
+    const combined = Uint8Array.from(atob(stored.slice(4)), c => c.charCodeAt(0));
+    const iv = combined.slice(0, 12);
+    const data = combined.slice(12);
+    const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, data);
+    return new TextDecoder().decode(decrypted);
+  } catch { return stored; }
+}
+
 async function verifyMetaSpendCap(actId: string, accessToken: string): Promise<number | null> {
   try {
     const res = await fetch(
@@ -211,6 +228,8 @@ Deno.serve(async (req) => {
 
     // --- Meta API v24.0 spend cap update ---
     const bm = (account as any).business_managers;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const bmToken = await decryptToken(bm.access_token, serviceKey);
     const oldSpendCap = Number(account.spend_cap);
     const newSpendCap = oldSpendCap + amount;
 
@@ -227,7 +246,7 @@ Deno.serve(async (req) => {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
           spend_cap: String(Math.round(newSpendCap * 100)),
-          access_token: bm.access_token,
+          access_token: bmToken,
         }),
       });
 
@@ -246,7 +265,7 @@ Deno.serve(async (req) => {
     // --- If POST failed/errored, verify actual spend cap before rollback ---
     if (!metaSuccess) {
       console.log(`Meta POST failed (${metaErrorMsg}), verifying actual spend cap...`);
-      const actualSpendCap = await verifyMetaSpendCap(actId, bm.access_token);
+      const actualSpendCap = await verifyMetaSpendCap(actId, bmToken);
 
       if (actualSpendCap !== null && actualSpendCap >= newSpendCap) {
         // Meta actually updated successfully despite the error response

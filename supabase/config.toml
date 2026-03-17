@@ -20,3 +20,9 @@ verify_jwt = false
 
 [functions.verify-topup]
 verify_jwt = false
+
+[functions.manage-bm]
+verify_jwt = false
+
+[functions.manage-ad-account-partners]
+verify_jwt = false
