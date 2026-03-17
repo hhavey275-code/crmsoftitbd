@@ -35,9 +35,6 @@ function centsToDollars(cents: number): number {
   return cents / 100;
 }
 
-function isRateLimitError(code: number | undefined): boolean {
-  return code === 17 || code === 32 || code === 4 || code === 429;
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -120,90 +117,59 @@ Deno.serve(async (req) => {
     });
 
     // ============================================
-    // STEP 1: Call Meta API (POST in CENTS, verify with GET)
+    // STEP 1: Single Meta API call (POST in CENTS, verify with GET)
     // ============================================
-    let metaSuccess = false;
     let metaErrorMsg = "";
-    let metaErrorCode: number | null = null;
-    let isRateLimit = false;
-    const MAX_RETRIES = 3;
 
-    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-      metaSuccess = false;
-      metaErrorMsg = "";
-      metaErrorCode = null;
-      isRateLimit = false;
+    try {
+      const metaRes = await fetch(`https://graph.facebook.com/v24.0/${actId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          spend_cap: String(newSpendCapCents),
+          access_token: bmToken,
+        }),
+      });
 
-      try {
-        const metaRes = await fetch(`https://graph.facebook.com/v25.0/${actId}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            spend_cap: String(newSpendCapCents),
-            access_token: bmToken,
-          }),
-        });
+      let metaData: any = null;
+      try { metaData = await metaRes.json(); } catch { metaData = null; }
 
-        let metaData: any = null;
-        try { metaData = await metaRes.json(); } catch { metaData = null; }
-
-        if (metaRes.ok && !metaData?.error) {
-          // Verify with GET
-          const verifyRes = await fetch(
-            `https://graph.facebook.com/v25.0/${actId}?fields=spend_cap&access_token=${encodeURIComponent(bmToken)}`
-          );
-          const verifyData = await verifyRes.json();
-
-          if (verifyData?.spend_cap !== undefined) {
-            const verifiedDollars = centsToDollars(Number(verifyData.spend_cap));
-            if (Math.abs(verifiedDollars - newSpendCapDollars) < 0.02) {
-              metaSuccess = true;
-              console.log(`Meta verified: $${verifiedDollars} (expected $${newSpendCapDollars})`);
-            } else {
-              metaErrorMsg = `Verification mismatch: expected $${newSpendCapDollars}, got $${verifiedDollars} (raw=${verifyData.spend_cap})`;
-              console.warn(metaErrorMsg);
-            }
-          } else {
-            metaErrorMsg = "Verification GET failed";
-            console.warn(metaErrorMsg, verifyData);
-          }
-          break;
-        }
-
+      if (!metaRes.ok || metaData?.error) {
         metaErrorMsg = metaData?.error?.message || `Meta HTTP ${metaRes.status}`;
-        metaErrorCode = metaData?.error?.code ?? (metaRes.status === 429 ? 429 : null);
-        isRateLimit = isRateLimitError(metaErrorCode ?? undefined) || metaRes.status === 429;
-
-        console.warn(`Meta POST failed (attempt ${attempt + 1})`, {
-          actId, status: metaRes.status, message: metaErrorMsg, code: metaErrorCode,
-        });
-
-        if (isRateLimit && attempt < MAX_RETRIES - 1) {
-          const waitMs = Math.pow(2, attempt + 1) * 1000 + Math.random() * 1000;
-          console.log(`Rate limit retry, waiting ${Math.round(waitMs)}ms...`);
-          await new Promise(r => setTimeout(r, waitMs));
-          continue;
-        }
-        break;
-      } catch (err) {
-        metaErrorMsg = err instanceof Error ? err.message : "Network error";
-        console.warn("Meta network error", metaErrorMsg);
-        break;
+        console.warn("Meta POST failed", { actId, status: metaRes.status, message: metaErrorMsg });
+        return json({
+          error: `Meta API error: ${metaErrorMsg}`,
+          ad_account_id: actId,
+          business_manager_id: bm?.bm_id ?? null,
+          wallet_charged: false,
+          hint: "Grant this token owner ad account admin/manage permission for the target ad account.",
+        }, 400);
       }
-    }
 
-    if (!metaSuccess) {
-      return json({
-        error: isRateLimit
-          ? "Meta API rate limit reached. Top-up was NOT processed and your wallet was NOT charged. Please try again in a few minutes."
-          : `Meta API error: ${metaErrorMsg}`,
-        meta_error_code: metaErrorCode,
-        is_rate_limit: isRateLimit,
-        ad_account_id: actId,
-        business_manager_id: bm?.bm_id ?? null,
-        wallet_charged: false,
-        ...(!isRateLimit && { hint: "Grant this token owner ad account admin/manage permission for the target ad account." }),
-      }, isRateLimit ? 429 : 400);
+      // Verify with GET
+      const verifyRes = await fetch(
+        `https://graph.facebook.com/v24.0/${actId}?fields=spend_cap&access_token=${encodeURIComponent(bmToken)}`
+      );
+      const verifyData = await verifyRes.json();
+
+      if (verifyData?.spend_cap !== undefined) {
+        const verifiedDollars = centsToDollars(Number(verifyData.spend_cap));
+        if (Math.abs(verifiedDollars - newSpendCapDollars) < 0.02) {
+          console.log(`Meta verified: $${verifiedDollars} (expected $${newSpendCapDollars})`);
+        } else {
+          metaErrorMsg = `Verification mismatch: expected $${newSpendCapDollars}, got $${verifiedDollars} (raw=${verifyData.spend_cap})`;
+          console.warn(metaErrorMsg);
+          return json({ error: metaErrorMsg, wallet_charged: false }, 400);
+        }
+      } else {
+        metaErrorMsg = "Verification GET failed";
+        console.warn(metaErrorMsg, verifyData);
+        return json({ error: metaErrorMsg, wallet_charged: false }, 400);
+      }
+    } catch (err) {
+      metaErrorMsg = err instanceof Error ? err.message : "Network error";
+      console.warn("Meta network error", metaErrorMsg);
+      return json({ error: `Meta API error: ${metaErrorMsg}`, wallet_charged: false }, 500);
     }
 
     // ============================================
