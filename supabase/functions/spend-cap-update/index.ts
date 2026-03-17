@@ -6,6 +6,48 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+async function verifyMetaSpendCap(actId: string, accessToken: string): Promise<number | null> {
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/v24.0/${actId}?fields=spend_cap&access_token=${encodeURIComponent(accessToken)}`
+    );
+    const data = await res.json();
+    if (data.error || data.spend_cap === undefined) return null;
+    // Meta returns spend_cap in cents as a string
+    return Number(data.spend_cap) / 100;
+  } catch {
+    return null;
+  }
+}
+
+async function rollbackWallet(
+  supabase: any,
+  walletId: string,
+  amount: number,
+  adAccountId: string,
+  walletUserId: string
+) {
+  const { data: wallet } = await supabase
+    .from("wallets")
+    .select("id, balance")
+    .eq("id", walletId)
+    .single();
+  if (wallet) {
+    await supabase
+      .from("wallets")
+      .update({ balance: Number(wallet.balance) + amount })
+      .eq("id", wallet.id);
+    await supabase
+      .from("transactions")
+      .delete()
+      .eq("reference_id", adAccountId)
+      .eq("user_id", walletUserId)
+      .eq("amount", -amount)
+      .order("created_at", { ascending: false })
+      .limit(1);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -61,7 +103,6 @@ Deno.serve(async (req) => {
 
     // --- Non-admin checks ---
     if (!isAdmin) {
-      // Check account status
       const { data: profile } = await supabase
         .from("profiles")
         .select("status, due_limit")
@@ -75,7 +116,6 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Check assignment
       const { data: assignment } = await supabase
         .from("user_ad_accounts")
         .select("id")
@@ -105,7 +145,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // --- Wallet deduction (only when deduct_wallet=true AND target_user_id exists) ---
+    // --- Wallet deduction ---
     const shouldDeductWallet = !!deduct_wallet && !!target_user_id;
     const walletUserId = target_user_id || user.id;
     let walletId: string | null = null;
@@ -125,7 +165,6 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Non-admin balance check (with due_limit)
       if (!isAdmin) {
         const { data: prof } = await supabase
           .from("profiles")
@@ -179,48 +218,55 @@ Deno.serve(async (req) => {
       ? account.account_id
       : `act_${account.account_id}`;
 
-    const metaRes = await fetch(`https://graph.facebook.com/v24.0/${actId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        spend_cap: String(Math.round(newSpendCap * 100)),
-        access_token: bm.access_token,
-      }),
-    });
+    let metaSuccess = false;
+    let metaErrorMsg = "";
 
-    const metaData = await metaRes.json();
-
-    if (metaData.error) {
-      // Rollback wallet if we deducted
-      if (shouldDeductWallet && walletId) {
-        const { data: wallet } = await supabase
-          .from("wallets")
-          .select("id, balance")
-          .eq("id", walletId)
-          .single();
-        if (wallet) {
-          await supabase
-            .from("wallets")
-            .update({ balance: Number(wallet.balance) + amount })
-            .eq("id", wallet.id);
-          await supabase
-            .from("transactions")
-            .delete()
-            .eq("reference_id", ad_account_id)
-            .eq("user_id", walletUserId)
-            .eq("amount", -amount)
-            .order("created_at", { ascending: false })
-            .limit(1);
-        }
-      }
-
-      return new Response(
-        JSON.stringify({
-          error: `Meta API error: ${metaData.error.message}`,
-          meta_error: metaData.error,
+    try {
+      const metaRes = await fetch(`https://graph.facebook.com/v24.0/${actId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          spend_cap: String(Math.round(newSpendCap * 100)),
+          access_token: bm.access_token,
         }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      });
+
+      const metaData = await metaRes.json();
+
+      if (!metaData.error) {
+        metaSuccess = true;
+      } else {
+        metaErrorMsg = metaData.error.message || "Unknown Meta error";
+      }
+    } catch (err) {
+      // Network timeout or fetch failure
+      metaErrorMsg = err instanceof Error ? err.message : "Network error calling Meta API";
+    }
+
+    // --- If POST failed/errored, verify actual spend cap before rollback ---
+    if (!metaSuccess) {
+      console.log(`Meta POST failed (${metaErrorMsg}), verifying actual spend cap...`);
+      const actualSpendCap = await verifyMetaSpendCap(actId, bm.access_token);
+
+      if (actualSpendCap !== null && actualSpendCap >= newSpendCap) {
+        // Meta actually updated successfully despite the error response
+        console.log(`Verification: spend cap IS updated on Meta (${actualSpendCap}). Treating as success.`);
+        metaSuccess = true;
+      } else {
+        // Confirmed not updated, proceed with rollback
+        console.log(`Verification: spend cap NOT updated (actual: ${actualSpendCap}). Rolling back.`);
+        if (shouldDeductWallet && walletId) {
+          await rollbackWallet(supabase, walletId, amount, ad_account_id, walletUserId);
+        }
+
+        return new Response(
+          JSON.stringify({
+            error: `Meta API error: ${metaErrorMsg}`,
+            verified: actualSpendCap !== null,
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // --- Update DB spend cap ---
