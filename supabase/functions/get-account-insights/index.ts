@@ -198,20 +198,18 @@ Deno.serve(async (req) => {
 
         const responses = await Promise.all(fetchPromises);
         
-        let todayData: any, yesterdayData: any, accountData: any, activeCampaigns: number, paymentMethodsData: any;
+        let todayData: any, yesterdayData: any, accountData: any, activeCampaigns: number;
         
         if (yesterdayUrl) {
           todayData = await responses[0].json();
           yesterdayData = await responses[1].json();
           accountData = await responses[2].json();
-          paymentMethodsData = await responses[3].json();
-          activeCampaigns = await responses[4].json();
+          activeCampaigns = await responses[3].json();
         } else {
           todayData = await responses[0].json();
           yesterdayData = { data: [] };
           accountData = await responses[1].json();
-          paymentMethodsData = await responses[2].json();
-          activeCampaigns = await responses[3].json();
+          activeCampaigns = await responses[2].json();
         }
 
         // Check for Meta API rate limit errors
