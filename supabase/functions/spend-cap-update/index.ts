@@ -167,7 +167,7 @@ Deno.serve(async (req) => {
 
     // --- Wallet deduction ---
     const shouldDeductWallet = !!deduct_wallet && !!target_user_id;
-    const walletUserId = target_user_id || user.id;
+    const walletUserId = target_user_id || userId;
     let walletId: string | null = null;
     let newBalance: number | null = null;
 
