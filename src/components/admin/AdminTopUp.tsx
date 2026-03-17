@@ -309,7 +309,8 @@ export function AdminTopUp() {
           balance_after: newBalance,
           reference_id: id,
           description: "Wallet top-up approved",
-        });
+          processed_by: `admin:${user!.id}`,
+        } as any);
         if (txError) throw txError;
       }
 

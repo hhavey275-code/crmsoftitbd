@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetricCard } from "@/components/MetricCard";
@@ -29,6 +30,7 @@ import { format, startOfMonth, endOfMonth } from "date-fns";
 
 export default function ClientDetailPage() {
   const { userId } = useParams<{ userId: string }>();
+  const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
 
   const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfMonth(new Date()));
@@ -176,6 +178,29 @@ export default function ClientDetailPage() {
     enabled: !!userId,
   });
 
+  // Fetch admin profiles for processed_by display
+  const adminProfileIds = [
+    ...new Set(
+      (transactions ?? [])
+        .map((tx: any) => {
+          const pb = tx.processed_by || "";
+          if (pb.startsWith("admin:")) return pb.split(":")[1];
+          return null;
+        })
+        .filter(Boolean)
+    ),
+  ];
+
+  const { data: allProfiles } = useQuery({
+    queryKey: ["admin-profiles-for-tx", adminProfileIds.join(",")],
+    queryFn: async () => {
+      if (adminProfileIds.length === 0) return [];
+      const { data } = await supabase.from("profiles").select("user_id, full_name, email").in("user_id", adminProfileIds);
+      return (data as any[]) ?? [];
+    },
+    enabled: adminProfileIds.length > 0,
+  });
+
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: ["client-detail-profile", userId] });
     queryClient.invalidateQueries({ queryKey: ["client-detail-wallet", userId] });
@@ -218,7 +243,8 @@ export default function ClientDetailPage() {
         balance_after: newBalance,
         type: isCredit ? "admin_credit" : "admin_debit",
         description: walletNote.trim() || (isCredit ? "Admin added balance" : "Admin deducted balance"),
-      });
+        processed_by: `admin:${currentUser!.id}`,
+      } as any);
       if (txErr) throw txErr;
     },
     onSuccess: () => {
@@ -644,6 +670,7 @@ export default function ClientDetailPage() {
                       <TableHead>Ad Account</TableHead>
                       <TableHead>Amount</TableHead>
                       <TableHead>Balance After</TableHead>
+                      <TableHead>Processed By</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -651,16 +678,36 @@ export default function ClientDetailPage() {
                       const linkedAccount = tx.reference_id && tx.type === "ad_topup"
                         ? adAccounts?.find((a: any) => a.id === tx.reference_id)
                         : null;
+                      const desc = tx.description || "—";
+                      const hasNewline = desc.includes("\n");
+                      const [descName, descId] = hasNewline ? desc.split("\n") : [desc, null];
+                      const pb = tx.processed_by || "";
+                      let processedByLabel = "—";
+                      if (pb === "system") processedByLabel = "Auto Approved by System";
+                      else if (pb.startsWith("admin:")) {
+                        const adminId = pb.split(":")[1];
+                        const adminProf = allProfiles?.find((p: any) => p.user_id === adminId);
+                        processedByLabel = adminProf?.full_name || adminProf?.email || adminId.slice(0, 8);
+                      } else if (pb.startsWith("client:")) {
+                        processedByLabel = profile?.full_name || profile?.email || "Client";
+                      }
                       return (
                         <TableRow key={tx.id}>
                           <TableCell className="text-muted-foreground whitespace-nowrap">{format(new Date(tx.created_at), "MMM d, yyyy HH:mm")}</TableCell>
                           <TableCell className="capitalize font-medium">{tx.type.replace(/_/g, " ")}</TableCell>
-                          <TableCell className="text-sm">{tx.description || "—"}</TableCell>
+                          <TableCell className="text-sm">
+                            {hasNewline ? (
+                              <div>
+                                <span>{descName}</span>
+                                <span className="block text-xs text-muted-foreground">{descId}</span>
+                              </div>
+                            ) : desc}
+                          </TableCell>
                           <TableCell className="text-sm">
                             {linkedAccount ? (
                               <div>
                                 <p className="font-medium">{linkedAccount.account_name}</p>
-                                <p className="text-[11px] text-muted-foreground font-mono">{linkedAccount.account_id}</p>
+                                <p className="text-[11px] text-muted-foreground font-mono">{linkedAccount.account_id.replace(/^act_/, "")}</p>
                               </div>
                             ) : (
                               <span className="text-muted-foreground">—</span>
@@ -670,11 +717,12 @@ export default function ClientDetailPage() {
                             {Number(tx.amount) >= 0 ? "+" : ""}${Math.abs(Number(tx.amount)).toLocaleString()}
                           </TableCell>
                           <TableCell className="font-medium">${Number(tx.balance_after ?? 0).toLocaleString()}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{processedByLabel}</TableCell>
                         </TableRow>
                       );
                     })}
                     {(!transactions || transactions.length === 0) && (
-                      <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No transactions yet</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No transactions yet</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
