@@ -1,0 +1,1 @@
+ALTER TABLE public.transactions ADD COLUMN processed_by text DEFAULT NULL;

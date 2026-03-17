@@ -553,6 +553,7 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          processed_by: string | null
           reference_id: string | null
           type: string
           user_id: string
@@ -563,6 +564,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          processed_by?: string | null
           reference_id?: string | null
           type: string
           user_id: string
@@ -573,6 +575,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          processed_by?: string | null
           reference_id?: string | null
           type?: string
           user_id?: string
