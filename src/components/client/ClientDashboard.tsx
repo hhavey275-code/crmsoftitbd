@@ -220,7 +220,9 @@ export function ClientDashboard() {
                 let processedByLabel = "—";
                 if (pb === "system") processedByLabel = "Auto Approved by System";
                 else if (pb.startsWith("admin:") || pb.startsWith("client:")) {
-                  processedByLabel = pb.split(":")[1]?.slice(0, 8) || "—";
+                  const id = pb.split(":")[1];
+                  const p = txProfiles?.find((pr: any) => pr.user_id === id);
+                  processedByLabel = p?.full_name || p?.email || "—";
                 }
                 return (
                   <TableRow key={tx.id}>
