@@ -107,13 +107,11 @@ Deno.serve(async (req) => {
     const bmToken = await decryptToken(bm.access_token, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const oldSpendCapDollars = Number(account.spend_cap);
     const newSpendCapDollars = oldSpendCapDollars + amount;
-    const newSpendCapCents = dollarsToCents(newSpendCapDollars);
-
     const actId = account.account_id.startsWith("act_") ? account.account_id : `act_${account.account_id}`;
 
     console.log("Spend cap update attempt", {
       actId, bmId: bm.bm_id, oldSpendCapDollars, amountDollars: amount,
-      newSpendCapDollars, newSpendCapCents_sentToMeta: newSpendCapCents,
+      newSpendCapDollars, sentToMetaPost: newSpendCapDollars,
     });
 
     // ============================================
