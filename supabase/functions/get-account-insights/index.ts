@@ -146,11 +146,10 @@ Deno.serve(async (req) => {
       balance: 0, cards: [],
     };
 
-    // Track amount_spent updates for ad_accounts table
-    // NOTE: We do NOT sync spend_cap from Meta here. Our system (spend-cap-update function) 
-    // is the source of truth for spend_cap. Meta may return 0 for accounts with no cap set,
-    // which would incorrectly reset our local spend_cap values.
-    const adAccountUpdates: { id: string; amount_spent: number }[] = [];
+    // Track amount_spent and spend_cap updates for ad_accounts table
+    // NOTE: We only sync spend_cap from Meta when it's > 0. Meta returns 0 for accounts
+    // with no cap set, which would incorrectly reset our local spend_cap values.
+    const adAccountUpdates: { id: string; amount_spent: number; spend_cap?: number }[] = [];
 
     const promises = (accounts ?? []).map(async (account: any) => {
       const rawToken = account.business_managers?.access_token;
@@ -232,7 +231,13 @@ Deno.serve(async (req) => {
         // Update amount_spent and spend_cap from Meta account data (not from date-specific query)
         if (!isSingleDate && !isDateRange && accountData?.amount_spent !== undefined) {
           const metaAmountSpent = parseFloat(accountData.amount_spent) / 100;
-          adAccountUpdates.push({ id: account.id, amount_spent: metaAmountSpent });
+          const metaSpendCap = accountData?.spend_cap ? parseFloat(accountData.spend_cap) / 100 : 0;
+          const update: any = { id: account.id, amount_spent: metaAmountSpent };
+          // Only sync spend_cap if Meta returns a non-zero value to avoid resetting local caps
+          if (metaSpendCap > 0) {
+            update.spend_cap = metaSpendCap;
+          }
+          adAccountUpdates.push(update);
         }
 
         const cards: any[] = [];
@@ -296,9 +301,13 @@ Deno.serve(async (req) => {
         const updateBatches = chunk(adAccountUpdates, 30);
         for (const batch of updateBatches) {
           for (const item of batch) {
+            const updateData: any = { amount_spent: item.amount_spent };
+            if (item.spend_cap !== undefined) {
+              updateData.spend_cap = item.spend_cap;
+            }
             await supabase
               .from("ad_accounts")
-              .update({ amount_spent: item.amount_spent })
+              .update(updateData)
               .eq("id", item.id);
           }
         }
