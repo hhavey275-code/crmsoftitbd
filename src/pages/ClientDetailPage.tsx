@@ -545,12 +545,13 @@ export default function ClientDetailPage() {
                 {/* Row 1: 5 cards */}
                 <div className="grid gap-2 grid-cols-2 lg:grid-cols-5">
                   <div className="relative">
-                    <MetricCard
+                     <MetricCard
                       title="Wallet Balance"
                       value={`$${walletBalance.toLocaleString()}`}
                       icon={Wallet}
                       iconBg="bg-green-100 dark:bg-green-900/50"
                       iconColor="text-green-600"
+                      size="sm"
                     />
                     <div className="absolute top-1.5 right-1.5 flex gap-0.5">
                       <Button size="icon" variant="ghost" className="h-5 w-5 text-green-600 hover:bg-green-100" onClick={() => { setWalletDialogType("credit"); setWalletAmount(""); setWalletNote(""); }}>
@@ -561,10 +562,10 @@ export default function ClientDetailPage() {
                       </Button>
                     </div>
                   </div>
-                  <MetricCard title="Total Ad Accounts" value={adAccounts?.length ?? 0} icon={MonitorSmartphone} iconBg="bg-blue-100 dark:bg-blue-900/50" iconColor="text-blue-600" />
-                  <MetricCard title="Active Accounts" value={activeAccounts.length} icon={CheckCircle} iconBg="bg-emerald-100 dark:bg-emerald-900/50" iconColor="text-emerald-600" />
-                  <MetricCard title="Disabled Accounts" value={disabledAccounts.length} icon={XCircle} iconBg="bg-red-100 dark:bg-red-900/50" iconColor="text-red-600" />
-                  <MetricCard title="Remaining Balance" value={`$${totalRemaining.toLocaleString()}`} subtitle="All ad accounts" icon={Wallet} iconBg="bg-indigo-100 dark:bg-indigo-900/50" iconColor="text-indigo-600" />
+                  <MetricCard title="Total Ad Accounts" value={adAccounts?.length ?? 0} icon={MonitorSmartphone} iconBg="bg-blue-100 dark:bg-blue-900/50" iconColor="text-blue-600" size="sm" />
+                  <MetricCard title="Active Accounts" value={activeAccounts.length} icon={CheckCircle} iconBg="bg-emerald-100 dark:bg-emerald-900/50" iconColor="text-emerald-600" size="sm" />
+                  <MetricCard title="Disabled Accounts" value={disabledAccounts.length} icon={XCircle} iconBg="bg-red-100 dark:bg-red-900/50" iconColor="text-red-600" size="sm" />
+                  <MetricCard title="Remaining Balance" value={`$${totalRemaining.toLocaleString()}`} subtitle="All ad accounts" icon={Wallet} iconBg="bg-indigo-100 dark:bg-indigo-900/50" iconColor="text-indigo-600" size="sm" />
                 </div>
                 {/* Row 2: 4 cards */}
                 <div className="grid gap-2 grid-cols-2 lg:grid-cols-4 mt-2">
@@ -575,6 +576,7 @@ export default function ClientDetailPage() {
                     icon={DollarSign}
                     iconBg="bg-emerald-100 dark:bg-emerald-900/50"
                     iconColor="text-emerald-600"
+                    size="sm"
                   />
                   <MetricCard
                     title="Today's Orders"
@@ -583,9 +585,10 @@ export default function ClientDetailPage() {
                     icon={ShoppingCart}
                     iconBg="bg-blue-100 dark:bg-blue-900/50"
                     iconColor="text-blue-600"
+                    size="sm"
                   />
-                  <MetricCard title="Total Top-Up" value={`$${Number(topUpTotal ?? 0).toLocaleString()}`} subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"} icon={TrendingUp} iconBg="bg-orange-100 dark:bg-orange-900/50" iconColor="text-orange-600" />
-                  <MetricCard title="Total Spending" value={`$${(totalSpendingFiltered ?? totalSpending).toLocaleString()}`} subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"} icon={TrendingDown} iconBg="bg-purple-100 dark:bg-purple-900/50" iconColor="text-purple-600" />
+                  <MetricCard title="Total Top-Up" value={`$${Number(topUpTotal ?? 0).toLocaleString()}`} subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"} icon={TrendingUp} iconBg="bg-orange-100 dark:bg-orange-900/50" iconColor="text-orange-600" size="sm" />
+                  <MetricCard title="Total Spending" value={`$${(totalSpendingFiltered ?? totalSpending).toLocaleString()}`} subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"} icon={TrendingDown} iconBg="bg-purple-100 dark:bg-purple-900/50" iconColor="text-purple-600" size="sm" />
                 </div>
               </CardContent>
             </Card>
