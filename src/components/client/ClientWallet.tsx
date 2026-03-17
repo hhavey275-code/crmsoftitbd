@@ -5,9 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
 import { format } from "date-fns";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Wallet } from "lucide-react";
 
 export function ClientWallet() {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
 
   const { data: wallet } = useQuery({
     queryKey: ["client-wallet", user?.id],
@@ -28,46 +31,85 @@ export function ClientWallet() {
   });
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Wallet</h1>
-      <Card className="bg-primary text-primary-foreground">
-        <CardContent className="p-8">
-          <p className="text-sm opacity-80">Available Balance</p>
-          <p className="text-4xl font-bold mt-1">${Number(wallet?.balance ?? 0).toLocaleString()}</p>
-          <p className="text-sm mt-2 opacity-70">{wallet?.currency ?? "USD"}</p>
-        </CardContent>
-      </Card>
+    <div className="space-y-4 md:space-y-6">
+      <h1 className="text-xl md:text-2xl font-bold">Wallet</h1>
+
+      {/* Wallet Balance Card */}
+      {isMobile ? (
+        <div className="rounded-2xl bg-gradient-to-br from-primary to-blue-600 p-5 text-primary-foreground shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm opacity-90">Available Balance</p>
+              <p className="text-3xl font-bold tracking-tight mt-1">
+                ${Number(wallet?.balance ?? 0).toLocaleString()}
+              </p>
+              <p className="text-xs opacity-70 mt-1">{wallet?.currency ?? "USD"}</p>
+            </div>
+            <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center">
+              <Wallet className="h-6 w-6" />
+            </div>
+          </div>
+        </div>
+      ) : (
+        <Card className="bg-primary text-primary-foreground">
+          <CardContent className="p-8">
+            <p className="text-sm opacity-80">Available Balance</p>
+            <p className="text-4xl font-bold mt-1">${Number(wallet?.balance ?? 0).toLocaleString()}</p>
+            <p className="text-sm mt-2 opacity-70">{wallet?.currency ?? "USD"}</p>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Top-Up History</CardTitle>
+        <CardHeader className="p-4 pb-2">
+          <CardTitle className="text-base md:text-lg">Top-Up History</CardTitle>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Amount</TableHead>
-                <TableHead>Old Cap</TableHead>
-                <TableHead>New Cap</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Date</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+        <CardContent className="p-4 pt-2">
+          {isMobile ? (
+            <div className="space-y-2.5">
               {topUps?.map((t: any) => (
-                <TableRow key={t.id}>
-                  <TableCell className="font-semibold">${Number(t.amount).toLocaleString()}</TableCell>
-                  <TableCell>${Number(t.old_spend_cap).toLocaleString()}</TableCell>
-                  <TableCell>${Number(t.new_spend_cap).toLocaleString()}</TableCell>
-                  <TableCell><StatusBadge status={t.status} /></TableCell>
-                  <TableCell className="text-muted-foreground">{format(new Date(t.created_at), "MMM d, yyyy")}</TableCell>
-                </TableRow>
+                <div key={t.id} className="rounded-lg border border-border/60 p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold">${Number(t.amount).toLocaleString()}</span>
+                    <StatusBadge status={t.status} />
+                  </div>
+                  <div className="flex items-center justify-between mt-1.5 text-xs text-muted-foreground">
+                    <span>Cap: ${Number(t.old_spend_cap).toLocaleString()} → ${Number(t.new_spend_cap).toLocaleString()}</span>
+                    <span>{format(new Date(t.created_at), "MMM d, yyyy")}</span>
+                  </div>
+                </div>
               ))}
               {(!topUps || topUps.length === 0) && (
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No top-ups yet</TableCell></TableRow>
+                <p className="text-center text-muted-foreground py-6 text-sm">No top-ups yet</p>
               )}
-            </TableBody>
-          </Table>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Old Cap</TableHead>
+                  <TableHead>New Cap</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {topUps?.map((t: any) => (
+                  <TableRow key={t.id}>
+                    <TableCell className="font-semibold">${Number(t.amount).toLocaleString()}</TableCell>
+                    <TableCell>${Number(t.old_spend_cap).toLocaleString()}</TableCell>
+                    <TableCell>${Number(t.new_spend_cap).toLocaleString()}</TableCell>
+                    <TableCell><StatusBadge status={t.status} /></TableCell>
+                    <TableCell className="text-muted-foreground">{format(new Date(t.created_at), "MMM d, yyyy")}</TableCell>
+                  </TableRow>
+                ))}
+                {(!topUps || topUps.length === 0) && (
+                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No top-ups yet</TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>
