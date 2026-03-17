@@ -16,10 +16,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { cn, friendlyEdgeError } from "@/lib/utils";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { toast } from "sonner";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export function ClientDashboard() {
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
   const isInactive = (profile as any)?.status === "inactive";
 
   const [adSearch, setAdSearch] = useState("");
@@ -146,182 +148,312 @@ export function ClientDashboard() {
     }
   };
 
+  const filtered = (adAccounts ?? []).filter((a: any) => {
+    const q = adSearch.toLowerCase();
+    return !q || a.account_name?.toLowerCase().includes(q) || a.account_id?.toLowerCase().includes(q);
+  });
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Welcome Banner */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-bold text-foreground">
-            {greeting()}, {profile?.full_name || "there"}! 👋
-          </h1>
-          <p className="text-xs text-muted-foreground">
-            {format(new Date(), "EEEE, MMMM d, yyyy")}
-          </p>
-        </div>
+      <div>
+        <h1 className="text-base md:text-lg font-bold text-foreground">
+          {greeting()}, {profile?.full_name || "there"}! 👋
+        </h1>
+        <p className="text-xs text-muted-foreground">
+          {format(new Date(), "EEEE, MMMM d, yyyy")}
+        </p>
       </div>
 
       {isInactive && (
         <Card className="border-destructive bg-destructive/10">
-          <CardContent className="p-4 flex items-center gap-3">
-            <span className="text-destructive font-semibold">⚠️ Your account has been frozen by admin. You cannot perform any transactions or top-ups.</span>
+          <CardContent className="p-3 md:p-4 flex items-center gap-3">
+            <span className="text-destructive font-semibold text-sm">⚠️ Your account has been frozen by admin. You cannot perform any transactions or top-ups.</span>
           </CardContent>
         </Card>
       )}
 
-      {/* Metric Cards in Premium White Container */}
-      <Card className="bg-white dark:bg-card border border-border/40 shadow-[0_2px_12px_rgba(0,0,0,0.04),0_8px_32px_rgba(0,0,0,0.06)] rounded-xl">
-        <CardContent className="p-6">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <MetricCard
-              title="Wallet Balance"
-              value={`$${Number(wallet?.balance ?? 0).toLocaleString()}`}
-              icon={Wallet}
-              iconBg="bg-violet-50 dark:bg-violet-900/30"
-              iconColor="text-violet-600"
-              className="border-0 shadow-none bg-violet-50/40 dark:bg-violet-900/10"
-            />
-            <MetricCard
-              title="Total Ad Accounts"
-              value={adAccounts?.length ?? 0}
-              icon={MonitorSmartphone}
-              iconBg="bg-amber-50 dark:bg-amber-900/30"
-              iconColor="text-amber-600"
-              className="border-0 shadow-none bg-amber-50/40 dark:bg-amber-900/10"
-            />
-            <MetricCard
-              title="Total Remaining Balance"
-              value={`$${totalRemaining.toLocaleString()}`}
-              subtitle="Across all ad accounts"
-              icon={Wallet}
-              iconBg="bg-rose-50 dark:bg-rose-900/30"
-              iconColor="text-rose-600"
-              className="border-0 shadow-none bg-rose-50/40 dark:bg-rose-900/10"
-            />
-            <MetricCard
-              title="Total Top-Up"
-              value={`$${Number(topUpTotal ?? 0).toLocaleString()}`}
-              subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"}
-              icon={TrendingUp}
-              iconBg="bg-emerald-50 dark:bg-emerald-900/30"
-              iconColor="text-emerald-600"
-              className="border-0 shadow-none bg-emerald-50/40 dark:bg-emerald-900/10"
-            />
+      {/* Mobile: Wallet Balance Hero Card */}
+      {isMobile ? (
+        <div className="space-y-3">
+          {/* Wallet Hero */}
+          <div className="rounded-2xl bg-gradient-to-br from-primary to-blue-600 p-5 text-primary-foreground shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm opacity-90">Wallet Balance</p>
+                <p className="text-3xl font-bold tracking-tight mt-1">
+                  ${Number(wallet?.balance ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center">
+                <Wallet className="h-6 w-6" />
+              </div>
+            </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Date Range for Total Top-Up */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-medium text-muted-foreground">Top-Up Period:</span>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className={cn("w-[140px] justify-start text-left font-normal", !dateFrom && "text-muted-foreground")}>
-              <CalendarIcon className="mr-1 h-3 w-3" />
-              {dateFrom ? format(dateFrom, "MMM d, yyyy") : "From"}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className="p-3 pointer-events-auto" />
-          </PopoverContent>
-        </Popover>
-        <span className="text-muted-foreground">—</span>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className={cn("w-[140px] justify-start text-left font-normal", !dateTo && "text-muted-foreground")}>
-              <CalendarIcon className="mr-1 h-3 w-3" />
-              {dateTo ? format(dateTo, "MMM d, yyyy") : "To"}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className="p-3 pointer-events-auto" />
-          </PopoverContent>
-        </Popover>
-      </div>
+          {/* Compact Metric Row */}
+          <div className="grid grid-cols-3 gap-2">
+            <Card className="bg-card border border-border/60">
+              <CardContent className="p-3 text-center">
+                <p className="text-[10px] text-muted-foreground font-medium">Ad Accounts</p>
+                <p className="text-lg font-bold text-foreground">{adAccounts?.length ?? 0}</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-card border border-border/60">
+              <CardContent className="p-3 text-center">
+                <p className="text-[10px] text-muted-foreground font-medium">Remaining</p>
+                <p className="text-lg font-bold text-foreground">${totalRemaining.toLocaleString()}</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-card border border-border/60">
+              <CardContent className="p-3 text-center">
+                <p className="text-[10px] text-muted-foreground font-medium">Total Top-Up</p>
+                <p className="text-lg font-bold text-foreground">${Number(topUpTotal ?? 0).toLocaleString()}</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      ) : (
+        /* Desktop: Original Metric Cards */
+        <>
+          <Card className="bg-white dark:bg-card border border-border/40 shadow-[0_2px_12px_rgba(0,0,0,0.04),0_8px_32px_rgba(0,0,0,0.06)] rounded-xl">
+            <CardContent className="p-6">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <MetricCard
+                  title="Wallet Balance"
+                  value={`$${Number(wallet?.balance ?? 0).toLocaleString()}`}
+                  icon={Wallet}
+                  iconBg="bg-violet-50 dark:bg-violet-900/30"
+                  iconColor="text-violet-600"
+                  className="border-0 shadow-none bg-violet-50/40 dark:bg-violet-900/10"
+                />
+                <MetricCard
+                  title="Total Ad Accounts"
+                  value={adAccounts?.length ?? 0}
+                  icon={MonitorSmartphone}
+                  iconBg="bg-amber-50 dark:bg-amber-900/30"
+                  iconColor="text-amber-600"
+                  className="border-0 shadow-none bg-amber-50/40 dark:bg-amber-900/10"
+                />
+                <MetricCard
+                  title="Total Remaining Balance"
+                  value={`$${totalRemaining.toLocaleString()}`}
+                  subtitle="Across all ad accounts"
+                  icon={Wallet}
+                  iconBg="bg-rose-50 dark:bg-rose-900/30"
+                  iconColor="text-rose-600"
+                  className="border-0 shadow-none bg-rose-50/40 dark:bg-rose-900/10"
+                />
+                <MetricCard
+                  title="Total Top-Up"
+                  value={`$${Number(topUpTotal ?? 0).toLocaleString()}`}
+                  subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"}
+                  icon={TrendingUp}
+                  iconBg="bg-emerald-50 dark:bg-emerald-900/30"
+                  iconColor="text-emerald-600"
+                  className="border-0 shadow-none bg-emerald-50/40 dark:bg-emerald-900/10"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Date Range for Total Top-Up */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-muted-foreground">Top-Up Period:</span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className={cn("w-[140px] justify-start text-left font-normal", !dateFrom && "text-muted-foreground")}>
+                  <CalendarIcon className="mr-1 h-3 w-3" />
+                  {dateFrom ? format(dateFrom, "MMM d, yyyy") : "From"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
+            <span className="text-muted-foreground">—</span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className={cn("w-[140px] justify-start text-left font-normal", !dateTo && "text-muted-foreground")}>
+                  <CalendarIcon className="mr-1 h-3 w-3" />
+                  {dateTo ? format(dateTo, "MMM d, yyyy") : "To"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
+          </div>
+        </>
+      )}
 
       {/* Ad Accounts Section */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <CardTitle className="text-lg">My Ad Accounts</CardTitle>
-          <div className="relative w-64">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-base md:text-lg font-semibold text-foreground">My Ad Accounts</h2>
+          {!isMobile && (
+            <div className="relative w-64">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search accounts..."
+                value={adSearch}
+                onChange={(e) => setAdSearch(e.target.value)}
+                className="w-full rounded-md border border-border bg-background pl-8 pr-3 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Mobile Search */}
+        {isMobile && (
+          <div className="relative mb-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type="text"
               placeholder="Search accounts..."
               value={adSearch}
               onChange={(e) => setAdSearch(e.target.value)}
-              className="w-full rounded-md border border-border bg-background pl-8 pr-3 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full rounded-xl border border-border bg-background pl-9 pr-3 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
-        </CardHeader>
-        <CardContent>
-          {(() => {
-            const filtered = (adAccounts ?? []).filter((a: any) => {
-              const q = adSearch.toLowerCase();
-              return !q || a.account_name?.toLowerCase().includes(q) || a.account_id?.toLowerCase().includes(q);
-            });
-            return filtered.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Account</TableHead>
-                  <TableHead>Account ID</TableHead>
-                  <TableHead>Spend</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((account: any) => {
-                  const displayId = account.account_id?.replace("act_", "") ?? "";
-                  return (
-                    <TableRow key={account.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                            <AppWindow className="h-4 w-4 text-primary" />
-                          </div>
-                          <span className="text-sm font-medium text-primary truncate max-w-[160px]">{account.account_name}</span>
+        )}
+
+        {filtered.length > 0 ? (
+          isMobile ? (
+            /* Mobile: Card-based layout */
+            <div className="space-y-3">
+              {filtered.map((account: any) => {
+                const displayId = account.account_id?.replace("act_", "") ?? "";
+                const remaining = Math.max(0, Number(account.spend_cap) - Number(account.amount_spent));
+                const ratio = Number(account.spend_cap) > 0 ? Number(account.amount_spent) / Number(account.spend_cap) : 0;
+                const percentage = Math.min(ratio * 100, 100);
+                const barColor = ratio >= 0.8 ? "bg-destructive" : ratio >= 0.5 ? "bg-yellow-500" : "bg-primary";
+
+                return (
+                  <Card key={account.id} className="border border-border/60 shadow-sm">
+                    <CardContent className="p-4">
+                      {/* Header: Name + Status */}
+                      <div className="flex items-start justify-between mb-1">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-sm text-foreground truncate">{account.account_name}</p>
+                          <a
+                            href={getAdsManagerUrl(account.account_id)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                          >
+                            {displayId}
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <a
-                          href={getAdsManagerUrl(account.account_id)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
-                        >
-                          {displayId}
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
-                      </TableCell>
-                      <TableCell>
-                        <SpendProgressBar amountSpent={Number(account.amount_spent)} spendCap={Number(account.spend_cap)} />
-                      </TableCell>
-                      <TableCell><StatusBadge status={account.status} /></TableCell>
-                      <TableCell className="text-right">
+                        <StatusBadge status={account.status} />
+                      </div>
+
+                      {/* Remaining + Progress */}
+                      <div className="mt-3">
+                        <p className="text-sm font-medium text-foreground">
+                          Remaining: <span className="font-bold">${remaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </p>
+                        <div className="h-2 w-full rounded-full bg-muted overflow-hidden mt-1.5">
+                          <div
+                            className={`h-full rounded-full transition-all ${barColor}`}
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Spent / Limit + Top Up */}
+                      <div className="flex items-center justify-between mt-2.5">
+                        <div className="flex gap-4 text-xs text-muted-foreground">
+                          <span>Spent: <span className="font-medium text-foreground">${Number(account.amount_spent).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
+                          <span>Limit: <span className="font-medium text-foreground">${Number(account.spend_cap).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
+                        </div>
                         <Button
                           size="sm"
-                          className="gap-1.5 bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs tracking-wide"
+                          className="gap-1 bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs"
                           onClick={() => { setTopUpAccount(account); setTopUpAmount(""); }}
                           disabled={isInactive}
                         >
-                          <ArrowUpCircle className="h-3.5 w-3.5" />
                           Top Up
                         </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
           ) : (
-            <p className="text-center text-muted-foreground py-8">
-              {adSearch ? "No matching accounts found" : "No ad accounts assigned yet"}
-            </p>
-          );
-          })()}
-        </CardContent>
-      </Card>
+            /* Desktop: Table layout */
+            <Card>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Account</TableHead>
+                      <TableHead>Account ID</TableHead>
+                      <TableHead>Spend</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filtered.map((account: any) => {
+                      const displayId = account.account_id?.replace("act_", "") ?? "";
+                      return (
+                        <TableRow key={account.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                                <AppWindow className="h-4 w-4 text-primary" />
+                              </div>
+                              <span className="text-sm font-medium text-primary truncate max-w-[160px]">{account.account_name}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <a
+                              href={getAdsManagerUrl(account.account_id)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                            >
+                              {displayId}
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </TableCell>
+                          <TableCell>
+                            <SpendProgressBar amountSpent={Number(account.amount_spent)} spendCap={Number(account.spend_cap)} />
+                          </TableCell>
+                          <TableCell><StatusBadge status={account.status} /></TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              size="sm"
+                              className="gap-1.5 bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs tracking-wide"
+                              onClick={() => { setTopUpAccount(account); setTopUpAmount(""); }}
+                              disabled={isInactive}
+                            >
+                              <ArrowUpCircle className="h-3.5 w-3.5" />
+                              Top Up
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )
+        ) : (
+          <Card>
+            <CardContent className="py-8">
+              <p className="text-center text-muted-foreground">
+                {adSearch ? "No matching accounts found" : "No ad accounts assigned yet"}
+              </p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       {/* Spend Cap Increase Dialog */}
       <Dialog open={!!topUpAccount} onOpenChange={(open) => { if (!open) setTopUpAccount(null); }}>
