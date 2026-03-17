@@ -497,6 +497,13 @@ export function AdminTopUp() {
                           <MessageSquareText className="h-4 w-4" />
                           {expandedSms[r.id] ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                         </Button>
+                        {r.status === "approved" && (
+                          <Button size="sm" variant="ghost" className="hover:text-primary" title="Invoice" asChild>
+                            <Link to={`/invoice/${r.id}`} target="_blank">
+                              <FileText className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

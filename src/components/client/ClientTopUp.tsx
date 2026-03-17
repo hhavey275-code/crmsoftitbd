@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
 import { toast } from "sonner";
-import { ArrowUpCircle, Banknote, DollarSign, MessageSquare, ImageIcon, X } from "lucide-react";
+import { ArrowUpCircle, Banknote, DollarSign, MessageSquare, ImageIcon, X, FileText } from "lucide-react";
 import { format } from "date-fns";
 
 export function ClientTopUp() {
