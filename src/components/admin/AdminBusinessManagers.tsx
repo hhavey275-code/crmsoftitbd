@@ -33,6 +33,7 @@ export function AdminBusinessManagers() {
   const [accessToken, setAccessToken] = useState("");
   const [expandedBm, setExpandedBm] = useState<string | null>(null);
   const [showLogs, setShowLogs] = useState<string | null>(null);
+  const [syncingBmId, setSyncingBmId] = useState<string | null>(null);
 
   // Selective import state
   const [importDialogOpen, setImportDialogOpen] = useState(false);
