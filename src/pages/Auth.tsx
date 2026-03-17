@@ -100,6 +100,8 @@ export default function Auth() {
         if (signUpData.user) {
           await supabase.from("profiles").update({
             company: businessName || null,
+            phone: phone || null,
+            business_address: businessAddress || null,
             monthly_spend: monthlySpend || null,
           } as any).eq("user_id", signUpData.user.id);
         }
