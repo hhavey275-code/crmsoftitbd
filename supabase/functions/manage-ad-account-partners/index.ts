@@ -73,14 +73,12 @@ Deno.serve(async (req) => {
       ? account.account_id
       : `act_${account.account_id}`;
 
+    // List partner agencies
     if (action === "list") {
       const url = `https://graph.facebook.com/v24.0/${actId}/agencies?fields=id,name&access_token=${bmToken}`;
       const resp = await fetch(url);
       const data = await resp.json();
-
-      if (data.error) {
-        throw new Error(data.error.message || "Failed to fetch partners from Meta");
-      }
+      if (data.error) throw new Error(data.error.message || "Failed to fetch partners from Meta");
 
       const partners = (data.data || []).map((p: any) => ({
         bm_id: p.id,
@@ -92,6 +90,7 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Remove partner agency
     if (action === "remove") {
       const { partner_bm_id } = body;
       if (!partner_bm_id) throw new Error("partner_bm_id is required");
@@ -99,233 +98,50 @@ Deno.serve(async (req) => {
       const url = `https://graph.facebook.com/v24.0/${actId}/agencies?business=${partner_bm_id}&access_token=${bmToken}`;
       const resp = await fetch(url, { method: "DELETE" });
       const data = await resp.json();
-
-      if (data.error) {
-        throw new Error(data.error.message || "Failed to remove partner");
-      }
+      if (data.error) throw new Error(data.error.message || "Failed to remove partner");
 
       return new Response(JSON.stringify({ success: true, removed_bm_id: partner_bm_id }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // List payment methods: current ad account's funding source + all unique funding sources across BM's ad accounts
-    if (action === "list_funding_sources") {
-      const sources: any[] = [];
-      const seenIds = new Set<string>();
-
-      const collectFundingSources = async (initialUrl: string) => {
-        let url: string | null = initialUrl;
-        while (url) {
-          const resp = await fetch(url);
-          const data = await resp.json();
-          if (data.error) {
-            console.error("Meta API error:", data.error);
-            break;
-          }
-          for (const acc of (data.data || [])) {
-            const fsId = acc.funding_source;
-            if (fsId && !seenIds.has(fsId)) {
-              seenIds.add(fsId);
-              const fsd = acc.funding_source_details || {};
-              sources.push({
-                id: fsId,
-                display_string: fsd.display_string || `Funding source ${fsId}`,
-                type: fsd.type?.toString() || "unknown",
-                from_account: acc.name || acc.id,
-              });
-            }
-          }
-          url = data.paging?.next || null;
-        }
-      };
-
-      // Fetch from both owned and client ad accounts
-      await Promise.all([
-        collectFundingSources(
-          `https://graph.facebook.com/v24.0/${bm.bm_id}/owned_ad_accounts?fields=id,name,funding_source,funding_source_details&limit=200&access_token=${bmToken}`
-        ),
-        collectFundingSources(
-          `https://graph.facebook.com/v24.0/${bm.bm_id}/client_ad_accounts?fields=id,name,funding_source,funding_source_details&limit=200&access_token=${bmToken}`
-        ),
-      ]);
-
-      return new Response(JSON.stringify({ funding_sources: sources }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // List all payment methods for THIS specific account
+    // Get the current funding source for this specific ad account
     if (action === "list_account_cards") {
-      const cards: any[] = [];
-      const seenIds = new Set<string>();
-
-      const addCard = (rawId: any, displayString?: string, type?: string, fromAccount?: string) => {
-        const id = rawId ? String(rawId) : "";
-        if (!id || seenIds.has(id)) return;
-        seenIds.add(id);
-        cards.push({
-          id,
-          display_string: displayString || `Card ...${id.slice(-4)}`,
-          type: type || "unknown",
-          from_account: fromAccount,
-        });
-      };
-
-      const addFromNode = (node: any, source: string) => {
-        if (!node) return;
-        addCard(
-          node.id || node.funding_source_id || node.funding_source || node.credential_id,
-          node.display_string,
-          node.type?.toString() || node.pm_credit_card_type || node.funding_source_type,
-          source
-        );
-      };
-
-      const fetchJson = async (url: string, label: string) => {
-        try {
-          const resp = await fetch(url);
-          const data = await resp.json();
-          if (data?.error) {
-            console.log(`${label} meta_error: ${JSON.stringify(data.error)}`);
-            return null;
-          }
-          return data;
-        } catch (e) {
-          console.log(`${label} fetch_error: ${String(e)}`);
-          return null;
-        }
-      };
-
-      // 1) Direct account fields (documented + possible hidden all_payment_methods field)
-      const accountFields = await fetchJson(
-        `https://graph.facebook.com/v24.0/${actId}?fields=funding_source,funding_source_details,expired_funding_source_details,all_payment_methods{id,display_string,pm_credit_card_type,funding_source_type,type}&access_token=${bmToken}`,
-        "account_fields"
+      const resp = await fetch(
+        `https://graph.facebook.com/v24.0/${actId}?fields=funding_source,funding_source_details&access_token=${bmToken}`
       );
-      if (accountFields) {
-        addFromNode(accountFields.funding_source_details, "account_fields.funding_source_details");
-        addFromNode(accountFields.expired_funding_source_details, "account_fields.expired_funding_source_details");
-        const allPm = Array.isArray(accountFields.all_payment_methods)
-          ? accountFields.all_payment_methods
-          : accountFields.all_payment_methods?.data || [];
-        for (const pm of allPm) addFromNode(pm, "account_fields.all_payment_methods");
+      const data = await resp.json();
+      if (data.error) throw new Error(data.error.message || "Failed to fetch account details");
+
+      const cards: any[] = [];
+      if (data.funding_source_details) {
+        cards.push({
+          id: data.funding_source || data.funding_source_details.id || "",
+          display_string: data.funding_source_details.display_string || "Unknown card",
+          type: data.funding_source_details.type?.toString() || "unknown",
+        });
       }
 
-      // 2) Try edges that may expose backup methods
-      const [allPaymentEdge, paymentMethodsEdge, paymentCycle] = await Promise.all([
-        fetchJson(
-          `https://graph.facebook.com/v24.0/${actId}/all_payment_methods?fields=id,display_string,pm_credit_card_type,funding_source_type,type&limit=200&access_token=${bmToken}`,
-          "all_payment_methods_edge"
-        ),
-        fetchJson(
-          `https://graph.facebook.com/v24.0/${actId}/payment_methods?fields=id,display_string,type&limit=200&access_token=${bmToken}`,
-          "payment_methods_edge"
-        ),
-        fetchJson(
-          `https://graph.facebook.com/v24.0/${actId}/adspaymentcycle?fields=funding_source_details&limit=200&access_token=${bmToken}`,
-          "adspaymentcycle"
-        ),
-      ]);
-
-      for (const pm of allPaymentEdge?.data || []) addFromNode(pm, "all_payment_methods_edge");
-      for (const pm of paymentMethodsEdge?.data || []) addFromNode(pm, "payment_methods_edge");
-      for (const cycle of paymentCycle?.data || []) addFromNode(cycle?.funding_source_details, "adspaymentcycle");
-
-      // 3) Scan BM owned + client accounts for this specific account
-      const scanBmAccounts = async (url: string, includeAllAccounts = false) => {
-        let nextUrl: string | null = url;
-        while (nextUrl) {
-          const data = await fetchJson(nextUrl, includeAllAccounts ? "scan_bm_all" : "scan_bm_target");
-          if (!data) break;
-
-          for (const acc of data.data || []) {
-            const isTarget = acc.id === actId || acc.id === actId.replace("act_", "");
-            if (includeAllAccounts || isTarget) {
-              if (acc.funding_source_details) {
-                addFromNode(
-                  {
-                    id: acc.funding_source_details.id || acc.funding_source,
-                    display_string: acc.funding_source_details.display_string,
-                    type: acc.funding_source_details.type,
-                  },
-                  acc.name || acc.id
-                );
-              }
-            }
-          }
-
-          // fallback scan: avoid extremely large payloads
-          if (includeAllAccounts && cards.length >= 25) break;
-          nextUrl = data.paging?.next || null;
-        }
-      };
-
-      await Promise.all([
-        scanBmAccounts(
-          `https://graph.facebook.com/v24.0/${bm.bm_id}/owned_ad_accounts?fields=id,name,funding_source,funding_source_details&limit=200&access_token=${bmToken}`
-        ),
-        scanBmAccounts(
-          `https://graph.facebook.com/v24.0/${bm.bm_id}/client_ad_accounts?fields=id,name,funding_source,funding_source_details&limit=200&access_token=${bmToken}`
-        ),
-      ]);
-
-      // If still only default found, fallback: collect from all BM accounts (owned + shared)
-      if (cards.length <= 1) {
-        await Promise.all([
-          scanBmAccounts(
-            `https://graph.facebook.com/v24.0/${bm.bm_id}/owned_ad_accounts?fields=id,name,funding_source,funding_source_details&limit=200&access_token=${bmToken}`,
-            true
-          ),
-          scanBmAccounts(
-            `https://graph.facebook.com/v24.0/${bm.bm_id}/client_ad_accounts?fields=id,name,funding_source,funding_source_details&limit=200&access_token=${bmToken}`,
-            true
-          ),
-        ]);
-      }
-
-      console.log(`list_account_cards for ${actId}: found ${cards.length} cards`, JSON.stringify(cards));
+      console.log(`list_account_cards for ${actId}: found ${cards.length} cards`);
 
       return new Response(JSON.stringify({ cards }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Attach a funding source to an ad account
-    if (action === "add_funding_source") {
-      const { funding_source_id } = body;
-      if (!funding_source_id) throw new Error("funding_source_id is required");
-
-      const url = `https://graph.facebook.com/v24.0/${actId}?funding_source=${funding_source_id}&access_token=${bmToken}`;
-      const resp = await fetch(url, { method: "POST" });
-      const data = await resp.json();
-
-      if (data.error) {
-        throw new Error(data.error.message || "Failed to add funding source");
-      }
-
-      return new Response(JSON.stringify({ success: true, funding_source_id }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Remove funding source from ad account (set to none)
+    // Remove funding source from ad account
     if (action === "remove_funding_source") {
-      // Meta doesn't have a direct DELETE for funding sources
-      // We clear by POSTing with funding_source=0 or empty
       const url = `https://graph.facebook.com/v24.0/${actId}?funding_source=0&access_token=${bmToken}`;
       const resp = await fetch(url, { method: "POST" });
       const data = await resp.json();
-
-      if (data.error) {
-        throw new Error(data.error.message || "Failed to remove funding source");
-      }
+      if (data.error) throw new Error(data.error.message || "Failed to remove funding source");
 
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    throw new Error("Invalid action. Use 'list', 'remove', 'list_funding_sources', or 'add_funding_source'.");
+    throw new Error("Invalid action. Use 'list', 'remove', 'list_account_cards', or 'remove_funding_source'.");
   } catch (err: any) {
     console.error("manage-ad-account-partners error:", err);
     return new Response(JSON.stringify({ error: err.message }), {
