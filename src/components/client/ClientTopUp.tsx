@@ -109,6 +109,32 @@ export function ClientTopUp() {
     enabled: !!user,
   });
 
+  // Collect reviewed_by IDs for name resolution
+  const reviewerIds = [
+    ...new Set(
+      (myRequests ?? [])
+        .map((r: any) => r.reviewed_by)
+        .filter(Boolean)
+    ),
+  ];
+
+  const { data: reviewerProfiles } = useQuery({
+    queryKey: ["reviewer-profiles", reviewerIds.join(",")],
+    queryFn: async () => {
+      if (reviewerIds.length === 0) return [];
+      const { data } = await supabase.from("profiles").select("user_id, full_name, email").in("user_id", reviewerIds);
+      return (data as any[]) ?? [];
+    },
+    enabled: reviewerIds.length > 0,
+  });
+
+  const getReviewerName = (r: any) => {
+    if (r.status !== "approved") return "—";
+    if (!r.reviewed_by) return "Auto Approved";
+    const p = reviewerProfiles?.find((pr: any) => pr.user_id === r.reviewed_by);
+    return p?.full_name || p?.email || "Admin";
+  };
+
   // Realtime subscription for top_up_requests
   useEffect(() => {
     if (!user) return;
