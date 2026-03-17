@@ -243,7 +243,8 @@ export default function ClientDetailPage() {
         balance_after: newBalance,
         type: isCredit ? "admin_credit" : "admin_debit",
         description: walletNote.trim() || (isCredit ? "Admin added balance" : "Admin deducted balance"),
-      });
+        processed_by: `admin:${currentUser!.id}`,
+      } as any);
       if (txErr) throw txErr;
     },
     onSuccess: () => {
