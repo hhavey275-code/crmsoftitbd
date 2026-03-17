@@ -391,7 +391,7 @@ export function AdminDashboard() {
                         <RankIcon className={`h-5 w-5 ${rankColors[i]}`} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold truncate text-primary hover:underline">{spender.name}</p>
+                        <p className="font-semibold truncate hover:underline">{spender.name}</p>
                         <p className="text-xs text-muted-foreground">Rank #{i + 1}</p>
                       </div>
                       <p className="font-bold text-lg">${spender.value.toLocaleString()}</p>

@@ -517,7 +517,15 @@ export function AdminAdAccounts() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <span className="text-sm">{getClientName(getAssignedUserId(a.id))}</span>
+                      {(() => {
+                        const uid = getAssignedUserId(a.id);
+                        const name = getClientName(uid);
+                        return uid ? (
+                          <span className="text-sm cursor-pointer hover:underline" onClick={(e) => { e.stopPropagation(); navigate(`/clients/${uid}`); }}>{name}</span>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">{name}</span>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <Button
