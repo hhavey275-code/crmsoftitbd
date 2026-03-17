@@ -10,13 +10,12 @@ import { Zap } from "lucide-react";
 const TechBackground = lazy(() => import("@/components/TechBackground"));
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { logoUrl, headerAnnouncement } = useSiteSettings();
+  const { logoUrl, headerAnnouncement, announcementColor, announcementSize } = useSiteSettings();
   const { isAdmin } = useAuth();
 
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full relative">
-        {/* Background with low opacity */}
         <div className="fixed inset-0 w-screen h-screen opacity-60 pointer-events-none" style={{ zIndex: 0 }}>
           <Suspense fallback={null}>
             <TechBackground />
@@ -38,7 +37,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               {headerAnnouncement ? (
                 <div className="flex-1 min-w-0 overflow-hidden">
                   <div className="announcement-ticker">
-                    <span className="text-sm font-medium text-primary whitespace-nowrap">
+                    <span
+                      className={`${announcementSize || "text-sm"} font-medium whitespace-nowrap`}
+                      style={{ color: announcementColor || undefined }}
+                    >
                       {headerAnnouncement}
                     </span>
                   </div>
