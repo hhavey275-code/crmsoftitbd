@@ -208,16 +208,14 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Convert to cents for Meta API
-    const newSpendCapCents = toMetaCents(newSpendCapDollars);
-
+    // Meta POST expects dollars (account currency), GET returns cents
     console.log("Spend cap update attempt", {
       actId,
       bmId: bm.bm_id,
       oldSpendCapDollars,
       amountDollars: amount,
       newSpendCapDollars,
-      newSpendCapCents_sentToMeta: newSpendCapCents,
+      sentToMeta_dollars: newSpendCapDollars,
     });
 
     // ============================================
