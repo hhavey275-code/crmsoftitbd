@@ -35,9 +35,6 @@ function centsToDollars(cents: number): number {
   return cents / 100;
 }
 
-function isRateLimitError(code: number | undefined): boolean {
-  return code === 17 || code === 32 || code === 4 || code === 429;
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
