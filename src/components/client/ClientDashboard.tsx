@@ -20,6 +20,7 @@ export function ClientDashboard() {
   const navigate = useNavigate();
   const isInactive = (profile as any)?.status === "inactive";
 
+  const [adSearch, setAdSearch] = useState("");
   const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfMonth(new Date()));
   const [dateTo, setDateTo] = useState<Date | undefined>(endOfMonth(new Date()));
 
