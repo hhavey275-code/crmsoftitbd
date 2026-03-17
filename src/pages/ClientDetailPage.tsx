@@ -563,7 +563,7 @@ export default function ClientDetailPage() {
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-lg">Ad Accounts ({adAccounts?.length ?? 0})</CardTitle>
                 <div className="flex items-center gap-2">
-                  {unassignSelectedIds.size > 0 && (
+                  {showUnassignCheckboxes && unassignSelectedIds.size > 0 && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -574,6 +574,7 @@ export default function ClientDetailPage() {
                         }
                         toast.success(`${ids.length} account(s) unassigned`);
                         setUnassignSelectedIds(new Set());
+                        setShowUnassignCheckboxes(false);
                         refetchAdAccounts();
                         queryClient.invalidateQueries({ queryKey: ["admin-user-ad-accounts"] });
                       }}
@@ -581,7 +582,19 @@ export default function ClientDetailPage() {
                       Unassign {unassignSelectedIds.size} Selected
                     </Button>
                   )}
-                  <Button size="sm" onClick={() => { setShowAssignDialog(true); setAssignSelectedIds(new Set()); }}>
+                  <Button
+                    variant={showUnassignCheckboxes ? "secondary" : "ghost"}
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => {
+                      setShowUnassignCheckboxes(v => !v);
+                      if (showUnassignCheckboxes) setUnassignSelectedIds(new Set());
+                    }}
+                    title="Toggle selection"
+                  >
+                    <ListChecks className="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" onClick={() => { setShowAssignDialog(true); setAssignSelectedIds(new Set()); setAssignSearch(""); }}>
                     <Plus className="h-3.5 w-3.5 mr-1" />
                     Assign Accounts
                   </Button>
