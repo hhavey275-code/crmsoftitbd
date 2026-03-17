@@ -97,6 +97,28 @@ export function AdminClients() {
     onError: (err: any) => toast.error(err.message),
   });
 
+  const impersonateMutation = useMutation({
+    mutationFn: async (targetUserId: string) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+      
+      const res = await supabase.functions.invoke("impersonate-client", {
+        body: { target_user_id: targetUserId },
+      });
+      
+      if (res.error) throw new Error(res.error.message || "Failed to impersonate");
+      if (res.data?.error) throw new Error(res.data.error);
+      return res.data;
+    },
+    onSuccess: (data) => {
+      if (data?.url) {
+        window.open(data.url, "_blank");
+        toast.success("Opening client dashboard in new tab...");
+      }
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
   // Menu permissions
   const { data: userMenuPerms } = useQuery({
     queryKey: ["menu-perms", permDialogUser?.user_id],
