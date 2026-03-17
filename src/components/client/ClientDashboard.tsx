@@ -251,8 +251,11 @@ export function ClientDashboard() {
               </TableBody>
             </Table>
           ) : (
-            <p className="text-center text-muted-foreground py-8">No ad accounts assigned yet</p>
-          )}
+            <p className="text-center text-muted-foreground py-8">
+              {adSearch ? "No matching accounts found" : "No ad accounts assigned yet"}
+            </p>
+          );
+          })()}
         </CardContent>
       </Card>
     </div>
