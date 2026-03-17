@@ -14,6 +14,7 @@ import { MetricCard } from "@/components/MetricCard";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { ArrowLeft, Pencil, Check, X, ExternalLink, User, RefreshCw, Megaphone, DollarSign, ShoppingCart, MessageSquare } from "lucide-react";
+import { AdAccountPartners } from "@/components/admin/AdAccountPartners";
 
 export default function AdAccountDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -324,6 +325,9 @@ export default function AdAccountDetailPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* Partner BMs (Admin only) */}
+          {isAdmin && id && <AdAccountPartners adAccountId={id} />}
         </div>
       </div>
     </DashboardLayout>
