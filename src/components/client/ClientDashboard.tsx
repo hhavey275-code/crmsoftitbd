@@ -5,9 +5,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { MetricCard } from "@/components/MetricCard";
 import { SpendProgressBar } from "@/components/SpendProgressBar";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Wallet, MonitorSmartphone, TrendingUp, CalendarIcon, AppWindow, ExternalLink } from "lucide-react";
+import { Wallet, MonitorSmartphone, TrendingUp, CalendarIcon, AppWindow, ExternalLink, ArrowUpCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -15,6 +17,7 @@ import { format, startOfMonth, endOfMonth } from "date-fns";
 
 export function ClientDashboard() {
   const { user, profile } = useAuth();
+  const navigate = useNavigate();
   const isInactive = (profile as any)?.status === "inactive";
 
   const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfMonth(new Date()));
@@ -178,40 +181,62 @@ export function ClientDashboard() {
         </CardHeader>
         <CardContent>
           {adAccounts && adAccounts.length > 0 ? (
-            <div className="space-y-3">
-              {adAccounts.map((account: any) => {
-                const displayId = account.account_id?.replace("act_", "") ?? "";
-                return (
-                  <div
-                    key={account.id}
-                    className="flex items-center gap-4 p-4 rounded-lg border border-border/50 bg-muted/20 hover:bg-muted/40 transition-colors"
-                  >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                      <AppWindow className="h-5 w-5 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-primary truncate">{account.account_name}</p>
-                      <a
-                        href={getAdsManagerUrl(account.account_id)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
-                      >
-                        {displayId}
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
-                      {account.business_name && (
-                        <p className="text-xs text-muted-foreground">{account.business_name}</p>
-                      )}
-                    </div>
-                    <div className="hidden sm:block w-32">
-                      <SpendProgressBar amountSpent={Number(account.amount_spent)} spendCap={Number(account.spend_cap)} />
-                    </div>
-                    <StatusBadge status={account.status} />
-                  </div>
-                );
-              })}
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Account</TableHead>
+                  <TableHead>Account ID</TableHead>
+                  <TableHead>BM Name</TableHead>
+                  <TableHead>Spend</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {adAccounts.map((account: any) => {
+                  const displayId = account.account_id?.replace("act_", "") ?? "";
+                  return (
+                    <TableRow key={account.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                            <AppWindow className="h-4 w-4 text-primary" />
+                          </div>
+                          <span className="text-sm font-medium text-primary truncate max-w-[160px]">{account.account_name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <a
+                          href={getAdsManagerUrl(account.account_id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                        >
+                          {displayId}
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{account.business_name || "—"}</TableCell>
+                      <TableCell>
+                        <SpendProgressBar amountSpent={Number(account.amount_spent)} spendCap={Number(account.spend_cap)} />
+                      </TableCell>
+                      <TableCell><StatusBadge status={account.status} /></TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1"
+                          onClick={() => navigate("/top-up", { state: { adAccountId: account.id } })}
+                        >
+                          <ArrowUpCircle className="h-3.5 w-3.5" />
+                          Top Up
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
           ) : (
             <p className="text-center text-muted-foreground py-8">No ad accounts assigned yet</p>
           )}
