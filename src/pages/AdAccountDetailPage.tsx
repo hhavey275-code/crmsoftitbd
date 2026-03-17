@@ -327,6 +327,14 @@ export default function AdAccountDetailPage() {
             </Card>
           )}
 
+          {/* Payment Methods (Admin only) */}
+          {isAdmin && id && (
+            <AdAccountPaymentMethods
+              adAccountId={id}
+              cards={insights?.cards as Array<{ display_string: string; id?: string }> | null}
+            />
+          )}
+
           {/* Partner BMs (Admin only) */}
           {isAdmin && id && <AdAccountPartners adAccountId={id} />}
         </div>
