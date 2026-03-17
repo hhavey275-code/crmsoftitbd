@@ -30,7 +30,8 @@ async function getMetaSpendCap(actId: string, accessToken: string): Promise<numb
     );
     const data = await res.json();
     if (data.error || data.spend_cap === undefined) return null;
-    return Number(data.spend_cap) / 100;
+    // Meta spend_cap is in currency units (dollars), NOT cents
+    return Number(data.spend_cap);
   } catch {
     return null;
   }
