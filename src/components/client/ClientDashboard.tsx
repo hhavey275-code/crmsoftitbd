@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
+import { cn, friendlyEdgeError } from "@/lib/utils";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { toast } from "sonner";
 
