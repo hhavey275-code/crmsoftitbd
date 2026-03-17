@@ -374,10 +374,10 @@ export function AdminDashboard() {
             {spenderChart.length === 0 ? (
               <p className="text-sm text-muted-foreground py-8 text-center">No spending data yet</p>
             ) : (
-              <div className="h-[300px]">
+              <div className="h-[250px] md:h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={spenderChart} cx="50%" cy="50%" innerRadius={60} outerRadius={110} paddingAngle={3} dataKey="value" nameKey="name">
+                    <Pie data={spenderChart} cx="50%" cy="50%" innerRadius={isMobile ? 40 : 60} outerRadius={isMobile ? 80 : 110} paddingAngle={3} dataKey="value" nameKey="name">
                       {spenderChart.map((_, index) => (
                         <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                       ))}
