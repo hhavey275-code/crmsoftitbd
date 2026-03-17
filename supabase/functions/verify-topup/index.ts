@@ -42,18 +42,25 @@ Deno.serve(async (req) => {
     const bdtNum = Number(bdt_amount);
     const verificationLog: string[] = [];
 
-    // 2. Get bank account last 4 digits
+    // 2. Get bank account details (last 4 digits + bank name)
     let bankLast4 = '';
+    let bankName = '';
     if (bank_account_id) {
       const { data: bank } = await supabase
         .from('bank_accounts')
-        .select('account_number')
+        .select('account_number, bank_name')
         .eq('id', bank_account_id)
         .single();
       if (bank?.account_number) {
         bankLast4 = bank.account_number.slice(-4);
       }
+      if (bank?.bank_name) {
+        bankName = bank.bank_name.toLowerCase();
+      }
     }
+
+    // Check if this is a bKash/Nagad agent payment
+    const isMobileAgent = bankName.includes('bkash') || bankName.includes('nagad');
 
     // 3. Step 1 & 2: AI OCR — Extract ref and amount from screenshot
     let ocrRef = '';
@@ -152,36 +159,46 @@ Deno.serve(async (req) => {
     let telegramMatch = false;
     let telegramMatchDetail = '';
     let matchedMsg: any = null;
-    if (telegramMsgs && bankLast4 && bdtNum > 0) {
+
+    if (telegramMsgs && bdtNum > 0) {
       for (const msg of telegramMsgs) {
-        // Get text from multiple possible fields
         const raw = (msg as any).raw_update || {};
         const payload = raw.message || raw.edited_message || raw.channel_post || raw.edited_channel_post || {};
         const text = msg.text || payload.text || payload.caption || '';
-        
-        const hasLast4 = text.includes(bankLast4);
-        
-        // Check amount with ±15 BDT tolerance
-        // Extract all numbers from the text and check if any match within tolerance
-        const numberMatches = text.match(/[\d,]+/g) || [];
-        let hasAmount = false;
-        let matchedTelegramAmount = 0;
-        
-        for (const numStr of numberMatches) {
-          const num = Number(numStr.replace(/,/g, ''));
-          if (num > 0 && amountMatches(num, bdtNum)) {
-            hasAmount = true;
-            matchedTelegramAmount = num;
+
+        if (isMobileAgent && payment_reference) {
+          // For bKash/Nagad: match by transaction ID (trnx id) in SMS
+          const hasTrnxId = text.toLowerCase().includes(payment_reference.toLowerCase());
+          if (hasTrnxId) {
+            telegramMatch = true;
+            matchedMsg = msg;
+            telegramMatchDetail = `trnxID: ${payment_reference} found in SMS`;
+            console.log(`Telegram trnx ID match found: ${telegramMatchDetail}, text snippet: ${text.substring(0, 100)}`);
             break;
           }
-        }
+        } else {
+          // For bank transfer: match by last4 + amount
+          const hasLast4 = bankLast4 && text.includes(bankLast4);
+          const numberMatches = text.match(/[\d,]+/g) || [];
+          let hasAmount = false;
+          let matchedTelegramAmount = 0;
 
-        if (hasLast4 && hasAmount) {
-          telegramMatch = true;
-          matchedMsg = msg;
-          telegramMatchDetail = `last4: ${bankLast4}, amount: ৳${matchedTelegramAmount} (submitted: ৳${bdtNum}, diff: ৳${Math.abs(matchedTelegramAmount - bdtNum)})`;
-          console.log(`Telegram match found: ${telegramMatchDetail}, text snippet: ${text.substring(0, 100)}`);
-          break;
+          for (const numStr of numberMatches) {
+            const num = Number(numStr.replace(/,/g, ''));
+            if (num > 0 && amountMatches(num, bdtNum)) {
+              hasAmount = true;
+              matchedTelegramAmount = num;
+              break;
+            }
+          }
+
+          if (hasLast4 && hasAmount) {
+            telegramMatch = true;
+            matchedMsg = msg;
+            telegramMatchDetail = `last4: ${bankLast4}, amount: ৳${matchedTelegramAmount} (submitted: ৳${bdtNum}, diff: ৳${Math.abs(matchedTelegramAmount - bdtNum)})`;
+            console.log(`Telegram match found: ${telegramMatchDetail}, text snippet: ${text.substring(0, 100)}`);
+            break;
+          }
         }
       }
     }
@@ -189,7 +206,10 @@ Deno.serve(async (req) => {
     if (telegramMatch) {
       verificationLog.push(`✅ Telegram SMS matched (${telegramMatchDetail})`);
     } else {
-      verificationLog.push(`❌ Telegram SMS no match (bankLast4=${bankLast4}, bdt=${bdtNum}, messages checked: ${telegramMsgs?.length ?? 0}, window: ${windowStart} → ${windowEnd})`);
+      const matchInfo = isMobileAgent 
+        ? `trnxID=${payment_reference}` 
+        : `bankLast4=${bankLast4}, bdt=${bdtNum}`;
+      verificationLog.push(`❌ Telegram SMS no match (${matchInfo}, messages checked: ${telegramMsgs?.length ?? 0}, window: ${windowStart} → ${windowEnd})`);
     }
 
     // Decision: All 3 steps must pass (OCR ref, OCR amount, Telegram SMS)

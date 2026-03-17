@@ -97,11 +97,12 @@ function BankSmsPanel({ request }: { request: any }) {
 
 function BankSmsTab() {
   const { data: messages, isLoading } = useQuery({
-    queryKey: ["all-bank-sms"],
+    queryKey: ["matched-bank-sms"],
     queryFn: async () => {
       const { data } = await (supabase as any)
         .from("telegram_messages")
         .select("*")
+        .not("matched_request_id", "is", null)
         .order("created_at", { ascending: false })
         .limit(100);
       return (data as any[]) ?? [];
@@ -123,13 +124,13 @@ function BankSmsTab() {
       <CardHeader>
         <CardTitle className="text-lg flex items-center gap-2">
           <MessageSquareText className="h-5 w-5 text-primary" />
-          Bank SMS Messages ({allMessages.length})
+          Matched Bank SMS ({allMessages.length})
         </CardTitle>
       </CardHeader>
       <CardContent>
         {allMessages.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">
-            No bank SMS messages found. Make sure the bot's Group Privacy is turned OFF in BotFather and the bot is added to your bank SMS group.
+            No matched SMS messages yet. Messages will appear here after they are used for auto-approval.
           </p>
         ) : (
           <div className="space-y-2 max-h-[500px] overflow-y-auto">
@@ -137,7 +138,7 @@ function BankSmsTab() {
               <div key={m.update_id} className="p-3 bg-muted/40 rounded-md border text-sm space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">{format(new Date(m.created_at), "MMM d, yyyy HH:mm:ss")}</span>
-                  <span className="text-xs text-muted-foreground">Chat: {m.chat_id}</span>
+                  <span className="text-xs text-green-600 font-medium">✅ Matched</span>
                 </div>
                 <p className="whitespace-pre-wrap text-foreground">{getTelegramDisplayText(m)}</p>
               </div>
