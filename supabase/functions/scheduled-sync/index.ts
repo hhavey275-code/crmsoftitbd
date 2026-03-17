@@ -44,9 +44,12 @@ Deno.serve(async (req) => {
 
     let totalSynced = 0;
 
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
     for (const bm of bms ?? []) {
       try {
-        const metaUrl = `https://graph.facebook.com/v21.0/${bm.bm_id}/owned_ad_accounts?fields=id,name,account_id,account_status,spend_cap,amount_spent&access_token=${bm.access_token}&limit=100`;
+        const accessToken = await decryptToken(bm.access_token, serviceKey);
+        const metaUrl = `https://graph.facebook.com/v21.0/${bm.bm_id}/owned_ad_accounts?fields=id,name,account_id,account_status,spend_cap,amount_spent&access_token=${accessToken}&limit=100`;
 
         const metaRes = await fetch(metaUrl);
         const metaData = await metaRes.json();
