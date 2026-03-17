@@ -387,60 +387,110 @@ export function ClientTopUp() {
           <CardTitle className="text-base">My Requests</CardTitle>
         </CardHeader>
         <CardContent className="p-4 pt-2">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>BDT</TableHead>
-                <TableHead>USD</TableHead>
-                <TableHead>Reference</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Invoice</TableHead>
-                <TableHead>Note</TableHead>
-                <TableHead>Processed By</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          {isMobile ? (
+            <div className="space-y-2.5">
               {myRequests?.map((r: any) => (
-                <TableRow key={r.id}>
-                  <TableCell className="text-muted-foreground">{format(new Date(r.created_at), "MMM d, yyyy")}</TableCell>
-                  <TableCell>{r.bdt_amount ? `৳${Number(r.bdt_amount).toLocaleString()}` : "—"}</TableCell>
-                  <TableCell className="font-semibold">${Number(r.amount).toLocaleString()}</TableCell>
-                  <TableCell className="text-sm">{r.payment_reference || "—"}</TableCell>
-                  <TableCell><StatusBadge status={r.status} /></TableCell>
-                  <TableCell>
-                    {r.status === "approved" ? (
-                      <Button size="sm" variant="ghost" className="gap-1 text-primary hover:underline" asChild>
+                <div key={r.id} className="rounded-lg border border-border/60 p-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-sm font-bold">${Number(r.amount).toLocaleString()}</span>
+                      {r.bdt_amount && (
+                        <span className="text-xs text-muted-foreground ml-1.5">
+                          (৳{Number(r.bdt_amount).toLocaleString()})
+                        </span>
+                      )}
+                    </div>
+                    <StatusBadge status={r.status} />
+                  </div>
+                  <div className="flex items-center justify-between mt-1.5">
+                    <span className="text-[11px] text-muted-foreground">
+                      {format(new Date(r.created_at), "MMM d, yyyy")}
+                    </span>
+                    {r.payment_reference && (
+                      <span className="text-[11px] text-muted-foreground">Ref: {r.payment_reference}</span>
+                    )}
+                  </div>
+                  {r.admin_note && !r.admin_note.startsWith('Auto-verification:') && (
+                    <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1">
+                      <MessageSquare className="h-3 w-3 mt-0.5 shrink-0" />
+                      {r.admin_note}
+                    </p>
+                  )}
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-[11px] text-muted-foreground">
+                      {getReviewerName(r)}
+                    </span>
+                    {r.status === "approved" && (
+                      <Button size="sm" variant="ghost" className="gap-1 text-primary hover:underline h-6 px-2 text-xs" asChild>
                         <Link to={`/invoice/${r.id}`} target="_blank">
-                          <FileText className="h-3.5 w-3.5" />
+                          <FileText className="h-3 w-3" />
                           Invoice
                         </Link>
                       </Button>
-                    ) : "—"}
-                  </TableCell>
-                  <TableCell className="text-sm max-w-[200px]">
-                    {r.admin_note && !r.admin_note.startsWith('Auto-verification:') ? (
-                      <span className="flex items-start gap-1 text-muted-foreground">
-                        <MessageSquare className="h-3 w-3 mt-0.5 shrink-0" />
-                        {r.admin_note}
-                      </span>
-                    ) : "—"}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    <span className="text-foreground">{getReviewerName(r)}</span>
-                    {r.status === "approved" && (
-                      <span className="block text-[10px] text-muted-foreground">
-                        {format(new Date(new Date(r.updated_at).toLocaleString("en-US", { timeZone: "Asia/Dhaka" })), "MMM d, yyyy hh:mm a")}
-                      </span>
                     )}
-                  </TableCell>
-                </TableRow>
+                  </div>
+                </div>
               ))}
               {(!myRequests || myRequests.length === 0) && (
-                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">No requests yet</TableCell></TableRow>
+                <p className="text-center text-muted-foreground py-6 text-sm">No requests yet</p>
               )}
-            </TableBody>
-          </Table>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>BDT</TableHead>
+                  <TableHead>USD</TableHead>
+                  <TableHead>Reference</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Invoice</TableHead>
+                  <TableHead>Note</TableHead>
+                  <TableHead>Processed By</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {myRequests?.map((r: any) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="text-muted-foreground">{format(new Date(r.created_at), "MMM d, yyyy")}</TableCell>
+                    <TableCell>{r.bdt_amount ? `৳${Number(r.bdt_amount).toLocaleString()}` : "—"}</TableCell>
+                    <TableCell className="font-semibold">${Number(r.amount).toLocaleString()}</TableCell>
+                    <TableCell className="text-sm">{r.payment_reference || "—"}</TableCell>
+                    <TableCell><StatusBadge status={r.status} /></TableCell>
+                    <TableCell>
+                      {r.status === "approved" ? (
+                        <Button size="sm" variant="ghost" className="gap-1 text-primary hover:underline" asChild>
+                          <Link to={`/invoice/${r.id}`} target="_blank">
+                            <FileText className="h-3.5 w-3.5" />
+                            Invoice
+                          </Link>
+                        </Button>
+                      ) : "—"}
+                    </TableCell>
+                    <TableCell className="text-sm max-w-[200px]">
+                      {r.admin_note && !r.admin_note.startsWith('Auto-verification:') ? (
+                        <span className="flex items-start gap-1 text-muted-foreground">
+                          <MessageSquare className="h-3 w-3 mt-0.5 shrink-0" />
+                          {r.admin_note}
+                        </span>
+                      ) : "—"}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      <span className="text-foreground">{getReviewerName(r)}</span>
+                      {r.status === "approved" && (
+                        <span className="block text-[10px] text-muted-foreground">
+                          {format(new Date(new Date(r.updated_at).toLocaleString("en-US", { timeZone: "Asia/Dhaka" })), "MMM d, yyyy hh:mm a")}
+                        </span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {(!myRequests || myRequests.length === 0) && (
+                  <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">No requests yet</TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>
