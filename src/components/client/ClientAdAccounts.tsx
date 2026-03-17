@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { friendlyEdgeError } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -257,7 +258,7 @@ export function ClientAdAccounts() {
       queryClient.invalidateQueries({ queryKey: ["client-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["client-dashboard-transactions"] });
     },
-    onError: (err: any) => toast.error(err.message),
+    onError: (err: any) => toast.error(friendlyEdgeError(err)),
   });
 
   const lastUpdated = useMemo(() => {

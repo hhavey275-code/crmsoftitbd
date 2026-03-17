@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
+import { cn, friendlyEdgeError } from "@/lib/utils";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { toast } from "sonner";
 
@@ -130,7 +130,7 @@ export function ClientDashboard() {
       });
 
       if (res.error || res.data?.error) {
-        toast.error(res.data?.error || res.error?.message || "Failed to update spend cap");
+        toast.error(friendlyEdgeError(res.error) || res.data?.error || "Failed to update spend cap");
         return;
       }
 
@@ -140,7 +140,7 @@ export function ClientDashboard() {
       queryClient.invalidateQueries({ queryKey: ["client-wallet"] });
       queryClient.invalidateQueries({ queryKey: ["client-ad-accounts"] });
     } catch (err: any) {
-      toast.error(err.message || "Something went wrong");
+      toast.error(friendlyEdgeError(err));
     } finally {
       setTopUpLoading(false);
     }
