@@ -379,6 +379,16 @@ export function ClientTopUp() {
                   <TableCell className="font-semibold">${Number(r.amount).toLocaleString()}</TableCell>
                   <TableCell className="text-sm">{r.payment_reference || "—"}</TableCell>
                   <TableCell><StatusBadge status={r.status} /></TableCell>
+                  <TableCell>
+                    {r.status === "approved" ? (
+                      <Button size="sm" variant="ghost" className="gap-1 text-primary hover:underline" asChild>
+                        <Link to={`/invoice/${r.id}`} target="_blank">
+                          <FileText className="h-3.5 w-3.5" />
+                          Invoice
+                        </Link>
+                      </Button>
+                    ) : "—"}
+                  </TableCell>
                   <TableCell className="text-sm max-w-[200px]">
                     {r.admin_note && !r.admin_note.startsWith('Auto-verification:') ? (
                       <span className="flex items-start gap-1 text-muted-foreground">
