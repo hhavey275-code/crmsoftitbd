@@ -369,6 +369,7 @@ export function ClientTopUp() {
                 <TableHead>Status</TableHead>
                 <TableHead>Invoice</TableHead>
                 <TableHead>Note</TableHead>
+                <TableHead>Processed By</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
