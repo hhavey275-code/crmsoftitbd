@@ -165,7 +165,7 @@ Deno.serve(async (req) => {
     if (action === "remove_funding_source") {
       // Meta doesn't have a direct DELETE for funding sources
       // We clear by POSTing with funding_source=0 or empty
-      const url = `https://graph.facebook.com/v24.0/${actId}?funding_source=0&access_token=${bm.access_token}`;
+      const url = `https://graph.facebook.com/v24.0/${actId}?funding_source=0&access_token=${bmToken}`;
       const resp = await fetch(url, { method: "POST" });
       const data = await resp.json();
 
