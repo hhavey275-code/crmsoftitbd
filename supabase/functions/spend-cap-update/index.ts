@@ -139,7 +139,7 @@ Deno.serve(async (req) => {
       const { data: assignment } = await supabase
         .from("user_ad_accounts")
         .select("id")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .eq("ad_account_id", ad_account_id)
         .single();
 
