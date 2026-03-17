@@ -301,9 +301,13 @@ Deno.serve(async (req) => {
         const updateBatches = chunk(adAccountUpdates, 30);
         for (const batch of updateBatches) {
           for (const item of batch) {
+            const updateData: any = { amount_spent: item.amount_spent };
+            if (item.spend_cap !== undefined) {
+              updateData.spend_cap = item.spend_cap;
+            }
             await supabase
               .from("ad_accounts")
-              .update({ amount_spent: item.amount_spent })
+              .update(updateData)
               .eq("id", item.id);
           }
         }
