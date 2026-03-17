@@ -87,13 +87,16 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const { data: { user }, error: userError } = await supabaseUser.auth.getUser(token);
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+    const { data: claimsData, error: claimsError } = await supabaseUser.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      console.error("getClaims error:", claimsError);
+      return new Response(JSON.stringify({ error: "Unauthorized - invalid token" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const userId = claimsData.claims.sub as string;
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -104,7 +107,7 @@ Deno.serve(async (req) => {
     const { data: userRole } = await supabase
       .from("user_roles")
       .select("role")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .single();
 
     const isAdmin = userRole?.role === "admin" || userRole?.role === "superadmin";
@@ -123,7 +126,7 @@ Deno.serve(async (req) => {
       const { data: profile } = await supabase
         .from("profiles")
         .select("status, due_limit")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .single();
 
       if (profile?.status === "inactive") {
@@ -136,7 +139,7 @@ Deno.serve(async (req) => {
       const { data: assignment } = await supabase
         .from("user_ad_accounts")
         .select("id")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .eq("ad_account_id", ad_account_id)
         .single();
 
@@ -164,7 +167,7 @@ Deno.serve(async (req) => {
 
     // --- Wallet deduction ---
     const shouldDeductWallet = !!deduct_wallet && !!target_user_id;
-    const walletUserId = target_user_id || user.id;
+    const walletUserId = target_user_id || userId;
     let walletId: string | null = null;
     let newBalance: number | null = null;
 
@@ -222,7 +225,7 @@ Deno.serve(async (req) => {
         type: "ad_topup",
         description: `${account.account_name}\n${cleanAccountId}`,
         reference_id: ad_account_id,
-        processed_by: isAdmin ? `admin:${user.id}` : `client:${walletUserId}`,
+        processed_by: isAdmin ? `admin:${userId}` : `client:${walletUserId}`,
       });
     }
 
