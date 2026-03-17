@@ -51,7 +51,7 @@ export function ClientAdAccounts() {
 
   const isInactive = (profile as any)?.status === "inactive";
   const dueLimit = Number((profile as any)?.due_limit ?? 0);
-  const META_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes
+  const META_COOLDOWN_MS = 15 * 60 * 1000;
 
   const { data: accounts } = useQuery({
     queryKey: ["client-ad-accounts", user?.id],
@@ -199,7 +199,6 @@ export function ClientAdAccounts() {
       });
   }, [accounts, insights, sortField, sortDir, search, statusFilter, cardFilter]);
 
-  // Pagination
   const totalPages = Math.max(1, Math.ceil(sortedAccounts.length / PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
   const paginatedAccounts = sortedAccounts.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
@@ -269,16 +268,15 @@ export function ClientAdAccounts() {
     return new Date(Math.min(...times.map((t: string) => new Date(t).getTime())));
   }, [insights]);
 
-  // Aggregate insights across all accounts
   const aggregatedTodaySpend = Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.today_spend ?? 0), 0);
   const aggregatedYesterdaySpend = Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.yesterday_spend ?? 0), 0);
   const aggregatedTodayOrders = Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.today_orders ?? 0), 0);
   const aggregatedYesterdayOrders = Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.yesterday_orders ?? 0), 0);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Today's Performance Summary */}
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-3 grid-cols-2">
         <MetricCard
           title="Today's Spend"
           value={`$${aggregatedTodaySpend.toLocaleString()}`}
@@ -286,6 +284,7 @@ export function ClientAdAccounts() {
           icon={DollarSign}
           iconBg="bg-emerald-50 dark:bg-emerald-900/30"
           iconColor="text-emerald-600"
+          size={isMobile ? "sm" : "default"}
         />
         <MetricCard
           title="Today's Orders"
@@ -294,13 +293,15 @@ export function ClientAdAccounts() {
           icon={ShoppingCart}
           iconBg="bg-blue-50 dark:bg-blue-900/30"
           iconColor="text-blue-600"
+          size={isMobile ? "sm" : "default"}
         />
       </div>
 
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Ad Accounts</h1>
-        <div className="flex items-center gap-3">
-          {lastUpdated && (
+      {/* Header */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-xl md:text-2xl font-bold">Ad Accounts</h1>
+        <div className="flex items-center gap-2 flex-wrap">
+          {lastUpdated && !isMobile && (
             <span className="text-xs text-muted-foreground">
               Last synced: {lastUpdated.toLocaleString()}
             </span>
@@ -313,7 +314,7 @@ export function ClientAdAccounts() {
               disabled={refreshSelectedMutation.isPending}
             >
               <RefreshCw className={`h-4 w-4 mr-1 ${refreshSelectedMutation.isPending ? 'animate-spin' : ''}`} />
-              {refreshSelectedMutation.isPending ? "Updating..." : `Update ${selectedIds.size} Selected`}
+              {refreshSelectedMutation.isPending ? "..." : `Update ${selectedIds.size}`}
             </Button>
           )}
           <Button
@@ -321,24 +322,27 @@ export function ClientAdAccounts() {
             size="sm"
             onClick={() => refreshAllMutation.mutate()}
             disabled={refreshAllMutation.isPending}
+            className="text-xs"
           >
             <RefreshCw className={`h-4 w-4 mr-1 ${refreshAllMutation.isPending ? 'animate-spin' : ''}`} />
-            {refreshAllMutation.isPending ? "Updating..." : "Update All from Meta"}
+            {refreshAllMutation.isPending ? "Updating..." : isMobile ? "Update All" : "Update All from Meta"}
           </Button>
         </div>
       </div>
+
+      {/* Filters */}
       <div className="flex items-center gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
+        <div className="relative flex-1 min-w-[140px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by name or ID..."
+            placeholder="Search..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 h-9"
+            className="pl-9 h-9 rounded-full"
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[140px] h-9">
+          <SelectTrigger className="w-[110px] md:w-[140px] h-9 text-xs">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -349,17 +353,19 @@ export function ClientAdAccounts() {
             <SelectItem value="unsettled">Unsettled</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={cardFilter} onValueChange={setCardFilter}>
-          <SelectTrigger className="w-[160px] h-9">
-            <SelectValue placeholder="Card" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Cards</SelectItem>
-            {uniqueCards.map((card) => (
-              <SelectItem key={card} value={card}>{card}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {!isMobile && (
+          <Select value={cardFilter} onValueChange={setCardFilter}>
+            <SelectTrigger className="w-[160px] h-9">
+              <SelectValue placeholder="Card" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Cards</SelectItem>
+              {uniqueCards.map((card) => (
+                <SelectItem key={card} value={card}>{card}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Button
           variant={showSelect ? "secondary" : "ghost"}
           size="icon"
@@ -376,75 +382,41 @@ export function ClientAdAccounts() {
 
       {isInactive && (
         <Card className="border-destructive bg-destructive/10">
-          <CardContent className="p-4 flex items-center gap-3">
-            <span className="text-destructive font-semibold">⚠️ Your account has been frozen by admin. You cannot top up ad accounts.</span>
+          <CardContent className="p-3 flex items-center gap-2">
+            <span className="text-destructive font-semibold text-sm">⚠️ Account frozen. Top up disabled.</span>
           </CardContent>
         </Card>
       )}
 
-      <Card>
-        <CardContent className="pt-6">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {showSelect && (
-                  <TableHead className="w-[40px]" onClick={(e) => e.stopPropagation()}>
-                    <Checkbox
-                      checked={allPageSelected}
-                      onCheckedChange={toggleSelectAll}
-                      aria-label="Select all"
-                    />
-                  </TableHead>
-                )}
-                <TableHead className="w-[200px]">
-                  <button className="flex items-center text-xs font-medium" onClick={() => toggleSort("account_name")}>
-                    Ad Account <SortIcon field="account_name" />
-                  </button>
-                </TableHead>
-                <TableHead className="w-[100px]">
-                  <button className="flex items-center text-xs font-medium" onClick={() => toggleSort("spend_cap")}>
-                    Budget <SortIcon field="spend_cap" />
-                  </button>
-                </TableHead>
-                <TableHead className="w-[90px] hidden sm:table-cell">
-                  <span className="text-xs font-medium">Status</span>
-                </TableHead>
-                <TableHead className="w-[50px]">
-                  <span className="text-xs font-medium">Actions</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paginatedAccounts.map((a: any) => {
-                const ins = insights[a.id];
-                return (
-                  <TableRow
-                    key={a.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => navigate(`/ad-accounts/${a.id}`)}
-                    data-state={selectedIds.has(a.id) ? "selected" : undefined}
-                  >
+      {/* Mobile Card Layout */}
+      {isMobile ? (
+        <div className="space-y-3">
+          {paginatedAccounts.map((a: any) => {
+            const ins = insights[a.id];
+            return (
+              <Card
+                key={a.id}
+                className="border border-border/60 shadow-sm cursor-pointer active:scale-[0.98] transition-transform"
+                onClick={() => navigate(`/ad-accounts/${a.id}`)}
+                data-state={selectedIds.has(a.id) ? "selected" : undefined}
+              >
+                <CardContent className="p-3">
+                  <div className="flex items-start gap-3">
                     {showSelect && (
-                      <TableCell onClick={(e) => e.stopPropagation()}>
+                      <div className="pt-1" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           checked={selectedIds.has(a.id)}
                           onCheckedChange={() => toggleSelect(a.id)}
-                          aria-label={`Select ${a.account_name}`}
                         />
-                      </TableCell>
+                      </div>
                     )}
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
-                          <AppWindow className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                        <div>
-                          <div className="text-sm text-primary">{a.account_name}</div>
-                          {a.business_managers?.name && (
-                            <div className="text-xs text-muted-foreground">{a.business_managers.name}</div>
-                          )}
-                          <div className="mt-0.5 flex items-center gap-1.5">
-                            <span className="text-xs text-muted-foreground font-mono">{a.account_id.replace(/^act_/, '')}</span>
+                    <div className="flex-1 min-w-0">
+                      {/* Top row: name + status */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold truncate">{a.account_name}</p>
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <span className="text-[11px] text-muted-foreground font-mono">{a.account_id.replace(/^act_/, '')}</span>
                             <a
                               href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${a.account_id.replace(/^act_/, '')}`}
                               target="_blank"
@@ -456,83 +428,186 @@ export function ClientAdAccounts() {
                             </a>
                           </div>
                         </div>
+                        <StatusBadge status={a.status} />
                       </div>
-                    </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} />
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell"><StatusBadge status={a.status} /></TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        size="sm"
-                        variant="default"
-                        className="bg-blue-600 hover:bg-blue-700 text-white"
-                        disabled={isInactive}
-                        onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
-                      >
-                        <ArrowUpCircle className="h-4 w-4" />
-                        Top Up
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-              {(!accounts || accounts.length === 0) && (
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No ad accounts assigned to you yet</TableCell></TableRow>
-              )}
-              {accounts && accounts.length > 0 && paginatedAccounts.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No accounts match your filters</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between border-t pt-4 mt-4">
-              <span className="text-sm text-muted-foreground">
-                Showing {((safePage - 1) * PAGE_SIZE) + 1}–{Math.min(safePage * PAGE_SIZE, sortedAccounts.length)} of {sortedAccounts.length}
-              </span>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  disabled={safePage <= 1}
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
-                  .map((p, idx, arr) => (
-                    <span key={p} className="flex items-center">
-                      {idx > 0 && arr[idx - 1] !== p - 1 && (
-                        <span className="px-1 text-xs text-muted-foreground">…</span>
+                      {/* Spend progress */}
+                      <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                        <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} />
+                      </div>
+
+                      {/* Insights row */}
+                      {ins && (
+                        <div className="mt-2 grid grid-cols-3 gap-2 text-center">
+                          <div className="bg-muted/50 rounded-md p-1.5">
+                            <p className="text-[10px] text-muted-foreground">Today Spend</p>
+                            <p className="text-xs font-semibold">${Number(ins.today_spend ?? 0).toLocaleString()}</p>
+                          </div>
+                          <div className="bg-muted/50 rounded-md p-1.5">
+                            <p className="text-[10px] text-muted-foreground">Orders</p>
+                            <p className="text-xs font-semibold">{Number(ins.today_orders ?? 0)}</p>
+                          </div>
+                          <div className="bg-muted/50 rounded-md p-1.5">
+                            <p className="text-[10px] text-muted-foreground">Balance</p>
+                            <p className="text-xs font-semibold">${Number(ins.balance ?? 0).toLocaleString()}</p>
+                          </div>
+                        </div>
                       )}
-                      <Button
-                        variant={p === safePage ? "default" : "outline"}
-                        size="icon"
-                        className="h-8 w-8 text-xs"
-                        onClick={() => setCurrentPage(p)}
-                      >
-                        {p}
-                      </Button>
-                    </span>
-                  ))}
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  disabled={safePage >= totalPages}
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
+
+                      {/* Top Up button */}
+                      <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          size="sm"
+                          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs h-8"
+                          disabled={isInactive}
+                          onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
+                        >
+                          <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
+                          Top Up
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+          {(!accounts || accounts.length === 0) && (
+            <p className="text-center text-muted-foreground py-8 text-sm">No ad accounts assigned to you yet</p>
           )}
-        </CardContent>
-      </Card>
+          {accounts && accounts.length > 0 && paginatedAccounts.length === 0 && (
+            <p className="text-center text-muted-foreground py-8 text-sm">No accounts match your filters</p>
+          )}
+        </div>
+      ) : (
+        /* Desktop Table Layout */
+        <Card>
+          <CardContent className="pt-6">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {showSelect && (
+                    <TableHead className="w-[40px]" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox checked={allPageSelected} onCheckedChange={toggleSelectAll} aria-label="Select all" />
+                    </TableHead>
+                  )}
+                  <TableHead className="w-[200px]">
+                    <button className="flex items-center text-xs font-medium" onClick={() => toggleSort("account_name")}>
+                      Ad Account <SortIcon field="account_name" />
+                    </button>
+                  </TableHead>
+                  <TableHead className="w-[100px]">
+                    <button className="flex items-center text-xs font-medium" onClick={() => toggleSort("spend_cap")}>
+                      Budget <SortIcon field="spend_cap" />
+                    </button>
+                  </TableHead>
+                  <TableHead className="w-[90px]">
+                    <span className="text-xs font-medium">Status</span>
+                  </TableHead>
+                  <TableHead className="w-[50px]">
+                    <span className="text-xs font-medium">Actions</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedAccounts.map((a: any) => {
+                  const ins = insights[a.id];
+                  return (
+                    <TableRow
+                      key={a.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => navigate(`/ad-accounts/${a.id}`)}
+                      data-state={selectedIds.has(a.id) ? "selected" : undefined}
+                    >
+                      {showSelect && (
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.has(a.id)}
+                            onCheckedChange={() => toggleSelect(a.id)}
+                            aria-label={`Select ${a.account_name}`}
+                          />
+                        </TableCell>
+                      )}
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
+                            <AppWindow className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                          <div>
+                            <div className="text-sm text-primary">{a.account_name}</div>
+                            {a.business_managers?.name && (
+                              <div className="text-xs text-muted-foreground">{a.business_managers.name}</div>
+                            )}
+                            <div className="mt-0.5 flex items-center gap-1.5">
+                              <span className="text-xs text-muted-foreground font-mono">{a.account_id.replace(/^act_/, '')}</span>
+                              <a
+                                href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${a.account_id.replace(/^act_/, '')}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-muted-foreground hover:text-primary"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} />
+                      </TableCell>
+                      <TableCell><StatusBadge status={a.status} /></TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                          disabled={isInactive}
+                          onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
+                        >
+                          <ArrowUpCircle className="h-4 w-4" />
+                          Top Up
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {(!accounts || accounts.length === 0) && (
+                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No ad accounts assigned to you yet</TableCell></TableRow>
+                )}
+                {accounts && accounts.length > 0 && paginatedAccounts.length === 0 && (
+                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No accounts match your filters</TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between pt-2">
+          <span className="text-xs text-muted-foreground">
+            {((safePage - 1) * PAGE_SIZE) + 1}–{Math.min(safePage * PAGE_SIZE, sortedAccounts.length)} of {sortedAccounts.length}
+          </span>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon" className="h-8 w-8" disabled={safePage <= 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+              .map((p, idx, arr) => (
+                <span key={p} className="flex items-center">
+                  {idx > 0 && arr[idx - 1] !== p - 1 && <span className="px-1 text-xs text-muted-foreground">…</span>}
+                  <Button variant={p === safePage ? "default" : "outline"} size="icon" className="h-8 w-8 text-xs" onClick={() => setCurrentPage(p)}>{p}</Button>
+                </span>
+              ))}
+            <Button variant="outline" size="icon" className="h-8 w-8" disabled={safePage >= totalPages} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Top Up Dialog */}
       <Dialog open={!!topUpAccount} onOpenChange={(open) => !open && setTopUpAccount(null)}>
