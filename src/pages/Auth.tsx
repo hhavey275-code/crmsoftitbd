@@ -108,7 +108,12 @@ export default function Auth() {
         toast.success("Account created! Please wait for admin approval after confirming your email.");
       }
     } catch (err: any) {
-      toast.error(err.message);
+      const msg = err?.message || err?.error_description || "";
+      if (!msg || msg === "{}" || msg.includes("timeout") || msg.includes("504") || msg.includes("non-2xx")) {
+        toast.error("Server is busy. Please try again in a moment.");
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setLoading(false);
     }
