@@ -33,6 +33,7 @@ interface InsightsData {
 }
 
 export function ClientAdAccounts() {
+  const isMobile = useIsMobile();
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
