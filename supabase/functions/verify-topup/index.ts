@@ -42,18 +42,25 @@ Deno.serve(async (req) => {
     const bdtNum = Number(bdt_amount);
     const verificationLog: string[] = [];
 
-    // 2. Get bank account last 4 digits
+    // 2. Get bank account details (last 4 digits + bank name)
     let bankLast4 = '';
+    let bankName = '';
     if (bank_account_id) {
       const { data: bank } = await supabase
         .from('bank_accounts')
-        .select('account_number')
+        .select('account_number, bank_name')
         .eq('id', bank_account_id)
         .single();
       if (bank?.account_number) {
         bankLast4 = bank.account_number.slice(-4);
       }
+      if (bank?.bank_name) {
+        bankName = bank.bank_name.toLowerCase();
+      }
     }
+
+    // Check if this is a bKash/Nagad agent payment
+    const isMobileAgent = bankName.includes('bkash') || bankName.includes('nagad');
 
     // 3. Step 1 & 2: AI OCR — Extract ref and amount from screenshot
     let ocrRef = '';
