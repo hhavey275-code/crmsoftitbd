@@ -1,28 +1,35 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { MetricCard } from "@/components/MetricCard";
 import { SpendProgressBar } from "@/components/SpendProgressBar";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Wallet, MonitorSmartphone, TrendingUp, CalendarIcon, AppWindow, ExternalLink, ArrowUpCircle, Search } from "lucide-react";
+import { Wallet, MonitorSmartphone, TrendingUp, CalendarIcon, AppWindow, ExternalLink, ArrowUpCircle, Search, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
+import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { format, startOfMonth, endOfMonth } from "date-fns";
+import { toast } from "sonner";
 
 export function ClientDashboard() {
   const { user, profile } = useAuth();
-  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const isInactive = (profile as any)?.status === "inactive";
 
   const [adSearch, setAdSearch] = useState("");
   const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfMonth(new Date()));
   const [dateTo, setDateTo] = useState<Date | undefined>(endOfMonth(new Date()));
+
+  // Spend cap dialog state
+  const [topUpAccount, setTopUpAccount] = useState<any>(null);
+  const [topUpAmount, setTopUpAmount] = useState("");
+  const [topUpLoading, setTopUpLoading] = useState(false);
 
   const { data: wallet } = useQuery({
     queryKey: ["client-wallet", user?.id],
@@ -81,6 +88,50 @@ export function ClientDashboard() {
   const getAdsManagerUrl = (accountId: string) => {
     const cleanId = accountId.replace("act_", "");
     return `https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${cleanId}&nav_source=flyout_menu`;
+  };
+
+  const handleSpendCapIncrease = async () => {
+    if (!topUpAccount || !topUpAmount) return;
+    const amount = Number(topUpAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast.error("Please enter a valid amount");
+      return;
+    }
+
+    const walletBalance = Number(wallet?.balance ?? 0);
+    const dueLimit = Number((profile as any)?.due_limit ?? 0);
+    if (walletBalance + dueLimit < amount) {
+      toast.error("Insufficient wallet balance");
+      return;
+    }
+
+    setTopUpLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await supabase.functions.invoke("spend-cap-update", {
+        body: {
+          ad_account_id: topUpAccount.id,
+          amount,
+          deduct_wallet: true,
+          target_user_id: user!.id,
+        },
+      });
+
+      if (res.error || res.data?.error) {
+        toast.error(res.data?.error || res.error?.message || "Failed to update spend cap");
+        return;
+      }
+
+      toast.success(`Spend cap increased by $${amount.toLocaleString()}`);
+      setTopUpAccount(null);
+      setTopUpAmount("");
+      queryClient.invalidateQueries({ queryKey: ["client-wallet"] });
+      queryClient.invalidateQueries({ queryKey: ["client-ad-accounts"] });
+    } catch (err: any) {
+      toast.error(err.message || "Something went wrong");
+    } finally {
+      setTopUpLoading(false);
+    }
   };
 
   return (
@@ -239,7 +290,8 @@ export function ClientDashboard() {
                         <Button
                           size="sm"
                           className="gap-1.5 bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs tracking-wide"
-                          onClick={() => navigate("/top-up", { state: { adAccountId: account.id } })}
+                          onClick={() => { setTopUpAccount(account); setTopUpAmount(""); }}
+                          disabled={isInactive}
                         >
                           <ArrowUpCircle className="h-3.5 w-3.5" />
                           Top Up
@@ -258,6 +310,59 @@ export function ClientDashboard() {
           })()}
         </CardContent>
       </Card>
+
+      {/* Spend Cap Increase Dialog */}
+      <Dialog open={!!topUpAccount} onOpenChange={(open) => { if (!open) setTopUpAccount(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Increase Spend Cap</DialogTitle>
+            <DialogDescription>
+              Top up <span className="font-medium text-foreground">{topUpAccount?.account_name}</span> by deducting from your wallet.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Wallet Balance</span>
+              <span className="font-semibold">${Number(wallet?.balance ?? 0).toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Current Spend Cap</span>
+              <span className="font-semibold">${Number(topUpAccount?.spend_cap ?? 0).toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Amount Spent</span>
+              <span className="font-semibold">${Number(topUpAccount?.amount_spent ?? 0).toLocaleString()}</span>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Amount (USD)</label>
+              <Input
+                type="number"
+                min="1"
+                placeholder="Enter amount to add"
+                value={topUpAmount}
+                onChange={(e) => setTopUpAmount(e.target.value)}
+                autoFocus
+              />
+              {topUpAmount && Number(topUpAmount) > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  New spend cap: <span className="font-medium text-foreground">${(Number(topUpAccount?.spend_cap ?? 0) + Number(topUpAmount)).toLocaleString()}</span>
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTopUpAccount(null)} disabled={topUpLoading}>Cancel</Button>
+            <Button
+              onClick={handleSpendCapIncrease}
+              disabled={topUpLoading || !topUpAmount || Number(topUpAmount) <= 0}
+              className="bg-gradient-to-r from-primary to-blue-500 text-primary-foreground"
+            >
+              {topUpLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <ArrowUpCircle className="h-4 w-4 mr-1" />}
+              Confirm Top Up
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
