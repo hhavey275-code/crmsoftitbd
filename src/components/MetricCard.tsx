@@ -15,16 +15,16 @@ interface MetricCardProps {
 
 export function MetricCard({ title, value, subtitle, icon: Icon, iconBg, iconColor, className }: MetricCardProps) {
   return (
-    <Card className={cn("bg-card border border-border/60 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.06)] hover:shadow-[0_2px_8px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.08)] transition-shadow duration-200", className)}>
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between">
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-muted-foreground">{title}</p>
-            <p className="text-2xl font-bold tracking-tight text-foreground">{value}</p>
-            {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+    <Card className={cn("bg-card border border-border/60 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_2px_6px_rgba(0,0,0,0.06)] transition-shadow duration-200", className)}>
+      <CardContent className="p-3">
+        <div className="flex items-center gap-2.5">
+          <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", iconBg || "bg-primary/10")}>
+            <Icon className={cn("h-3.5 w-3.5", iconColor || "text-primary")} />
           </div>
-          <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl", iconBg || "bg-primary/10")}>
-            <Icon className={cn("h-5 w-5", iconColor || "text-primary")} />
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium text-muted-foreground truncate">{title}</p>
+            <p className="text-base font-bold tracking-tight text-foreground leading-tight">{value}</p>
+            {subtitle && <p className="text-[10px] text-muted-foreground truncate">{subtitle}</p>}
           </div>
         </div>
       </CardContent>
