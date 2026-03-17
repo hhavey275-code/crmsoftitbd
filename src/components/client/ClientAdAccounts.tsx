@@ -44,9 +44,11 @@ export function ClientAdAccounts() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [cardFilter, setCardFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [lastMetaUpdate, setLastMetaUpdate] = useState<number>(0);
 
   const isInactive = (profile as any)?.status === "inactive";
   const dueLimit = Number((profile as any)?.due_limit ?? 0);
+  const META_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes
 
   const { data: accounts } = useQuery({
     queryKey: ["client-ad-accounts", user?.id],
