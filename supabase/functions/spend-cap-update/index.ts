@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
       const { data: profile } = await supabase
         .from("profiles")
         .select("status, due_limit")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .single();
 
       if (profile?.status === "inactive") {
