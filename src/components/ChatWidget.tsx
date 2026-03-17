@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
-import { MessageCircle, Send, X, Minus } from "lucide-react";
+import { MessageCircle, Send, X, Minus, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ChatMessage {
   id: string;
@@ -18,6 +19,7 @@ interface ChatMessage {
 
 export function ChatWidget() {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -42,7 +44,6 @@ export function ChatWidget() {
     load();
   }, [user]);
 
-  // Load messages when conversation exists
   useEffect(() => {
     if (!conversationId) return;
     const loadMessages = async () => {
@@ -56,14 +57,12 @@ export function ChatWidget() {
     loadMessages();
   }, [conversationId]);
 
-  // Count unread (messages not from me and not read)
   useEffect(() => {
     if (!user) return;
     const count = messages.filter(m => m.sender_id !== user.id && !m.is_read).length;
     setUnreadCount(count);
   }, [messages, user]);
 
-  // Mark messages as read when chat is open
   useEffect(() => {
     if (!open || !conversationId || !user) return;
     const unread = messages.filter(m => m.sender_id !== user.id && !m.is_read);
@@ -80,7 +79,6 @@ export function ChatWidget() {
     }
   }, [open, messages, conversationId, user]);
 
-  // Realtime subscription
   useEffect(() => {
     if (!conversationId) return;
     const channel = supabase
@@ -105,7 +103,6 @@ export function ChatWidget() {
     return () => { supabase.removeChannel(channel); };
   }, [conversationId]);
 
-  // Also listen for new conversations created by admin for this client
   useEffect(() => {
     if (!user || conversationId) return;
     const channel = supabase
@@ -128,7 +125,6 @@ export function ChatWidget() {
     return () => { supabase.removeChannel(channel); };
   }, [user, conversationId]);
 
-  // Auto-scroll
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -172,6 +168,68 @@ export function ChatWidget() {
     return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
+  // Mobile: full-screen chat
+  if (isMobile && open) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col bg-background">
+        {/* Header */}
+        <div className="flex items-center gap-3 px-4 py-3 bg-primary text-primary-foreground safe-area-top">
+          <button onClick={() => setOpen(false)} className="p-1">
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <MessageCircle className="h-5 w-5" />
+          <span className="font-semibold text-sm">Chat Support</span>
+          <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
+        </div>
+
+        {/* Messages */}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+          {messages.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm">
+              <MessageCircle className="h-10 w-10 mb-2 opacity-30" />
+              <p>Start a conversation!</p>
+              <p className="text-xs mt-1">We typically reply within minutes</p>
+            </div>
+          )}
+          {messages.map((msg) => {
+            const isMe = msg.sender_id === user?.id;
+            return (
+              <div key={msg.id} className={cn("flex", isMe ? "justify-end" : "justify-start")}>
+                <div
+                  className={cn(
+                    "max-w-[80%] rounded-2xl px-3 py-2 text-sm",
+                    isMe
+                      ? "bg-primary text-primary-foreground rounded-br-md"
+                      : "bg-muted text-foreground rounded-bl-md"
+                  )}
+                >
+                  <p className="break-words">{msg.message}</p>
+                  <p className={cn("text-[10px] mt-1", isMe ? "text-primary-foreground/70" : "text-muted-foreground")}>
+                    {formatTime(msg.created_at)}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Input */}
+        <div className="border-t p-3 flex gap-2 safe-area-bottom">
+          <Input
+            placeholder="Type a message..."
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
+            className="flex-1 h-10 text-sm rounded-full"
+          />
+          <Button size="icon" className="h-10 w-10 shrink-0 rounded-full" onClick={handleSend} disabled={!message.trim() || sending}>
+            <Send className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       {/* Floating button */}
@@ -189,10 +247,9 @@ export function ChatWidget() {
         </button>
       )}
 
-      {/* Chat panel */}
+      {/* Chat panel - desktop */}
       {open && (
         <div className="fixed bottom-6 right-6 z-50 w-[360px] max-h-[500px] flex flex-col rounded-xl border bg-card shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
-          {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 bg-primary text-primary-foreground">
             <div className="flex items-center gap-2">
               <MessageCircle className="h-5 w-5" />
@@ -209,7 +266,6 @@ export function ChatWidget() {
             </div>
           </div>
 
-          {/* Messages */}
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[300px] max-h-[350px]">
             {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm">
@@ -240,7 +296,6 @@ export function ChatWidget() {
             })}
           </div>
 
-          {/* Input */}
           <div className="border-t p-3 flex gap-2">
             <Input
               placeholder="Type a message..."
