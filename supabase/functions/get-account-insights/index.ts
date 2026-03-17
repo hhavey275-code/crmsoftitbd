@@ -49,9 +49,6 @@ function extractOrders(data: any) {
   if (!actions) return 0;
   const purchaseTypes = [
     "purchase",
-    "offsite_conversion.fb_pixel_purchase",
-    "omni_purchase",
-    "onsite_web_purchase",
   ];
   let total = 0;
   for (const a of actions) {
