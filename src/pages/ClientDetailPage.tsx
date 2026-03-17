@@ -24,7 +24,7 @@ import { toast } from "sonner";
 import {
   User, Building2, Phone, CalendarDays, Wallet, MonitorSmartphone,
   CheckCircle, XCircle, TrendingUp, TrendingDown, DollarSign, CalendarIcon, Save,
-  Plus, Minus, ArrowUpCircle, CreditCard, Shield, Receipt, ShoppingCart, RefreshCw, ListChecks, Search
+  Plus, Minus, ArrowUpCircle, CreditCard, Shield, Receipt, ShoppingCart, RefreshCw, ListChecks, Search, LayoutDashboard, FileText
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 
@@ -297,11 +297,21 @@ export default function ClientDetailPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-5">
+        {/* Header */}
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Client Details</h1>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+              <User className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-foreground">{profile?.full_name || "Client Details"}</h1>
+              <p className="text-xs text-muted-foreground">{profile?.email || ""}</p>
+            </div>
+            <StatusBadge status={isActive ? "active" : "inactive"} />
+          </div>
           <Button
-            className="bg-blue-600 hover:bg-blue-700 text-white"
+            className="bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-5 font-semibold"
             onClick={() => { setTopUpDialogOpen(true); setSelectedAccountId(""); setTopUpAmount(""); }}
           >
             <ArrowUpCircle className="h-4 w-4 mr-2" />
@@ -309,184 +319,205 @@ export default function ClientDetailPage() {
           </Button>
         </div>
 
-        {/* Client Info Card */}
-        <Card className={!isActive ? "border-destructive/50 bg-destructive/5" : ""}>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Client Information
-              <span className="ml-auto">
-                <StatusBadge status={isActive ? "active" : "inactive"} />
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-              {/* Full Name */}
-              <div className="flex items-center gap-3 rounded-lg border p-4">
-                <User className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Full Name</p>
-                  <p className="font-medium">{profile?.full_name || "—"}</p>
-                </div>
-              </div>
-
-              {/* Business Name - editable */}
-              <div className="flex items-center gap-3 rounded-lg border p-4">
-                <Building2 className="h-5 w-5 text-muted-foreground" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-muted-foreground">Business Name</p>
-                  {editingCompany ? (
-                    <div className="flex items-center gap-1 mt-1">
-                      <Input className="w-24 h-7 text-sm" value={companyInput} onChange={(e) => setCompanyInput(e.target.value)} />
-                      <Button size="icon" className="h-7 w-7" onClick={() => { saveProfileMutation.mutate({ company: companyInput }); setEditingCompany(false); }}>
-                        <Save className="h-3 w-3" />
-                      </Button>
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingCompany(false)}>
-                        <XCircle className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <p className="font-medium cursor-pointer hover:underline" onClick={() => { setCompanyInput(profile?.company ?? ""); setEditingCompany(true); }}>
-                      {profile?.company || "—"}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Phone - editable */}
-              <div className="flex items-center gap-3 rounded-lg border p-4">
-                <Phone className="h-5 w-5 text-muted-foreground" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-muted-foreground">Phone Number</p>
-                  {editingPhone ? (
-                    <div className="flex items-center gap-1 mt-1">
-                      <Input className="w-28 h-7 text-sm" value={phoneInput} onChange={(e) => setPhoneInput(e.target.value)} />
-                      <Button size="icon" className="h-7 w-7" onClick={() => { saveProfileMutation.mutate({ phone: phoneInput }); setEditingPhone(false); }}>
-                        <Save className="h-3 w-3" />
-                      </Button>
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingPhone(false)}>
-                        <XCircle className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <p className="font-medium cursor-pointer hover:underline" onClick={() => { setPhoneInput(profile?.phone ?? ""); setEditingPhone(true); }}>
-                      {profile?.phone || "—"}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Onboarding Date */}
-              <div className="flex items-center gap-3 rounded-lg border p-4">
-                <CalendarDays className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Onboarding Date</p>
-                  <p className="font-medium">
-                    {profile?.created_at ? format(new Date(profile.created_at), "MMM d, yyyy") : "—"}
-                  </p>
-                </div>
-              </div>
-
-              {/* USD Rate - editable */}
-              <div className="flex items-center gap-3 rounded-lg border border-cyan-200 bg-cyan-50/50 dark:bg-cyan-950/20 dark:border-cyan-800 p-4">
-                <DollarSign className="h-5 w-5 text-cyan-600" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-muted-foreground">USD Rate</p>
-                  {editingRate ? (
-                    <div className="flex items-center gap-1 mt-1">
-                      <Input type="number" step="0.01" className="w-20 h-7 text-sm" value={rateInput} onChange={(e) => setRateInput(e.target.value)} placeholder="e.g. 125" />
-                      <Button size="icon" className="h-7 w-7" onClick={() => { saveProfileMutation.mutate({ usd_rate: rateInput.trim() === "" ? null : parseFloat(rateInput) }); setEditingRate(false); }}>
-                        <Save className="h-3 w-3" />
-                      </Button>
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingRate(false)}>
-                        <XCircle className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <p className="font-medium text-cyan-700 dark:text-cyan-400 cursor-pointer hover:underline" onClick={() => { setRateInput(clientRate?.toString() ?? ""); setEditingRate(true); }}>
-                      {clientRate ? `৳${clientRate}` : `Global (৳${globalRate})`}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Due Limit - editable */}
-              <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800 p-4">
-                <Shield className="h-5 w-5 text-amber-600" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-muted-foreground">Due Limit</p>
-                  {editingDueLimit ? (
-                    <div className="flex items-center gap-1 mt-1">
-                      <Input type="number" step="1" className="w-20 h-7 text-sm" value={dueLimitInput} onChange={(e) => setDueLimitInput(e.target.value)} placeholder="e.g. 500" />
-                      <Button size="icon" className="h-7 w-7" onClick={() => { saveProfileMutation.mutate({ due_limit: dueLimitInput.trim() === "" ? null : parseFloat(dueLimitInput) } as any); setEditingDueLimit(false); }}>
-                        <Save className="h-3 w-3" />
-                      </Button>
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingDueLimit(false)}>
-                        <XCircle className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <p className="font-medium text-amber-700 dark:text-amber-400 cursor-pointer hover:underline" onClick={() => { setDueLimitInput(dueLimit?.toString() ?? ""); setEditingDueLimit(true); }}>
-                      {dueLimit ? `$${Number(dueLimit).toLocaleString()}` : "No due limit"}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {!isActive && (
-              <div className="mt-4 rounded-md bg-destructive/10 border border-destructive/30 p-3 text-sm text-destructive font-medium">
-                ⚠️ This account is currently frozen/inactive.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Tabs: Overview & Transaction History */}
-        <Tabs defaultValue="overview" className="space-y-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-sm font-medium text-muted-foreground">Period:</span>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className={cn("w-[140px] justify-start text-left font-normal", !dateFrom && "text-muted-foreground")}>
-                  <CalendarIcon className="mr-1 h-3 w-3" />
-                  {dateFrom ? format(dateFrom, "MMM d, yyyy") : "From"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className="p-3 pointer-events-auto" />
-              </PopoverContent>
-            </Popover>
-            <span className="text-muted-foreground">—</span>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className={cn("w-[140px] justify-start text-left font-normal", !dateTo && "text-muted-foreground")}>
-                  <CalendarIcon className="mr-1 h-3 w-3" />
-                  {dateTo ? format(dateTo, "MMM d, yyyy") : "To"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className="p-3 pointer-events-auto" />
-              </PopoverContent>
-            </Popover>
-
-            <TabsList className="ml-auto">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="transactions" className="flex items-center gap-1.5">
-                <Receipt className="h-3.5 w-3.5" />
-                Transactions
-              </TabsTrigger>
-            </TabsList>
+        {!isActive && (
+          <div className="rounded-lg bg-destructive/10 border border-destructive/30 p-3 text-sm text-destructive font-medium">
+            ⚠️ This account is currently frozen/inactive.
           </div>
+        )}
 
-          <TabsContent value="overview" className="space-y-6 mt-0">
+        {/* Date Range Filter */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-muted-foreground">Period:</span>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className={cn("w-[140px] justify-start text-left font-normal", !dateFrom && "text-muted-foreground")}>
+                <CalendarIcon className="mr-1 h-3 w-3" />
+                {dateFrom ? format(dateFrom, "MMM d, yyyy") : "From"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className="p-3 pointer-events-auto" />
+            </PopoverContent>
+          </Popover>
+          <span className="text-muted-foreground">—</span>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className={cn("w-[140px] justify-start text-left font-normal", !dateTo && "text-muted-foreground")}>
+                <CalendarIcon className="mr-1 h-3 w-3" />
+                {dateTo ? format(dateTo, "MMM d, yyyy") : "To"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className="p-3 pointer-events-auto" />
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        {/* Main Tabs: Client Info, Overview, Transactions */}
+        <Tabs defaultValue="overview" className="space-y-4">
+          <TabsList className="bg-muted/60 p-1 rounded-lg">
+            <TabsTrigger value="info" className="gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+              <User className="h-3.5 w-3.5" />
+              Client Info
+            </TabsTrigger>
+            <TabsTrigger value="overview" className="gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+              <LayoutDashboard className="h-3.5 w-3.5" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="transactions" className="gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+              <Receipt className="h-3.5 w-3.5" />
+              Transactions
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Client Info Tab */}
+          <TabsContent value="info" className="mt-0">
+            <Card className={cn("border-border/40 shadow-[0_2px_12px_rgba(0,0,0,0.04)]", !isActive && "border-destructive/50 bg-destructive/5")}>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <User className="h-4 w-4 text-primary" />
+                  Client Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                  {/* Full Name */}
+                  <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-muted/30 p-4 transition-colors hover:bg-muted/50">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                      <User className="h-4 w-4 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Full Name</p>
+                      <p className="font-semibold text-sm">{profile?.full_name || "—"}</p>
+                    </div>
+                  </div>
+
+                  {/* Business Name - editable */}
+                  <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-muted/30 p-4 transition-colors hover:bg-muted/50">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/10">
+                      <Building2 className="h-4 w-4 text-violet-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Business Name</p>
+                      {editingCompany ? (
+                        <div className="flex items-center gap-1 mt-1">
+                          <Input className="w-24 h-7 text-sm" value={companyInput} onChange={(e) => setCompanyInput(e.target.value)} />
+                          <Button size="icon" className="h-7 w-7" onClick={() => { saveProfileMutation.mutate({ company: companyInput }); setEditingCompany(false); }}>
+                            <Save className="h-3 w-3" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingCompany(false)}>
+                            <XCircle className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <p className="font-semibold text-sm cursor-pointer hover:text-primary transition-colors" onClick={() => { setCompanyInput(profile?.company ?? ""); setEditingCompany(true); }}>
+                          {profile?.company || "—"}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Phone - editable */}
+                  <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-muted/30 p-4 transition-colors hover:bg-muted/50">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10">
+                      <Phone className="h-4 w-4 text-emerald-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Phone Number</p>
+                      {editingPhone ? (
+                        <div className="flex items-center gap-1 mt-1">
+                          <Input className="w-28 h-7 text-sm" value={phoneInput} onChange={(e) => setPhoneInput(e.target.value)} />
+                          <Button size="icon" className="h-7 w-7" onClick={() => { saveProfileMutation.mutate({ phone: phoneInput }); setEditingPhone(false); }}>
+                            <Save className="h-3 w-3" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingPhone(false)}>
+                            <XCircle className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <p className="font-semibold text-sm cursor-pointer hover:text-primary transition-colors" onClick={() => { setPhoneInput(profile?.phone ?? ""); setEditingPhone(true); }}>
+                          {profile?.phone || "—"}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Onboarding Date */}
+                  <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-muted/30 p-4 transition-colors hover:bg-muted/50">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/10">
+                      <CalendarDays className="h-4 w-4 text-amber-600" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Onboarding Date</p>
+                      <p className="font-semibold text-sm">
+                        {profile?.created_at ? format(new Date(profile.created_at), "MMM d, yyyy") : "—"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* USD Rate - editable */}
+                  <div className="flex items-center gap-3 rounded-xl border border-cyan-200/60 bg-cyan-50/40 dark:bg-cyan-950/20 dark:border-cyan-800/40 p-4 transition-colors hover:bg-cyan-50/60">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-cyan-500/10">
+                      <DollarSign className="h-4 w-4 text-cyan-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">USD Rate</p>
+                      {editingRate ? (
+                        <div className="flex items-center gap-1 mt-1">
+                          <Input type="number" step="0.01" className="w-20 h-7 text-sm" value={rateInput} onChange={(e) => setRateInput(e.target.value)} placeholder="e.g. 125" />
+                          <Button size="icon" className="h-7 w-7" onClick={() => { saveProfileMutation.mutate({ usd_rate: rateInput.trim() === "" ? null : parseFloat(rateInput) }); setEditingRate(false); }}>
+                            <Save className="h-3 w-3" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingRate(false)}>
+                            <XCircle className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <p className="font-semibold text-sm text-cyan-700 dark:text-cyan-400 cursor-pointer hover:text-cyan-500 transition-colors" onClick={() => { setRateInput(clientRate?.toString() ?? ""); setEditingRate(true); }}>
+                          {clientRate ? `৳${clientRate}` : `Global (৳${globalRate})`}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Due Limit - editable */}
+                  <div className="flex items-center gap-3 rounded-xl border border-amber-200/60 bg-amber-50/40 dark:bg-amber-950/20 dark:border-amber-800/40 p-4 transition-colors hover:bg-amber-50/60">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/10">
+                      <Shield className="h-4 w-4 text-amber-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Due Limit</p>
+                      {editingDueLimit ? (
+                        <div className="flex items-center gap-1 mt-1">
+                          <Input type="number" step="1" className="w-20 h-7 text-sm" value={dueLimitInput} onChange={(e) => setDueLimitInput(e.target.value)} placeholder="e.g. 500" />
+                          <Button size="icon" className="h-7 w-7" onClick={() => { saveProfileMutation.mutate({ due_limit: dueLimitInput.trim() === "" ? null : parseFloat(dueLimitInput) } as any); setEditingDueLimit(false); }}>
+                            <Save className="h-3 w-3" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingDueLimit(false)}>
+                            <XCircle className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <p className="font-semibold text-sm text-amber-700 dark:text-amber-400 cursor-pointer hover:text-amber-500 transition-colors" onClick={() => { setDueLimitInput(dueLimit?.toString() ?? ""); setEditingDueLimit(true); }}>
+                          {dueLimit ? `$${Number(dueLimit).toLocaleString()}` : "No due limit"}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="space-y-5 mt-0">
             {/* Today's Performance */}
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium text-muted-foreground">Today's Performance</h3>
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Today's Performance</h3>
               <Button
                 variant="outline"
                 size="sm"
+                className="rounded-full"
                 disabled={insightsLoading || !adAccounts || adAccounts.length === 0}
                 onClick={async () => {
                   if (!adAccounts || adAccounts.length === 0) return;
@@ -509,7 +540,7 @@ export default function ClientDetailPage() {
                 {insightsLoading ? "Updating..." : "Update from Meta"}
               </Button>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-3 grid-cols-2">
               <MetricCard
                 title="Today's Spend"
                 value={`$${(insights ? Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.today_spend ?? 0), 0) : 0).toLocaleString()}`}
@@ -530,43 +561,52 @@ export default function ClientDetailPage() {
               />
             </div>
 
-            {/* Metric Cards */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="relative">
-                <MetricCard
-                  title="Wallet Balance"
-                  value={`$${walletBalance.toLocaleString()}`}
-                  icon={Wallet}
-                  iconBg="bg-green-100 dark:bg-green-900/50"
-                  iconColor="text-green-600"
-                  gradientClass="bg-gradient-to-br from-green-50 to-emerald-100/50 dark:from-green-950/40 dark:to-emerald-900/20 border-green-200 dark:border-green-800"
-                />
-                <div className="absolute top-2 right-2 flex gap-1">
-                  <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600 hover:bg-green-100" onClick={() => { setWalletDialogType("credit"); setWalletAmount(""); setWalletNote(""); }}>
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                  <Button size="icon" variant="ghost" className="h-7 w-7 text-red-600 hover:bg-red-100" onClick={() => { setWalletDialogType("debit"); setWalletAmount(""); setWalletNote(""); }}>
-                    <Minus className="h-4 w-4" />
-                  </Button>
+            {/* Metric Cards - 2 rows */}
+            <Card className="bg-card/50 border-border/40 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+              <CardContent className="p-4">
+                {/* Row 1: 4 cards */}
+                <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+                  <div className="relative">
+                    <MetricCard
+                      title="Wallet Balance"
+                      value={`$${walletBalance.toLocaleString()}`}
+                      icon={Wallet}
+                      iconBg="bg-green-100 dark:bg-green-900/50"
+                      iconColor="text-green-600"
+                      gradientClass="bg-gradient-to-br from-green-50 to-emerald-100/50 dark:from-green-950/40 dark:to-emerald-900/20 border-green-200 dark:border-green-800"
+                    />
+                    <div className="absolute top-2 right-2 flex gap-0.5">
+                      <Button size="icon" variant="ghost" className="h-6 w-6 text-green-600 hover:bg-green-100" onClick={() => { setWalletDialogType("credit"); setWalletAmount(""); setWalletNote(""); }}>
+                        <Plus className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-6 w-6 text-red-600 hover:bg-red-100" onClick={() => { setWalletDialogType("debit"); setWalletAmount(""); setWalletNote(""); }}>
+                        <Minus className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                  <MetricCard title="Total Ad Accounts" value={adAccounts?.length ?? 0} icon={MonitorSmartphone} iconBg="bg-blue-100 dark:bg-blue-900/50" iconColor="text-blue-600" gradientClass="bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/40 dark:to-blue-900/20 border-blue-200 dark:border-blue-800" />
+                  <MetricCard title="Active Accounts" value={activeAccounts.length} icon={CheckCircle} iconBg="bg-emerald-100 dark:bg-emerald-900/50" iconColor="text-emerald-600" gradientClass="bg-gradient-to-br from-emerald-50 to-green-100/50 dark:from-emerald-950/40 dark:to-green-900/20 border-emerald-200 dark:border-emerald-800" />
+                  <MetricCard title="Disabled Accounts" value={disabledAccounts.length} icon={XCircle} iconBg="bg-red-100 dark:bg-red-900/50" iconColor="text-red-600" gradientClass="bg-gradient-to-br from-red-50 to-rose-100/50 dark:from-red-950/40 dark:to-rose-900/20 border-red-200 dark:border-red-800" />
                 </div>
-              </div>
-              <MetricCard title="Total Ad Accounts" value={adAccounts?.length ?? 0} icon={MonitorSmartphone} iconBg="bg-blue-100 dark:bg-blue-900/50" iconColor="text-blue-600" gradientClass="bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/40 dark:to-blue-900/20 border-blue-200 dark:border-blue-800" />
-              <MetricCard title="Active Ad Accounts" value={activeAccounts.length} icon={CheckCircle} iconBg="bg-emerald-100 dark:bg-emerald-900/50" iconColor="text-emerald-600" gradientClass="bg-gradient-to-br from-emerald-50 to-green-100/50 dark:from-emerald-950/40 dark:to-green-900/20 border-emerald-200 dark:border-emerald-800" />
-              <MetricCard title="Disabled Ad Accounts" value={disabledAccounts.length} icon={XCircle} iconBg="bg-red-100 dark:bg-red-900/50" iconColor="text-red-600" gradientClass="bg-gradient-to-br from-red-50 to-rose-100/50 dark:from-red-950/40 dark:to-rose-900/20 border-red-200 dark:border-red-800" />
-              <MetricCard title="Total Top-Up" value={`$${Number(topUpTotal ?? 0).toLocaleString()}`} subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"} icon={TrendingUp} iconBg="bg-orange-100 dark:bg-orange-900/50" iconColor="text-orange-600" gradientClass="bg-gradient-to-br from-orange-50 to-amber-100/50 dark:from-orange-950/40 dark:to-amber-900/20 border-orange-200 dark:border-orange-800" />
-              <MetricCard title="Total Remaining Balance" value={`$${totalRemaining.toLocaleString()}`} subtitle="Across all ad accounts" icon={Wallet} iconBg="bg-indigo-100 dark:bg-indigo-900/50" iconColor="text-indigo-600" gradientClass="bg-gradient-to-br from-indigo-50 to-violet-100/50 dark:from-indigo-950/40 dark:to-violet-900/20 border-indigo-200 dark:border-indigo-800" />
-              <MetricCard title="Total Spending" value={`$${(totalSpendingFiltered ?? totalSpending).toLocaleString()}`} subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time (cumulative)"} icon={TrendingDown} iconBg="bg-purple-100 dark:bg-purple-900/50" iconColor="text-purple-600" gradientClass="bg-gradient-to-br from-purple-50 to-violet-100/50 dark:from-purple-950/40 dark:to-violet-900/20 border-purple-200 dark:border-purple-800" />
-            </div>
+                {/* Row 2: 3 cards */}
+                <div className="grid gap-3 grid-cols-2 lg:grid-cols-3 mt-3">
+                  <MetricCard title="Total Top-Up" value={`$${Number(topUpTotal ?? 0).toLocaleString()}`} subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"} icon={TrendingUp} iconBg="bg-orange-100 dark:bg-orange-900/50" iconColor="text-orange-600" gradientClass="bg-gradient-to-br from-orange-50 to-amber-100/50 dark:from-orange-950/40 dark:to-amber-900/20 border-orange-200 dark:border-orange-800" />
+                  <MetricCard title="Remaining Balance" value={`$${totalRemaining.toLocaleString()}`} subtitle="Across all ad accounts" icon={Wallet} iconBg="bg-indigo-100 dark:bg-indigo-900/50" iconColor="text-indigo-600" gradientClass="bg-gradient-to-br from-indigo-50 to-violet-100/50 dark:from-indigo-950/40 dark:to-violet-900/20 border-indigo-200 dark:border-indigo-800" />
+                  <MetricCard title="Total Spending" value={`$${(totalSpendingFiltered ?? totalSpending).toLocaleString()}`} subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"} icon={TrendingDown} iconBg="bg-purple-100 dark:bg-purple-900/50" iconColor="text-purple-600" gradientClass="bg-gradient-to-br from-purple-50 to-violet-100/50 dark:from-purple-950/40 dark:to-violet-900/20 border-purple-200 dark:border-purple-800" />
+                </div>
+              </CardContent>
+            </Card>
 
-            {/* Ad Accounts */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-lg">Ad Accounts ({adAccounts?.length ?? 0})</CardTitle>
+            {/* Ad Accounts Table */}
+            <Card className="border-border/40 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <CardTitle className="text-base font-semibold">Ad Accounts ({adAccounts?.length ?? 0})</CardTitle>
                 <div className="flex items-center gap-2">
                   {showUnassignCheckboxes && unassignSelectedIds.size > 0 && (
                     <Button
                       variant="outline"
                       size="sm"
+                      className="rounded-full"
                       onClick={async () => {
                         const ids = Array.from(unassignSelectedIds);
                         for (const adAccountId of ids) {
@@ -585,7 +625,7 @@ export default function ClientDetailPage() {
                   <Button
                     variant={showUnassignCheckboxes ? "secondary" : "ghost"}
                     size="icon"
-                    className="h-8 w-8"
+                    className="h-8 w-8 rounded-full"
                     onClick={() => {
                       setShowUnassignCheckboxes(v => !v);
                       if (showUnassignCheckboxes) setUnassignSelectedIds(new Set());
@@ -594,157 +634,160 @@ export default function ClientDetailPage() {
                   >
                     <ListChecks className="h-4 w-4" />
                   </Button>
-                  <Button size="sm" onClick={() => { setShowAssignDialog(true); setAssignSelectedIds(new Set()); setAssignSearch(""); }}>
+                  <Button size="sm" className="rounded-full" onClick={() => { setShowAssignDialog(true); setAssignSelectedIds(new Set()); setAssignSearch(""); }}>
                     <Plus className="h-3.5 w-3.5 mr-1" />
-                    Assign Accounts
+                    Assign
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
                 {adAccounts?.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">No ad accounts assigned</p>
+                  <p className="text-sm text-muted-foreground py-6 text-center">No ad accounts assigned</p>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        {showUnassignCheckboxes && (
-                          <TableHead className="w-[40px]">
-                            <Checkbox
-                              checked={adAccounts?.length > 0 && adAccounts?.every((a: any) => unassignSelectedIds.has(a.id))}
-                              onCheckedChange={() => {
-                                if (adAccounts?.every((a: any) => unassignSelectedIds.has(a.id))) {
-                                  setUnassignSelectedIds(new Set());
-                                } else {
-                                  setUnassignSelectedIds(new Set(adAccounts?.map((a: any) => a.id)));
-                                }
-                              }}
-                            />
-                          </TableHead>
-                        )}
-                        <TableHead>Account</TableHead>
-                        <TableHead>Budget</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Spent</TableHead>
-                        <TableHead>Action</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {adAccounts?.map((acc: any) => (
-                        <TableRow key={acc.id}>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent">
                           {showUnassignCheckboxes && (
-                            <TableCell>
+                            <TableHead className="w-[40px]">
                               <Checkbox
-                                checked={unassignSelectedIds.has(acc.id)}
+                                checked={adAccounts?.length > 0 && adAccounts?.every((a: any) => unassignSelectedIds.has(a.id))}
                                 onCheckedChange={() => {
-                                  setUnassignSelectedIds(prev => {
-                                    const next = new Set(prev);
-                                    if (next.has(acc.id)) next.delete(acc.id);
-                                    else next.add(acc.id);
-                                    return next;
-                                  });
+                                  if (adAccounts?.every((a: any) => unassignSelectedIds.has(a.id))) {
+                                    setUnassignSelectedIds(new Set());
+                                  } else {
+                                    setUnassignSelectedIds(new Set(adAccounts?.map((a: any) => a.id)));
+                                  }
                                 }}
                               />
-                            </TableCell>
+                            </TableHead>
                           )}
-                          <TableCell>
-                            <p className="font-medium">{acc.account_name}</p>
-                            <p className="text-xs text-muted-foreground">{acc.account_id}</p>
-                          </TableCell>
-                          <TableCell>${Number(acc.spend_cap).toLocaleString()}</TableCell>
-                          <TableCell><StatusBadge status={acc.status} /></TableCell>
-                          <TableCell>
-                            <SpendProgressBar amountSpent={Number(acc.amount_spent)} spendCap={Number(acc.spend_cap)} />
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              size="sm"
-                              className="bg-primary text-primary-foreground hover:bg-primary/90"
-                              onClick={() => { setSelectedAccountId(acc.id); setTopUpDialogOpen(true); setTopUpAmount(""); }}
-                            >
-                              <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
-                              Top Up
-                            </Button>
-                          </TableCell>
+                          <TableHead className="w-[35%]">Account</TableHead>
+                          <TableHead className="w-[20%]">Status</TableHead>
+                          <TableHead className="w-[30%]">Spend Progress</TableHead>
+                          <TableHead className="w-[15%] text-right">Action</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {adAccounts?.map((acc: any) => (
+                          <TableRow key={acc.id}>
+                            {showUnassignCheckboxes && (
+                              <TableCell>
+                                <Checkbox
+                                  checked={unassignSelectedIds.has(acc.id)}
+                                  onCheckedChange={() => {
+                                    setUnassignSelectedIds(prev => {
+                                      const next = new Set(prev);
+                                      if (next.has(acc.id)) next.delete(acc.id);
+                                      else next.add(acc.id);
+                                      return next;
+                                    });
+                                  }}
+                                />
+                              </TableCell>
+                            )}
+                            <TableCell>
+                              <p className="font-medium text-sm">{acc.account_name}</p>
+                              <p className="text-xs text-muted-foreground font-mono">{acc.account_id}</p>
+                            </TableCell>
+                            <TableCell><StatusBadge status={acc.status} /></TableCell>
+                            <TableCell>
+                              <SpendProgressBar amountSpent={Number(acc.amount_spent)} spendCap={Number(acc.spend_cap)} />
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                size="sm"
+                                className="rounded-full bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-sm px-3 text-xs font-semibold"
+                                onClick={() => { setSelectedAccountId(acc.id); setTopUpDialogOpen(true); setTopUpAmount(""); }}
+                              >
+                                <ArrowUpCircle className="h-3 w-3 mr-1" />
+                                Top Up
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 )}
               </CardContent>
             </Card>
           </TabsContent>
 
+          {/* Transactions Tab */}
           <TabsContent value="transactions" className="mt-0">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Transaction History</CardTitle>
+            <Card className="border-border/40 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-semibold">Transaction History</CardTitle>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Ad Account</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Balance After</TableHead>
-                      <TableHead>Processed By</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {transactions?.map((tx: any) => {
-                      const linkedAccount = tx.reference_id && tx.type === "ad_topup"
-                        ? adAccounts?.find((a: any) => a.id === tx.reference_id)
-                        : null;
-                      const desc = tx.description || "—";
-                      const hasNewline = desc.includes("\n");
-                      const [descName, descId] = hasNewline ? desc.split("\n") : [desc, null];
-                      const pb = tx.processed_by || "";
-                      let processedByLabel = "—";
-                      if (pb === "system") processedByLabel = "Auto Approved by System";
-                      else if (pb.startsWith("admin:")) {
-                        const adminId = pb.split(":")[1];
-                        const adminProf = allProfiles?.find((p: any) => p.user_id === adminId);
-                        processedByLabel = adminProf?.full_name || adminProf?.email || adminId.slice(0, 8);
-                      } else if (pb.startsWith("client:")) {
-                        processedByLabel = profile?.full_name || profile?.email || "Client";
-                      }
-                      return (
-                        <TableRow key={tx.id}>
-                          <TableCell className="text-muted-foreground whitespace-nowrap">{format(new Date(tx.created_at), "MMM d, yyyy HH:mm")}</TableCell>
-                          <TableCell className="capitalize font-medium">{tx.type.replace(/_/g, " ")}</TableCell>
-                          <TableCell className="text-sm">
-                            {hasNewline ? (
-                              <div>
-                                <span>{descName}</span>
-                                <span className="block text-xs text-muted-foreground">{descId}</span>
-                              </div>
-                            ) : desc}
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {linkedAccount ? (
-                              <div>
-                                <p className="font-medium">{linkedAccount.account_name}</p>
-                                <p className="text-[11px] text-muted-foreground font-mono">{linkedAccount.account_id.replace(/^act_/, "")}</p>
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell className={cn("font-semibold", Number(tx.amount) >= 0 ? "text-green-600" : "text-red-600")}>
-                            {Number(tx.amount) >= 0 ? "+" : ""}${Math.abs(Number(tx.amount)).toLocaleString()}
-                          </TableCell>
-                          <TableCell className="font-medium">${Number(tx.balance_after ?? 0).toLocaleString()}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{processedByLabel}</TableCell>
-                        </TableRow>
-                      );
-                    })}
-                    {(!transactions || transactions.length === 0) && (
-                      <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No transactions yet</TableCell></TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead>Date</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Ad Account</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Balance After</TableHead>
+                        <TableHead>Processed By</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {transactions?.map((tx: any) => {
+                        const linkedAccount = tx.reference_id && tx.type === "ad_topup"
+                          ? adAccounts?.find((a: any) => a.id === tx.reference_id)
+                          : null;
+                        const desc = tx.description || "—";
+                        const hasNewline = desc.includes("\n");
+                        const [descName, descId] = hasNewline ? desc.split("\n") : [desc, null];
+                        const pb = tx.processed_by || "";
+                        let processedByLabel = "—";
+                        if (pb === "system") processedByLabel = "Auto Approved by System";
+                        else if (pb.startsWith("admin:")) {
+                          const adminId = pb.split(":")[1];
+                          const adminProf = allProfiles?.find((p: any) => p.user_id === adminId);
+                          processedByLabel = adminProf?.full_name || adminProf?.email || adminId.slice(0, 8);
+                        } else if (pb.startsWith("client:")) {
+                          processedByLabel = profile?.full_name || profile?.email || "Client";
+                        }
+                        return (
+                          <TableRow key={tx.id}>
+                            <TableCell className="text-muted-foreground whitespace-nowrap text-xs">{format(new Date(tx.created_at), "MMM d, yyyy HH:mm")}</TableCell>
+                            <TableCell className="capitalize font-medium text-xs">{tx.type.replace(/_/g, " ")}</TableCell>
+                            <TableCell className="text-xs">
+                              {hasNewline ? (
+                                <div>
+                                  <span>{descName}</span>
+                                  <span className="block text-[11px] text-muted-foreground">{descId}</span>
+                                </div>
+                              ) : desc}
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              {linkedAccount ? (
+                                <div>
+                                  <p className="font-medium">{linkedAccount.account_name}</p>
+                                  <p className="text-[11px] text-muted-foreground font-mono">{linkedAccount.account_id.replace(/^act_/, "")}</p>
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell className={cn("font-semibold text-xs", Number(tx.amount) >= 0 ? "text-green-600" : "text-red-600")}>
+                              {Number(tx.amount) >= 0 ? "+" : ""}${Math.abs(Number(tx.amount)).toLocaleString()}
+                            </TableCell>
+                            <TableCell className="font-medium text-xs">${Number(tx.balance_after ?? 0).toLocaleString()}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{processedByLabel}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                      {(!transactions || transactions.length === 0) && (
+                        <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No transactions yet</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -908,7 +951,7 @@ export default function ClientDetailPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setTopUpDialogOpen(false)}>Cancel</Button>
             <Button
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground"
               onClick={() => topUpMutation.mutate()}
               disabled={!selectedAccountId || !topUpAmount || parseFloat(topUpAmount) <= 0 || topUpMutation.isPending}
             >
