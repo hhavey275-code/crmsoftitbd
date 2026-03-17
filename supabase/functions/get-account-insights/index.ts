@@ -146,8 +146,11 @@ Deno.serve(async (req) => {
       balance: 0, cards: [],
     };
 
-    // Track amount_spent and spend_cap updates for ad_accounts table
-    const adAccountUpdates: { id: string; amount_spent: number; spend_cap?: number }[] = [];
+    // Track amount_spent updates for ad_accounts table
+    // NOTE: We do NOT sync spend_cap from Meta here. Our system (spend-cap-update function) 
+    // is the source of truth for spend_cap. Meta may return 0 for accounts with no cap set,
+    // which would incorrectly reset our local spend_cap values.
+    const adAccountUpdates: { id: string; amount_spent: number }[] = [];
 
     const promises = (accounts ?? []).map(async (account: any) => {
       const rawToken = account.business_managers?.access_token;
