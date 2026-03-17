@@ -136,9 +136,13 @@ Deno.serve(async (req) => {
 
     console.log(`Telegram search window: ${windowStart} → ${windowEnd}`);
 
+    // Only check messages from monitored groups: -1003856921490 first, then -1003763493818
+    const MONITORED_CHAT_IDS = [-1003856921490, -1003763493818];
+
     const { data: telegramMsgs } = await supabase
       .from('telegram_messages')
       .select('text, raw_update, created_at, update_id, chat_id, matched_request_id')
+      .in('chat_id', MONITORED_CHAT_IDS)
       .gte('created_at', windowStart)
       .lte('created_at', windowEnd)
       .is('matched_request_id', null)
