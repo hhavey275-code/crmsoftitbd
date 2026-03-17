@@ -3,10 +3,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { CardBrandIcon } from "@/components/CardBrandIcon";
 import { toast } from "sonner";
-import { CreditCard, Plus, Loader2, Trash2, RefreshCw } from "lucide-react";
+import { CreditCard, Loader2, Trash2, RefreshCw } from "lucide-react";
 
 interface FundingSource {
   id: string;
@@ -17,14 +17,13 @@ interface FundingSource {
 
 interface Props {
   adAccountId: string;
-  currentCard?: { id?: string; display_string: string } | null;
+  currentCards?: { id?: string; display_string: string }[];
 }
 
-export function AdAccountPaymentMethods({ adAccountId, currentCard }: Props) {
+export function AdAccountPaymentMethods({ adAccountId, currentCards = [] }: Props) {
   const [addOpen, setAddOpen] = useState(false);
   const queryClient = useQueryClient();
 
-  // List BM's available funding sources (for the add dialog)
   const { data: bmSources, isLoading: loadingSources, refetch: refetchSources } = useQuery({
     queryKey: ["bm-funding-sources", adAccountId],
     queryFn: async () => {
@@ -76,13 +75,21 @@ export function AdAccountPaymentMethods({ adAccountId, currentCard }: Props) {
     if (isOpen) refetchSources();
   };
 
+  // Filter out funding sources that look invalid (just IDs with no proper card info)
+  const filteredSources = bmSources?.filter((s) => {
+    if (!s.display_string) return false;
+    // Filter out sources that are just "Funding source {id}" with no real card info
+    if (s.display_string.startsWith("Funding source ") && !s.display_string.includes("*")) return false;
+    return true;
+  }) ?? [];
+
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
             <CreditCard className="h-4 w-4" />
-            Payment Method
+            Payment Methods
           </CardTitle>
           <Dialog open={addOpen} onOpenChange={handleOpenAdd}>
             <DialogTrigger asChild>
@@ -94,21 +101,21 @@ export function AdAccountPaymentMethods({ adAccountId, currentCard }: Props) {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Select Funding Source from BM</DialogTitle>
+                <DialogDescription>
+                  Choose a funding source from the Business Manager's owned & shared ad accounts to attach to this ad account.
+                </DialogDescription>
               </DialogHeader>
-              <p className="text-sm text-muted-foreground">
-                Choose a funding source from the Business Manager's ad accounts to attach to this ad account.
-              </p>
               <div className="space-y-2 max-h-[400px] overflow-y-auto mt-2">
                 {loadingSources ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                   </div>
-                ) : !bmSources?.length ? (
+                ) : !filteredSources.length ? (
                   <p className="text-sm text-muted-foreground text-center py-8">
-                    No funding sources found on this Business Manager.
+                    No active funding sources found on this Business Manager.
                   </p>
                 ) : (
-                  bmSources.map((source) => (
+                  filteredSources.map((source) => (
                     <div
                       key={source.id}
                       className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 transition-colors"
@@ -138,25 +145,31 @@ export function AdAccountPaymentMethods({ adAccountId, currentCard }: Props) {
         </div>
       </CardHeader>
       <CardContent>
-        {currentCard ? (
-          <div className="flex items-center justify-between p-3 border rounded-lg">
-            <div className="flex items-center gap-3">
-              <CardBrandIcon displayString={currentCard.display_string} />
-              <span className="text-sm font-medium">{currentCard.display_string}</span>
-            </div>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-              onClick={() => {
-                if (confirm("Remove funding source from this ad account?")) {
-                  removeMutation.mutate();
-                }
-              }}
-              disabled={removeMutation.isPending}
-            >
-              {removeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-            </Button>
+        {currentCards.length > 0 ? (
+          <div className="space-y-2">
+            {currentCards.map((card, idx) => (
+              <div key={card.id || idx} className="flex items-center justify-between p-3 border rounded-lg">
+                <div className="flex items-center gap-3">
+                  <CardBrandIcon displayString={card.display_string} />
+                  <span className="text-sm font-medium">{card.display_string}</span>
+                </div>
+                {idx === 0 && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => {
+                      if (confirm("Remove funding source from this ad account?")) {
+                        removeMutation.mutate();
+                      }
+                    }}
+                    disabled={removeMutation.isPending}
+                  >
+                    {removeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                  </Button>
+                )}
+              </div>
+            ))}
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">No payment method linked to this ad account.</p>
