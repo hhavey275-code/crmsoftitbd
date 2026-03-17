@@ -241,6 +241,7 @@ Deno.serve(async (req) => {
     const bm = (account as any).business_managers;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const bmToken = await decryptToken(bm.access_token, serviceKey);
+    const tokenMeta = getSafeTokenMeta(bmToken);
     const oldSpendCap = Number(account.spend_cap);
     const newSpendCap = oldSpendCap + amount;
 
@@ -250,6 +251,7 @@ Deno.serve(async (req) => {
 
     let metaSuccess = false;
     let metaErrorMsg = "";
+    let metaErrorCode: number | null = null;
 
     try {
       const metaRes = await fetch(`https://graph.facebook.com/v24.0/${actId}`, {
@@ -267,10 +269,25 @@ Deno.serve(async (req) => {
         metaSuccess = true;
       } else {
         metaErrorMsg = metaData.error.message || "Unknown Meta error";
+        metaErrorCode = typeof metaData.error.code === "number" ? metaData.error.code : null;
+        console.warn("Meta spend cap update denied", {
+          actId,
+          bmId: bm?.bm_id,
+          message: metaErrorMsg,
+          code: metaData.error.code,
+          subcode: metaData.error.error_subcode,
+          tokenMeta,
+        });
       }
     } catch (err) {
       // Network timeout or fetch failure
       metaErrorMsg = err instanceof Error ? err.message : "Network error calling Meta API";
+      console.warn("Meta spend cap request failed before response", {
+        actId,
+        bmId: bm?.bm_id,
+        message: metaErrorMsg,
+        tokenMeta,
+      });
     }
 
     // --- If POST failed/errored, verify actual spend cap before rollback ---
@@ -293,6 +310,10 @@ Deno.serve(async (req) => {
           JSON.stringify({
             error: `Meta API error: ${metaErrorMsg}`,
             verified: actualSpendCap !== null,
+            meta_error_code: metaErrorCode,
+            ad_account_id: actId,
+            business_manager_id: bm?.bm_id ?? null,
+            hint: "Grant this token owner ad account admin/manage permission for the target ad account.",
           }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
