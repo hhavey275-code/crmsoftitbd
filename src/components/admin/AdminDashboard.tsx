@@ -260,8 +260,8 @@ export function AdminDashboard() {
 
       {/* Spend Overview - Single Card */}
       <Card>
-        <CardContent className="py-4">
-          <div className="flex items-center gap-3 flex-wrap">
+        <CardContent className="py-3 md:py-4">
+          <div className="flex flex-col md:flex-row md:items-center gap-3 flex-wrap">
             <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className={cn("justify-start text-left font-normal gap-2", !dateRange?.from && "text-muted-foreground")}>
