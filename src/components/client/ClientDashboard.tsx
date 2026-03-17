@@ -85,16 +85,16 @@ export function ClientDashboard() {
   return (
     <div className="space-y-6">
       {/* Welcome Banner */}
-      <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10">
-        <CardContent className="p-5">
-          <h1 className="text-xl font-bold text-foreground">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-bold text-foreground">
             {greeting()}, {profile?.full_name || "there"}! 👋
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Welcome to your dashboard • {format(new Date(), "EEEE, MMMM d, yyyy")}
+          <p className="text-xs text-muted-foreground">
+            {format(new Date(), "EEEE, MMMM d, yyyy")}
           </p>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {isInactive && (
         <Card className="border-destructive bg-destructive/10">
