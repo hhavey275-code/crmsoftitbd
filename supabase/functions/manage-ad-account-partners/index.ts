@@ -90,21 +90,33 @@ Deno.serve(async (req) => {
       });
     }
 
-    // List payment methods on ad account
+    // List payment methods: current ad account's funding source + all unique funding sources across BM's ad accounts
     if (action === "list_funding_sources") {
-      const url = `https://graph.facebook.com/v24.0/${actId}/adspaymentmethods?access_token=${bm.access_token}`;
+      const sources: any[] = [];
+      const seenIds = new Set<string>();
+
+      // Fetch all ad accounts under this BM to collect all unique funding sources
+      const url = `https://graph.facebook.com/v24.0/${bm.bm_id}/owned_ad_accounts?fields=id,name,funding_source,funding_source_details&limit=200&access_token=${bm.access_token}`;
       const resp = await fetch(url);
       const data = await resp.json();
 
       if (data.error) {
-        throw new Error(data.error.message || "Failed to fetch payment methods");
+        throw new Error(data.error.message || "Failed to fetch funding sources");
       }
 
-      const sources = (data.data || []).map((s: any) => ({
-        id: s.id,
-        display_string: s.display_string || s.id,
-        type: s.type?.toString() || "unknown",
-      }));
+      for (const acc of (data.data || [])) {
+        const fsId = acc.funding_source;
+        if (fsId && !seenIds.has(fsId)) {
+          seenIds.add(fsId);
+          const fsd = acc.funding_source_details || {};
+          sources.push({
+            id: fsId,
+            display_string: fsd.display_string || `Funding source ${fsId}`,
+            type: fsd.type?.toString() || "unknown",
+            from_account: acc.name || acc.id,
+          });
+        }
+      }
 
       return new Response(JSON.stringify({ funding_sources: sources }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -129,20 +141,19 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Remove a payment method from ad account
+    // Remove funding source from ad account (set to none)
     if (action === "remove_funding_source") {
-      const { payment_method_id } = body;
-      if (!payment_method_id) throw new Error("payment_method_id is required");
-
-      const url = `https://graph.facebook.com/v24.0/${actId}/adspaymentmethods/${payment_method_id}?access_token=${bm.access_token}`;
-      const resp = await fetch(url, { method: "DELETE" });
+      // Meta doesn't have a direct DELETE for funding sources
+      // We clear by POSTing with funding_source=0 or empty
+      const url = `https://graph.facebook.com/v24.0/${actId}?funding_source=0&access_token=${bm.access_token}`;
+      const resp = await fetch(url, { method: "POST" });
       const data = await resp.json();
 
       if (data.error) {
-        throw new Error(data.error.message || "Failed to remove payment method");
+        throw new Error(data.error.message || "Failed to remove funding source");
       }
 
-      return new Response(JSON.stringify({ success: true, removed_id: payment_method_id }), {
+      return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
