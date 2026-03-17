@@ -192,6 +192,7 @@ Deno.serve(async (req) => {
     console.log("Spend cap update attempt", {
       actId, bmId: bm.bm_id, oldSpendCap, amount, newSpendCap,
       metaValueToSend: String(Math.round(newSpendCap * 100)),
+      metaValueDirect: String(newSpendCap),
     });
 
     // ============================================
