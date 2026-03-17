@@ -222,46 +222,67 @@ Deno.serve(async (req) => {
 
     // ============================================
     // STEP 1: Call Meta API FIRST (before wallet)
+    // With retry on rate limit (up to 3 attempts)
     // ============================================
     let metaSuccess = false;
     let metaErrorMsg = "";
     let metaErrorCode: number | null = null;
     let isRateLimit = false;
+    const MAX_RETRIES = 3;
 
-    try {
-      const metaRes = await fetch(`https://graph.facebook.com/v25.0/${actId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          spend_cap: String(newSpendCapCents),
-          access_token: bmToken,
-        }),
-      });
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      metaSuccess = false;
+      metaErrorMsg = "";
+      metaErrorCode = null;
+      isRateLimit = false;
 
-      const metaData = await metaRes.json();
-
-      if (!metaData.error) {
-        // POST reported success — now VERIFY with GET
-        const verifiedDollars = await getMetaSpendCapDollars(actId, bmToken);
-        if (verifiedDollars !== null && Math.abs(verifiedDollars - newSpendCapDollars) < 0.02) {
-          metaSuccess = true;
-          console.log(`Meta POST success, verified cap: $${verifiedDollars} (expected $${newSpendCapDollars})`);
-        } else {
-          metaErrorMsg = `Meta POST reported success but verification failed. Expected $${newSpendCapDollars}, got $${verifiedDollars}`;
-          console.warn(metaErrorMsg);
+      try {
+        if (attempt > 0) {
+          // Exponential backoff: 2s, 4s + jitter
+          const waitMs = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+          console.log(`Rate limit retry ${attempt}/${MAX_RETRIES}, waiting ${Math.round(waitMs)}ms...`);
+          await new Promise(resolve => setTimeout(resolve, waitMs));
         }
-      } else {
-        metaErrorMsg = metaData.error.message || "Unknown Meta error";
-        metaErrorCode = typeof metaData.error.code === "number" ? metaData.error.code : null;
-        isRateLimit = isRateLimitError(metaData.error.code);
-        console.warn("Meta spend cap POST failed", {
-          actId, bmId: bm.bm_id, message: metaErrorMsg,
-          code: metaData.error.code, subcode: metaData.error.error_subcode,
+
+        const metaRes = await fetch(`https://graph.facebook.com/v25.0/${actId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            spend_cap: String(newSpendCapCents),
+            access_token: bmToken,
+          }),
         });
+
+        const metaData = await metaRes.json();
+
+        if (!metaData.error) {
+          // POST reported success — now VERIFY with GET
+          const verifiedDollars = await getMetaSpendCapDollars(actId, bmToken);
+          if (verifiedDollars !== null && Math.abs(verifiedDollars - newSpendCapDollars) < 0.02) {
+            metaSuccess = true;
+            console.log(`Meta POST success, verified cap: $${verifiedDollars} (expected $${newSpendCapDollars})`);
+          } else {
+            metaErrorMsg = `Meta POST reported success but verification failed. Expected $${newSpendCapDollars}, got $${verifiedDollars}`;
+            console.warn(metaErrorMsg);
+          }
+          break; // Don't retry on non-rate-limit responses
+        } else {
+          metaErrorMsg = metaData.error.message || "Unknown Meta error";
+          metaErrorCode = typeof metaData.error.code === "number" ? metaData.error.code : null;
+          isRateLimit = isRateLimitError(metaData.error.code);
+          console.warn(`Meta spend cap POST failed (attempt ${attempt + 1})`, {
+            actId, bmId: bm.bm_id, message: metaErrorMsg,
+            code: metaData.error.code, subcode: metaData.error.error_subcode,
+          });
+
+          if (!isRateLimit) break; // Only retry on rate limits
+          // Rate limit — continue to next retry attempt
+        }
+      } catch (err) {
+        metaErrorMsg = err instanceof Error ? err.message : "Network error calling Meta API";
+        console.warn("Meta spend cap request network error", { actId, message: metaErrorMsg });
+        break; // Don't retry on network errors
       }
-    } catch (err) {
-      metaErrorMsg = err instanceof Error ? err.message : "Network error calling Meta API";
-      console.warn("Meta spend cap request network error", { actId, message: metaErrorMsg });
     }
 
     // --- If Meta failed, return error immediately. NO wallet deduction. ---
