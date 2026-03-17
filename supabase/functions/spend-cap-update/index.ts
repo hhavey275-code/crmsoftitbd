@@ -30,7 +30,8 @@ async function getMetaSpendCap(actId: string, accessToken: string): Promise<numb
     );
     const data = await res.json();
     if (data.error || data.spend_cap === undefined) return null;
-    return Number(data.spend_cap) / 100;
+    // Meta spend_cap is in currency units (dollars), NOT cents
+    return Number(data.spend_cap);
   } catch {
     return null;
   }
@@ -175,7 +176,6 @@ Deno.serve(async (req) => {
     const bmToken = await decryptToken(bm.access_token, serviceKey);
     const oldSpendCap = Number(account.spend_cap);
     const newSpendCap = oldSpendCap + amount;
-    const newSpendCapCents = Math.round(newSpendCap * 100);
 
     const actId = account.account_id.startsWith("act_")
       ? account.account_id
@@ -184,21 +184,15 @@ Deno.serve(async (req) => {
     // --- Safety guard ---
     if (newSpendCap > 100000) {
       console.warn("SAFETY WARNING: spend cap exceeding $100k", {
-        actId,
-        oldSpendCap,
-        amount,
-        newSpendCap,
-        newSpendCapCents,
+        actId, oldSpendCap, amount, newSpendCap,
       });
     }
 
+    // Meta spend_cap is in currency units (dollars), NOT cents
     console.log("Spend cap update attempt", {
-      actId,
-      bmId: bm.bm_id,
-      oldSpendCap,
-      amount,
-      newSpendCap,
-      newSpendCapCents,
+      actId, bmId: bm.bm_id, oldSpendCap, amount, newSpendCap,
+      metaValueToSend: String(Math.round(newSpendCap * 100)),
+      metaValueDirect: String(newSpendCap),
     });
 
     // ============================================
@@ -213,7 +207,7 @@ Deno.serve(async (req) => {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
-          spend_cap: String(newSpendCapCents),
+          spend_cap: String(newSpendCap),
           access_token: bmToken,
         }),
       });

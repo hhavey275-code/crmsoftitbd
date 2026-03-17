@@ -71,7 +71,8 @@ Deno.serve(async (req) => {
             account.account_id || account.id?.replace("act_", "");
 
           // Sync spend_cap from Meta only when non-zero to avoid resetting local caps
-          const metaSpendCap = Number(account.spend_cap ?? 0) / 100;
+          // Meta spend_cap is in currency units (dollars), NOT cents
+          const metaSpendCap = Number(account.spend_cap ?? 0);
           const updateData: any = {
             status:
               account.account_status === 1
