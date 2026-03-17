@@ -117,8 +117,13 @@ export function ClientAdAccounts() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      toast.success(`${selectedIds.size} account(s) updated from Meta`);
+    onSuccess: (data) => {
+      const rl = data?.rate_limited;
+      if (rl && rl.length > 0) {
+        toast.warning(`⚠️ ${rl.length} of ${selectedIds.size} account(s) rate-limited. Please retry after a few minutes.`);
+      } else {
+        toast.success(`${selectedIds.size} account(s) updated from Meta`);
+      }
       refetchInsights();
       setSelectedIds(new Set());
     },
