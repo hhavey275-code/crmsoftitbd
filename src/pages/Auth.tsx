@@ -68,6 +68,8 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [businessName, setBusinessName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [businessAddress, setBusinessAddress] = useState("");
   const [monthlySpend, setMonthlySpend] = useState("");
   const [loading, setLoading] = useState(false);
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
