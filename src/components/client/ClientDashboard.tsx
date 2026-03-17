@@ -130,7 +130,7 @@ export function ClientDashboard() {
       });
 
       if (res.error || res.data?.error) {
-        toast.error(res.data?.error || res.error?.message || "Failed to update spend cap");
+        toast.error(friendlyEdgeError(res.error) || res.data?.error || "Failed to update spend cap");
         return;
       }
 
