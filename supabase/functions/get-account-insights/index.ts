@@ -146,8 +146,8 @@ Deno.serve(async (req) => {
       balance: 0, cards: [],
     };
 
-    // Track amount_spent updates for ad_accounts table
-    const amountSpentUpdates: { id: string; amount_spent: number }[] = [];
+    // Track amount_spent and spend_cap updates for ad_accounts table
+    const adAccountUpdates: { id: string; amount_spent: number; spend_cap?: number }[] = [];
 
     const promises = (accounts ?? []).map(async (account: any) => {
       const rawToken = account.business_managers?.access_token;
