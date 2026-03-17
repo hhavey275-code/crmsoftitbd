@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { ArrowLeft, Pencil, Check, X, ExternalLink, User, RefreshCw, Megaphone, DollarSign, ShoppingCart, MessageSquare } from "lucide-react";
 import { AdAccountPartners } from "@/components/admin/AdAccountPartners";
+import { AdAccountPaymentMethods } from "@/components/admin/AdAccountPaymentMethods";
 
 export default function AdAccountDetailPage() {
   const { id } = useParams<{ id: string }>();
