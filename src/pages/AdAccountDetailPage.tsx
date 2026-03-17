@@ -309,22 +309,45 @@ export default function AdAccountDetailPage() {
               </CardHeader>
               <CardContent>
                 <Label className="text-sm text-muted-foreground mb-2 block">Assigned To</Label>
-                <Select
-                  value={assignedUserId || "unassigned"}
-                  onValueChange={(val) => assignMutation.mutate(val === "unassigned" ? null : val)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Unassigned" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                    {clients?.map((c: any) => (
-                      <SelectItem key={c.user_id} value={c.user_id}>
-                        {c.full_name || c.email || c.user_id}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                      {assignedUserId
+                        ? clients?.find((c: any) => c.user_id === assignedUserId)?.full_name ||
+                          clients?.find((c: any) => c.user_id === assignedUserId)?.email ||
+                          "Assigned"
+                        : "Unassigned"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-0">
+                    <Command>
+                      <CommandInput placeholder="Search client..." />
+                      <CommandList>
+                        <CommandEmpty>No client found.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="unassigned"
+                            onSelect={() => assignMutation.mutate(null)}
+                          >
+                            <Check className={`mr-2 h-4 w-4 ${!assignedUserId ? "opacity-100" : "opacity-0"}`} />
+                            Unassigned
+                          </CommandItem>
+                          {clients?.map((c: any) => (
+                            <CommandItem
+                              key={c.user_id}
+                              value={`${c.full_name || ""} ${c.email || ""}`}
+                              onSelect={() => assignMutation.mutate(c.user_id)}
+                            >
+                              <Check className={`mr-2 h-4 w-4 ${assignedUserId === c.user_id ? "opacity-100" : "opacity-0"}`} />
+                              {c.full_name || c.email || c.user_id}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </CardContent>
             </Card>
           )}
