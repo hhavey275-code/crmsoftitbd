@@ -105,8 +105,13 @@ export function AdminAdAccounts() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      toast.success("All accounts updated from Meta");
+    onSuccess: (data) => {
+      const rl = data?.rate_limited;
+      if (rl && rl.length > 0) {
+        toast.warning(`⚠️ ${rl.length} account(s) could not be updated due to Meta API rate limits. Please retry after a few minutes.`);
+      } else {
+        toast.success("All accounts updated from Meta");
+      }
       refetchInsights();
       queryClient.invalidateQueries({ queryKey: ["billings-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["billings-insights"] });
