@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,9 +11,10 @@ import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SpendProgressBar } from "@/components/SpendProgressBar";
 import { MetricCard } from "@/components/MetricCard";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { ArrowLeft, Pencil, Check, X, ExternalLink, User, RefreshCw, Megaphone, DollarSign, ShoppingCart, MessageSquare } from "lucide-react";
+import { ArrowLeft, Pencil, Check, X, ExternalLink, User, RefreshCw, Megaphone, DollarSign, ShoppingCart, MessageSquare, ChevronsUpDown } from "lucide-react";
 import { AdAccountPartners } from "@/components/admin/AdAccountPartners";
 import { AdAccountPaymentMethods } from "@/components/admin/AdAccountPaymentMethods";
 
@@ -26,6 +27,7 @@ export default function AdAccountDetailPage() {
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState("");
   const [updatingMeta, setUpdatingMeta] = useState(false);
+  const [clientSearch, setClientSearch] = useState("");
 
   const { data: account, isLoading } = useQuery({
     queryKey: ["ad-account-detail", id],
@@ -307,22 +309,45 @@ export default function AdAccountDetailPage() {
               </CardHeader>
               <CardContent>
                 <Label className="text-sm text-muted-foreground mb-2 block">Assigned To</Label>
-                <Select
-                  value={assignedUserId || "unassigned"}
-                  onValueChange={(val) => assignMutation.mutate(val === "unassigned" ? null : val)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Unassigned" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                    {clients?.map((c: any) => (
-                      <SelectItem key={c.user_id} value={c.user_id}>
-                        {c.full_name || c.email || c.user_id}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                      {assignedUserId
+                        ? clients?.find((c: any) => c.user_id === assignedUserId)?.full_name ||
+                          clients?.find((c: any) => c.user_id === assignedUserId)?.email ||
+                          "Assigned"
+                        : "Unassigned"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-0">
+                    <Command>
+                      <CommandInput placeholder="Search client..." />
+                      <CommandList>
+                        <CommandEmpty>No client found.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="unassigned"
+                            onSelect={() => assignMutation.mutate(null)}
+                          >
+                            <Check className={`mr-2 h-4 w-4 ${!assignedUserId ? "opacity-100" : "opacity-0"}`} />
+                            Unassigned
+                          </CommandItem>
+                          {clients?.map((c: any) => (
+                            <CommandItem
+                              key={c.user_id}
+                              value={`${c.full_name || ""} ${c.email || ""}`}
+                              onSelect={() => assignMutation.mutate(c.user_id)}
+                            >
+                              <Check className={`mr-2 h-4 w-4 ${assignedUserId === c.user_id ? "opacity-100" : "opacity-0"}`} />
+                              {c.full_name || c.email || c.user_id}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </CardContent>
             </Card>
           )}
