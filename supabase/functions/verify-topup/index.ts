@@ -225,7 +225,8 @@ Deno.serve(async (req) => {
       .from('top_up_requests')
       .update({ 
         status: 'approved', 
-        admin_note: logText
+        admin_note: logText,
+        reviewed_by: 'system'
       })
       .eq('id', request_id);
     if (updateErr) throw updateErr;
