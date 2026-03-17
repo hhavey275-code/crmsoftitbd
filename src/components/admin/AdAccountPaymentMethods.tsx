@@ -24,6 +24,19 @@ export function AdAccountPaymentMethods({ adAccountId, currentCards = [] }: Prop
   const [addOpen, setAddOpen] = useState(false);
   const queryClient = useQueryClient();
 
+  // Fetch all cards attached to THIS account from BM
+  const { data: accountCards, isLoading: loadingCards } = useQuery({
+    queryKey: ["account-all-cards", adAccountId],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("manage-ad-account-partners", {
+        body: { action: "list_account_cards", ad_account_id: adAccountId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return (data?.cards ?? []) as { id: string; display_string: string; type: string }[];
+    },
+  });
+
   const { data: bmSources, isLoading: loadingSources, refetch: refetchSources } = useQuery({
     queryKey: ["bm-funding-sources", adAccountId],
     queryFn: async () => {
