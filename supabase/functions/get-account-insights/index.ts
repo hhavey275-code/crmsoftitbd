@@ -236,13 +236,34 @@ Deno.serve(async (req) => {
         }
 
         const cards: any[] = [];
-        const fsd = accountData?.funding_source_details;
-        if (fsd) {
-          cards.push({
-            id: fsd.id,
-            display_string: fsd.display_string || `Card ending ${fsd.id?.slice(-4) || '****'}`,
-            type: fsd.type,
-          });
+        const seenCardIds = new Set<string>();
+        
+        // Try all_payment_methods first (returns multiple cards)
+        const allPm = accountData?.all_payment_methods?.data;
+        if (Array.isArray(allPm) && allPm.length > 0) {
+          for (const pm of allPm) {
+            const pmId = pm.funding_source_id || pm.id;
+            if (pmId && !seenCardIds.has(pmId)) {
+              seenCardIds.add(pmId);
+              cards.push({
+                id: pmId,
+                display_string: pm.display_string || `Card ending ${pmId?.slice(-4) || '****'}`,
+                type: pm.pm_credit_card_type ?? pm.type,
+              });
+            }
+          }
+        }
+        
+        // Fallback to funding_source_details if all_payment_methods didn't return anything
+        if (cards.length === 0) {
+          const fsd = accountData?.funding_source_details;
+          if (fsd) {
+            cards.push({
+              id: fsd.id,
+              display_string: fsd.display_string || `Card ending ${fsd.id?.slice(-4) || '****'}`,
+              type: fsd.type,
+            });
+          }
         }
 
         insights[account.id] = {
