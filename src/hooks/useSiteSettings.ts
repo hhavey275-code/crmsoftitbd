@@ -7,6 +7,8 @@ interface SiteSettings {
   headerAnnouncement: string | null;
   welcomeTitle: string | null;
   welcomeNote: string | null;
+  announcementColor: string | null;
+  announcementSize: string | null;
 }
 
 const CACHE_KEY = "site_settings_cache";
@@ -23,7 +25,11 @@ async function fetchSettings(): Promise<SiteSettings> {
   const { data } = await supabase
     .from("site_settings")
     .select("key, value")
-    .in("key", ["logo_url", "site_name", "header_announcement", "welcome_title", "welcome_note"]);
+    .in("key", [
+      "logo_url", "site_name", "header_announcement",
+      "welcome_title", "welcome_note",
+      "announcement_color", "announcement_size",
+    ]);
 
   const settings: SiteSettings = {
     logoUrl: null,
@@ -31,6 +37,8 @@ async function fetchSettings(): Promise<SiteSettings> {
     headerAnnouncement: null,
     welcomeTitle: null,
     welcomeNote: null,
+    announcementColor: null,
+    announcementSize: null,
   };
 
   if (data) {
@@ -40,6 +48,8 @@ async function fetchSettings(): Promise<SiteSettings> {
       if (row.key === "header_announcement") settings.headerAnnouncement = row.value;
       if (row.key === "welcome_title") settings.welcomeTitle = row.value;
       if (row.key === "welcome_note") settings.welcomeNote = row.value;
+      if (row.key === "announcement_color") settings.announcementColor = row.value;
+      if (row.key === "announcement_size") settings.announcementSize = row.value;
     }
   }
 
@@ -66,6 +76,8 @@ export function useSiteSettings() {
     headerAnnouncement: data?.headerAnnouncement ?? null,
     welcomeTitle: data?.welcomeTitle ?? null,
     welcomeNote: data?.welcomeNote ?? null,
+    announcementColor: data?.announcementColor ?? null,
+    announcementSize: data?.announcementSize ?? null,
     loading: isLoading,
     refetch: () => queryClient.invalidateQueries({ queryKey: ["site-settings"] }),
   };

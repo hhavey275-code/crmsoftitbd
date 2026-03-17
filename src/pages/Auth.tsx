@@ -145,9 +145,12 @@ export default function Auth() {
             <RobotMascot isCovering={isPasswordFocused} />
             <div className="mx-auto mt-2 rounded-lg bg-gradient-to-r from-emerald-500 via-cyan-500 to-blue-600 px-5 py-2 shadow-[0_0_20px_rgba(6,182,212,0.4)]">
               <p className="text-sm font-bold text-white tracking-wide text-center">
-                {isLogin ? "Sign in to your account" : "Create a new account"}
+                {welcomeTitle || (isLogin ? "Sign in to your account" : "Create a new account")}
               </p>
             </div>
+            {welcomeNote && (
+              <p className="text-xs text-muted-foreground text-center mt-2 px-4">{welcomeNote}</p>
+            )}
           </CardHeader>
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4 px-8">

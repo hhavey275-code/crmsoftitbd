@@ -10,6 +10,15 @@ import { useNavigate } from "react-router-dom";
 
 function playNotificationSound() {
   if (localStorage.getItem("notification_sound") === "false") return;
+  const customUrl = localStorage.getItem("notification_sound_url");
+  if (customUrl) {
+    try {
+      const audio = new Audio(customUrl);
+      audio.volume = 0.5;
+      audio.play().catch(() => {});
+    } catch {}
+    return;
+  }
   try {
     const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
     const osc = ctx.createOscillator();
@@ -22,9 +31,7 @@ function playNotificationSound() {
     osc.start();
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
     osc.stop(ctx.currentTime + 0.3);
-  } catch {
-    // Audio context not available
-  }
+  } catch {}
 }
 
 export function NotificationBell() {
