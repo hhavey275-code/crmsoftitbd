@@ -30,6 +30,7 @@ import { format, startOfMonth, endOfMonth } from "date-fns";
 
 export default function ClientDetailPage() {
   const { userId } = useParams<{ userId: string }>();
+  const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
 
   const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfMonth(new Date()));
