@@ -251,8 +251,8 @@ export function ClientTopUp() {
   });
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Top-Up Wallet</h1>
+    <div className="space-y-4 md:space-y-6">
+      <h1 className="text-xl md:text-2xl font-bold">Top-Up Wallet</h1>
 
       {isInactive && (
         <Card className="border-destructive bg-destructive/10">
