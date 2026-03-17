@@ -707,30 +707,52 @@ export function AdminBusinessManagers() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Access Token Dialog */}
+      {/* Edit BM Dialog */}
       <Dialog open={editOpen} onOpenChange={(v) => { setEditOpen(v); if (!v) setEditBmId(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Update Access Token</DialogTitle>
+            <DialogTitle>Edit Business Manager</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>New Access Token</Label>
+              <Label>Name</Label>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Business Manager Name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Business Manager ID</Label>
+              <Input
+                value={editMetaId}
+                onChange={(e) => setEditMetaId(e.target.value)}
+                placeholder="123456789012345"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Access Token <span className="text-xs text-muted-foreground">(leave empty to keep current)</span></Label>
               <Input
                 type="password"
                 value={editAccessToken}
                 onChange={(e) => setEditAccessToken(e.target.value)}
-                placeholder="EAA..."
+                placeholder="EAA... (encrypted at rest)"
               />
+              <p className="text-xs text-muted-foreground">🔒 Token is encrypted with AES-256-GCM before storing</p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
             <Button
-              onClick={() => editBmId && updateTokenMutation.mutate({ id: editBmId, token: editAccessToken })}
-              disabled={!editAccessToken || updateTokenMutation.isPending}
+              onClick={() => editBmId && updateBmMutation.mutate({
+                id: editBmId,
+                name: editName || undefined,
+                bm_id: editMetaId || undefined,
+                access_token: editAccessToken || undefined,
+              })}
+              disabled={updateBmMutation.isPending}
             >
-              {updateTokenMutation.isPending ? "Updating..." : "Update Token"}
+              {updateBmMutation.isPending ? "Updating..." : "Update"}
             </Button>
           </DialogFooter>
         </DialogContent>
