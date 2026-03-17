@@ -38,6 +38,7 @@ const DATE_SPEND_SESSION_KEY = "admin-dashboard-date-spend";
 export function AdminDashboard() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [metaLoading, setMetaLoading] = useState(false);
   const [dailySpendLoading, setDailySpendLoading] = useState(false);
 
