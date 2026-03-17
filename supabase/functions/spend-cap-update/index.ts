@@ -158,13 +158,15 @@ Deno.serve(async (req) => {
         );
       }
 
+      const cleanAccountId = account.account_id.replace(/^act_/, '');
       await supabase.from("transactions").insert({
         user_id: walletUserId,
         amount: -amount,
         balance_after: newBalance,
         type: "ad_topup",
-        description: `Ad account top-up: $${amount} to ${account.account_name}`,
+        description: `${account.account_name}\n${cleanAccountId}`,
         reference_id: ad_account_id,
+        processed_by: isAdmin ? `admin:${user.id}` : `client:${walletUserId}`,
       });
     }
 

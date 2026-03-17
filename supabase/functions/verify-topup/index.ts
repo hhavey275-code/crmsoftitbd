@@ -247,6 +247,7 @@ Deno.serve(async (req) => {
       balance_after: newBalance,
       reference_id: request_id,
       description: 'Wallet top-up auto-approved',
+      processed_by: 'system',
     });
     if (txErr) throw txErr;
 
