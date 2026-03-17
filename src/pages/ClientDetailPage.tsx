@@ -24,7 +24,7 @@ import { toast } from "sonner";
 import {
   User, Building2, Phone, CalendarDays, Wallet, MonitorSmartphone,
   CheckCircle, XCircle, TrendingUp, TrendingDown, DollarSign, CalendarIcon, Save,
-  Plus, Minus, ArrowUpCircle, CreditCard, Shield, Receipt, ShoppingCart, RefreshCw
+  Plus, Minus, ArrowUpCircle, CreditCard, Shield, Receipt, ShoppingCart, RefreshCw, ListChecks, Search
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 
@@ -58,6 +58,8 @@ export default function ClientDetailPage() {
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [assignSelectedIds, setAssignSelectedIds] = useState<Set<string>>(new Set());
   const [unassignSelectedIds, setUnassignSelectedIds] = useState<Set<string>>(new Set());
+  const [showUnassignCheckboxes, setShowUnassignCheckboxes] = useState(false);
+  const [assignSearch, setAssignSearch] = useState("");
 
   const { data: profile } = useQuery({
     queryKey: ["client-detail-profile", userId],
@@ -561,7 +563,7 @@ export default function ClientDetailPage() {
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-lg">Ad Accounts ({adAccounts?.length ?? 0})</CardTitle>
                 <div className="flex items-center gap-2">
-                  {unassignSelectedIds.size > 0 && (
+                  {showUnassignCheckboxes && unassignSelectedIds.size > 0 && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -572,6 +574,7 @@ export default function ClientDetailPage() {
                         }
                         toast.success(`${ids.length} account(s) unassigned`);
                         setUnassignSelectedIds(new Set());
+                        setShowUnassignCheckboxes(false);
                         refetchAdAccounts();
                         queryClient.invalidateQueries({ queryKey: ["admin-user-ad-accounts"] });
                       }}
@@ -579,7 +582,19 @@ export default function ClientDetailPage() {
                       Unassign {unassignSelectedIds.size} Selected
                     </Button>
                   )}
-                  <Button size="sm" onClick={() => { setShowAssignDialog(true); setAssignSelectedIds(new Set()); }}>
+                  <Button
+                    variant={showUnassignCheckboxes ? "secondary" : "ghost"}
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => {
+                      setShowUnassignCheckboxes(v => !v);
+                      if (showUnassignCheckboxes) setUnassignSelectedIds(new Set());
+                    }}
+                    title="Toggle selection"
+                  >
+                    <ListChecks className="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" onClick={() => { setShowAssignDialog(true); setAssignSelectedIds(new Set()); setAssignSearch(""); }}>
                     <Plus className="h-3.5 w-3.5 mr-1" />
                     Assign Accounts
                   </Button>
@@ -592,18 +607,20 @@ export default function ClientDetailPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[40px]">
-                          <Checkbox
-                            checked={adAccounts?.length > 0 && adAccounts?.every((a: any) => unassignSelectedIds.has(a.id))}
-                            onCheckedChange={() => {
-                              if (adAccounts?.every((a: any) => unassignSelectedIds.has(a.id))) {
-                                setUnassignSelectedIds(new Set());
-                              } else {
-                                setUnassignSelectedIds(new Set(adAccounts?.map((a: any) => a.id)));
-                              }
-                            }}
-                          />
-                        </TableHead>
+                        {showUnassignCheckboxes && (
+                          <TableHead className="w-[40px]">
+                            <Checkbox
+                              checked={adAccounts?.length > 0 && adAccounts?.every((a: any) => unassignSelectedIds.has(a.id))}
+                              onCheckedChange={() => {
+                                if (adAccounts?.every((a: any) => unassignSelectedIds.has(a.id))) {
+                                  setUnassignSelectedIds(new Set());
+                                } else {
+                                  setUnassignSelectedIds(new Set(adAccounts?.map((a: any) => a.id)));
+                                }
+                              }}
+                            />
+                          </TableHead>
+                        )}
                         <TableHead>Account</TableHead>
                         <TableHead>Budget</TableHead>
                         <TableHead>Status</TableHead>
@@ -614,19 +631,21 @@ export default function ClientDetailPage() {
                     <TableBody>
                       {adAccounts?.map((acc: any) => (
                         <TableRow key={acc.id}>
-                          <TableCell>
-                            <Checkbox
-                              checked={unassignSelectedIds.has(acc.id)}
-                              onCheckedChange={() => {
-                                setUnassignSelectedIds(prev => {
-                                  const next = new Set(prev);
-                                  if (next.has(acc.id)) next.delete(acc.id);
-                                  else next.add(acc.id);
-                                  return next;
-                                });
-                              }}
-                            />
-                          </TableCell>
+                          {showUnassignCheckboxes && (
+                            <TableCell>
+                              <Checkbox
+                                checked={unassignSelectedIds.has(acc.id)}
+                                onCheckedChange={() => {
+                                  setUnassignSelectedIds(prev => {
+                                    const next = new Set(prev);
+                                    if (next.has(acc.id)) next.delete(acc.id);
+                                    else next.add(acc.id);
+                                    return next;
+                                  });
+                                }}
+                              />
+                            </TableCell>
+                          )}
                           <TableCell>
                             <p className="font-medium">{acc.account_name}</p>
                             <p className="text-xs text-muted-foreground">{acc.account_id}</p>
@@ -739,31 +758,47 @@ export default function ClientDetailPage() {
             <DialogTitle>Assign Ad Accounts</DialogTitle>
             <DialogDescription>Select accounts to assign to this client.</DialogDescription>
           </DialogHeader>
-          <div className="py-2 space-y-2 max-h-[50vh] overflow-y-auto">
-            {(() => {
-              const assignedIds = new Set(adAccounts?.map((a: any) => a.id) ?? []);
-              const unassigned = allAdAccounts?.filter((a: any) => !assignedIds.has(a.id)) ?? [];
-              if (unassigned.length === 0) return <p className="text-sm text-muted-foreground text-center py-4">No unassigned accounts available</p>;
-              return unassigned.map((acc: any) => (
-                <label key={acc.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-muted cursor-pointer">
-                  <Checkbox
-                    checked={assignSelectedIds.has(acc.id)}
-                    onCheckedChange={() => {
-                      setAssignSelectedIds(prev => {
-                        const next = new Set(prev);
-                        if (next.has(acc.id)) next.delete(acc.id);
-                        else next.add(acc.id);
-                        return next;
-                      });
-                    }}
-                  />
-                  <div>
-                    <p className="text-sm font-medium">{acc.account_name}</p>
-                    <p className="text-xs text-muted-foreground">{acc.account_id}</p>
-                  </div>
-                </label>
-              ));
-            })()}
+          <div className="py-2 space-y-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name or ID..."
+                value={assignSearch}
+                onChange={(e) => setAssignSearch(e.target.value)}
+                className="pl-9 h-9"
+              />
+            </div>
+            <div className="max-h-[50vh] overflow-y-auto space-y-1">
+              {(() => {
+                const assignedIds = new Set(adAccounts?.map((a: any) => a.id) ?? []);
+                const q = assignSearch.toLowerCase();
+                const unassigned = (allAdAccounts?.filter((a: any) => {
+                  if (assignedIds.has(a.id)) return false;
+                  if (q && !a.account_name?.toLowerCase().includes(q) && !a.account_id?.toLowerCase().includes(q)) return false;
+                  return true;
+                }) ?? []);
+                if (unassigned.length === 0) return <p className="text-sm text-muted-foreground text-center py-4">No unassigned accounts found</p>;
+                return unassigned.map((acc: any) => (
+                  <label key={acc.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-muted cursor-pointer">
+                    <Checkbox
+                      checked={assignSelectedIds.has(acc.id)}
+                      onCheckedChange={() => {
+                        setAssignSelectedIds(prev => {
+                          const next = new Set(prev);
+                          if (next.has(acc.id)) next.delete(acc.id);
+                          else next.add(acc.id);
+                          return next;
+                        });
+                      }}
+                    />
+                    <div>
+                      <p className="text-sm font-medium">{acc.account_name}</p>
+                      <p className="text-xs text-muted-foreground">{acc.account_id}</p>
+                    </div>
+                  </label>
+                ));
+              })()}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAssignDialog(false)}>Cancel</Button>
