@@ -17,6 +17,7 @@ import { format, startOfMonth, endOfMonth } from "date-fns";
 
 export function ClientDashboard() {
   const { user, profile } = useAuth();
+  const navigate = useNavigate();
   const isInactive = (profile as any)?.status === "inactive";
 
   const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfMonth(new Date()));
