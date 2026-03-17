@@ -545,12 +545,13 @@ export default function ClientDetailPage() {
                 {/* Row 1: 5 cards */}
                 <div className="grid gap-2 grid-cols-2 lg:grid-cols-5">
                   <div className="relative">
-                    <MetricCard
+                     <MetricCard
                       title="Wallet Balance"
                       value={`$${walletBalance.toLocaleString()}`}
                       icon={Wallet}
                       iconBg="bg-green-100 dark:bg-green-900/50"
                       iconColor="text-green-600"
+                      size="sm"
                     />
                     <div className="absolute top-1.5 right-1.5 flex gap-0.5">
                       <Button size="icon" variant="ghost" className="h-5 w-5 text-green-600 hover:bg-green-100" onClick={() => { setWalletDialogType("credit"); setWalletAmount(""); setWalletNote(""); }}>
