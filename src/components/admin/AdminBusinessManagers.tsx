@@ -171,7 +171,8 @@ export function AdminBusinessManagers() {
       queryClient.invalidateQueries({ queryKey: ["admin-business-managers"] });
       queryClient.invalidateQueries({ queryKey: ["admin-sync-logs"] });
     },
-    onError: (err: any) => toast.error(err.message),
+    onError: (err: any) => { toast.error(err.message); setSyncingBmId(null); },
+    onSettled: () => setSyncingBmId(null),
   });
 
   const importMutation = useMutation({
