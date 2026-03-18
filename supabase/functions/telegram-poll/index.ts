@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const MAX_RUNTIME_MS = 55_000;
+const MAX_RUNTIME_MS = 280_000;
 const MIN_REMAINING_MS = 5_000;
 
 type TelegramPayload = {
@@ -209,19 +209,25 @@ Deno.serve(async (req) => {
 
       try {
         await processUpdates(updates);
+        // Auto-verify immediately after each batch of new messages
+        try {
+          const verified = await autoVerifyPending();
+          if (verified > 0) totalProcessed += 0; // just log
+          console.log(`Auto-verified ${verified} requests after batch`);
+        } catch (e) {
+          console.error('Auto-verify after batch failed:', e);
+        }
       } catch (e) {
         return new Response(JSON.stringify({ error: (e as Error).message }), { status: 500, headers: corsHeaders });
       }
     }
 
-    // Auto-verify after long-polling loop ends
+    // Final auto-verify sweep when loop ends (catches any stragglers)
     let autoVerified = 0;
-    if (totalProcessed > 0) {
-      try {
-        autoVerified = await autoVerifyPending();
-      } catch (e) {
-        console.error('Auto-verify sweep failed:', e);
-      }
+    try {
+      autoVerified = await autoVerifyPending();
+    } catch (e) {
+      console.error('Auto-verify sweep failed:', e);
     }
 
     return new Response(JSON.stringify({ ok: true, processed: totalProcessed, finalOffset: currentOffset, auto_verified: autoVerified }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
