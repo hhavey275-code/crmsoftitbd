@@ -11,8 +11,6 @@ export function useSidebarBadges(): Record<string, number> {
   const fetchCounts = useCallback(async () => {
     if (!user) return;
 
-    const promises: Promise<any>[] = [];
-
     if (isAdminUser) {
       const [topUpRes, chatRes, clientsRes, failedRes] = await Promise.all([
         (supabase as any)
