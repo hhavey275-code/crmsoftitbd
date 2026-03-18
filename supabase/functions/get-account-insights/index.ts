@@ -237,7 +237,7 @@ async function processAccount(
 // ====== MAIN ======
 // Process accounts in small batches (5 at a time) with 300ms delay between batches
 // to avoid Meta API rate limits. Each account makes 3-4 API calls, so batch of 5 = ~20 calls.
-const META_BATCH_SIZE = 5;
+const META_BATCH_SIZE = 20;
 const META_BATCH_DELAY_MS = 300;
 
 Deno.serve(async (req) => {
