@@ -6,55 +6,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-// VAPID signing utilities for Web Push
-async function generateVapidAuth(
-  endpoint: string,
-  vapidSubject: string,
-  vapidPublicKey: string,
-  vapidPrivateKey: string
-) {
-  const urlObj = new URL(endpoint);
-  const audience = `${urlObj.protocol}//${urlObj.host}`;
-
-  // Create JWT header and payload
-  const header = { typ: "JWT", alg: "ES256" };
-  const now = Math.floor(Date.now() / 1000);
-  const payload = {
-    aud: audience,
-    exp: now + 12 * 60 * 60,
-    sub: vapidSubject,
-  };
-
-  const headerB64 = base64urlEncode(JSON.stringify(header));
-  const payloadB64 = base64urlEncode(JSON.stringify(payload));
-  const unsignedToken = `${headerB64}.${payloadB64}`;
-
-  // Import private key and sign
-  const privateKeyBytes = base64urlDecode(vapidPrivateKey);
-  const key = await crypto.subtle.importKey(
-    "pkcs8",
-    convertECPrivateKeyToPKCS8(privateKeyBytes),
-    { name: "ECDSA", namedCurve: "P-256" },
-    false,
-    ["sign"]
-  );
-
-  const signature = await crypto.subtle.sign(
-    { name: "ECDSA", hash: "SHA-256" },
-    key,
-    new TextEncoder().encode(unsignedToken)
-  );
-
-  const signatureB64 = base64urlEncodeBuffer(convertDERToRaw(new Uint8Array(signature)));
-  const jwt = `${unsignedToken}.${signatureB64}`;
-
-  const publicKeyBytes = base64urlDecode(vapidPublicKey);
-  const publicKeyB64 = base64urlEncodeBuffer(publicKeyBytes);
-
-  return {
-    authorization: `vapid t=${jwt}, k=${publicKeyB64}`,
-  };
-}
+// --- Base64url helpers ---
 
 function base64urlEncode(str: string): string {
   return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -78,41 +30,77 @@ function base64urlDecode(str: string): Uint8Array {
   return bytes;
 }
 
-// Convert raw 32-byte EC private key to PKCS8 DER format
-function convertECPrivateKeyToPKCS8(rawKey: Uint8Array): ArrayBuffer {
-  // PKCS8 wrapper for P-256 EC key
-  const pkcs8Header = new Uint8Array([
-    0x30, 0x81, 0x87, 0x02, 0x01, 0x00, 0x30, 0x13, 0x06, 0x07, 0x2a, 0x86,
-    0x48, 0xce, 0x3d, 0x02, 0x01, 0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d,
-    0x03, 0x01, 0x07, 0x04, 0x6d, 0x30, 0x6b, 0x02, 0x01, 0x01, 0x04, 0x20,
-  ]);
-  // After the private key bytes, we need the suffix
-  const pkcs8Suffix = new Uint8Array([
-    0xa1, 0x44, 0x03, 0x42, 0x00,
-  ]);
+// --- VAPID JWT signing using JWK import ---
 
-  // We only need the private key without the public key part for signing
-  const result = new Uint8Array(pkcs8Header.length + rawKey.length);
-  result.set(pkcs8Header);
-  result.set(rawKey, pkcs8Header.length);
-  
-  // Simplified: just wrap the raw key in PKCS8 format
-  const der = new Uint8Array([
-    0x30, 0x41, 0x02, 0x01, 0x00, 0x30, 0x13, 0x06, 0x07, 0x2a, 0x86,
-    0x48, 0xce, 0x3d, 0x02, 0x01, 0x06, 0x08, 0x2a, 0x86, 0x48, 0xce,
-    0x3d, 0x03, 0x01, 0x07, 0x04, 0x27, 0x30, 0x25, 0x02, 0x01, 0x01,
-    0x04, 0x20,
-    ...rawKey,
-  ]);
-  return der.buffer;
+async function generateVapidAuth(
+  endpoint: string,
+  vapidSubject: string,
+  vapidPublicKey: string,
+  vapidPrivateKey: string
+) {
+  const urlObj = new URL(endpoint);
+  const audience = `${urlObj.protocol}//${urlObj.host}`;
+
+  const header = { typ: "JWT", alg: "ES256" };
+  const now = Math.floor(Date.now() / 1000);
+  const payload = {
+    aud: audience,
+    exp: now + 12 * 60 * 60,
+    sub: vapidSubject,
+  };
+
+  const headerB64 = base64urlEncode(JSON.stringify(header));
+  const payloadB64 = base64urlEncode(JSON.stringify(payload));
+  const unsignedToken = `${headerB64}.${payloadB64}`;
+
+  // Decode public key (65 bytes: 0x04 || x(32) || y(32))
+  const pubKeyBytes = base64urlDecode(vapidPublicKey);
+  const x = base64urlEncodeBuffer(pubKeyBytes.slice(1, 33));
+  const y = base64urlEncodeBuffer(pubKeyBytes.slice(33, 65));
+
+  // Import private key as JWK (avoids PKCS8 DER encoding issues)
+  const key = await crypto.subtle.importKey(
+    "jwk",
+    {
+      kty: "EC",
+      crv: "P-256",
+      x,
+      y,
+      d: vapidPrivateKey,
+    },
+    { name: "ECDSA", namedCurve: "P-256" },
+    false,
+    ["sign"]
+  );
+
+  const signatureRaw = new Uint8Array(
+    await crypto.subtle.sign(
+      { name: "ECDSA", hash: "SHA-256" },
+      key,
+      new TextEncoder().encode(unsignedToken)
+    )
+  );
+
+  // Web Crypto ECDSA may return DER or raw depending on runtime
+  // If length > 64, it's DER and needs conversion
+  const rawSig = signatureRaw.length > 64
+    ? convertDERToRaw(signatureRaw)
+    : signatureRaw;
+
+  const signatureB64 = base64urlEncodeBuffer(rawSig);
+  const jwt = `${unsignedToken}.${signatureB64}`;
+  const publicKeyB64 = base64urlEncodeBuffer(pubKeyBytes);
+
+  return {
+    authorization: `vapid t=${jwt}, k=${publicKeyB64}`,
+  };
 }
 
 // Convert DER signature to raw 64-byte format
 function convertDERToRaw(der: Uint8Array): Uint8Array {
-  // DER: 0x30 <len> 0x02 <len_r> <r> 0x02 <len_s> <s>
   const raw = new Uint8Array(64);
   let offset = 2; // skip 0x30 and total length
-  
+
   // R value
   offset++; // skip 0x02
   const rLen = der[offset++];
@@ -120,18 +108,19 @@ function convertDERToRaw(der: Uint8Array): Uint8Array {
   const rDest = 32 - Math.min(rLen, 32);
   raw.set(der.slice(rStart, offset + rLen), rDest);
   offset += rLen;
-  
+
   // S value
   offset++; // skip 0x02
   const sLen = der[offset++];
   const sStart = offset + (sLen > 32 ? sLen - 32 : 0);
   const sDest = 32 + 32 - Math.min(sLen, 32);
   raw.set(der.slice(sStart, offset + sLen), sDest);
-  
+
   return raw;
 }
 
-// Encrypt payload using ECDH + HKDF + AES-GCM (RFC 8291)
+// --- Web Push payload encryption (RFC 8291 / aesgcm) ---
+
 async function encryptPayload(
   payload: string,
   p256dhKey: string,
@@ -173,26 +162,7 @@ async function encryptPayload(
   // Generate salt
   const salt = crypto.getRandomValues(new Uint8Array(16));
 
-  // HKDF for auth info
-  const authInfo = createInfo("auth", new Uint8Array(0), new Uint8Array(0));
-  const prkKey = await crypto.subtle.importKey(
-    "raw",
-    userAuth,
-    { name: "HKDF" },
-    false,
-    ["deriveBits"]
-  );
-
-  // IKM = HKDF(auth_secret, ecdh_secret, auth_info, 32)
-  const ikmHkdfKey = await crypto.subtle.importKey(
-    "raw",
-    sharedSecret,
-    { name: "HKDF" },
-    false,
-    ["deriveBits"]
-  );
-
-  // Use HMAC-based approach for the PRK
+  // PRK = HMAC-SHA256(auth_secret, shared_secret)
   const prkHmacKey = await crypto.subtle.importKey(
     "raw",
     userAuth,
@@ -204,10 +174,11 @@ async function encryptPayload(
     await crypto.subtle.sign("HMAC", prkHmacKey, sharedSecret)
   );
 
-  // Derive IKM
+  // IKM = HKDF-Expand(prk, auth_info, 32)
+  const authInfo = createInfo("auth", new Uint8Array(0), new Uint8Array(0));
   const ikm = await hkdfExpand(prk, authInfo, 32);
 
-  // PRK for content encryption
+  // PRK for content encryption = HMAC-SHA256(salt, ikm)
   const prkCeHmacKey = await crypto.subtle.importKey(
     "raw",
     salt,
@@ -228,11 +199,10 @@ async function encryptPayload(
   const nonce = await hkdfExpand(prkCe, nonceInfo, 12);
 
   // Add padding
-  const paddingLength = 0;
-  const paddedPayload = new Uint8Array(2 + paddingLength + payloadBytes.length);
-  paddedPayload[0] = (paddingLength >> 8) & 0xff;
-  paddedPayload[1] = paddingLength & 0xff;
-  paddedPayload.set(payloadBytes, 2 + paddingLength);
+  const paddedPayload = new Uint8Array(2 + payloadBytes.length);
+  paddedPayload[0] = 0;
+  paddedPayload[1] = 0;
+  paddedPayload.set(payloadBytes, 2);
 
   // Encrypt with AES-128-GCM
   const aesKey = await crypto.subtle.importKey(
@@ -265,10 +235,8 @@ function createInfo(
   const info = new Uint8Array(
     typeBytes.length +
       p256Prefix.length +
-      2 +
-      clientPublicKey.length +
-      2 +
-      serverPublicKey.length
+      2 + clientPublicKey.length +
+      2 + serverPublicKey.length
   );
 
   let offset = 0;
@@ -309,6 +277,31 @@ async function hkdfExpand(
   );
   return output.slice(0, length);
 }
+
+// --- URL routing helper ---
+
+function getUrlForType(type: string): string {
+  switch (type) {
+    case "chat_message":
+      return "/chat";
+    case "client_status":
+      return "/dashboard";
+    case "new_signup":
+      return "/clients";
+    case "top_up_request":
+    case "top_up_approved":
+    case "top_up_rejected":
+    case "top_up_on_hold":
+      return "/top-up";
+    case "ad_account_request":
+    case "bm_access_request":
+      return "/requests";
+    default:
+      return "/dashboard";
+  }
+}
+
+// --- Main handler ---
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -428,25 +421,3 @@ Deno.serve(async (req) => {
     );
   }
 });
-
-function getUrlForType(type: string): string {
-  switch (type) {
-    case "chat_message":
-      return "/chat";
-    case "client_status":
-      return "/dashboard";
-    case "new_signup":
-      return "/clients";
-    case "top_up_request":
-    case "top_up_approved":
-    case "top_up_rejected":
-    case "top_up_on_hold":
-      return "/top-up";
-    case "ad_account_request":
-      return "/requests";
-    case "bm_access_request":
-      return "/requests";
-    default:
-      return "/dashboard";
-  }
-}
