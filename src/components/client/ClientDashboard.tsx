@@ -177,7 +177,77 @@ export function ClientDashboard() {
         </Card>
       )}
 
-      {/* Mobile: Wallet Balance Hero Card */}
+      {/* Download App Banner */}
+      {!isInstalled && !dismissedInstall && (canInstall || isIOS) && (
+        <Card className="border-primary/30 bg-gradient-to-r from-primary/10 to-blue-500/10 relative overflow-hidden">
+          <button
+            onClick={() => { setDismissedInstall(true); localStorage.setItem("pwa-install-dismissed", "true"); }}
+            className="absolute top-2 right-2 p-1 rounded-full hover:bg-muted/60 transition-colors"
+          >
+            <X className="h-4 w-4 text-muted-foreground" />
+          </button>
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="h-12 w-12 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+              <Smartphone className="h-6 w-6 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm text-foreground">📱 Download Our App</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {isIOS ? "Install this app on your iPhone for quick access" : "Install the app on your phone for quick access"}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              className="gap-1.5 rounded-full px-4 flex-shrink-0"
+              onClick={async () => {
+                if (isIOS) {
+                  setShowIOSGuide(true);
+                } else {
+                  await promptInstall();
+                }
+              }}
+            >
+              <Download className="h-4 w-4" />
+              Install
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* iOS Install Guide Dialog */}
+      {showIOSGuide && (
+        <Dialog open={showIOSGuide} onOpenChange={setShowIOSGuide}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Install on iPhone</DialogTitle>
+              <DialogDescription>Follow these steps to install the app:</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="flex items-start gap-3">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 text-sm font-bold text-primary">1</div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">Tap the Share button</p>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                    <Share className="h-3 w-3" /> at the bottom of Safari
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 text-sm font-bold text-primary">2</div>
+                <p className="text-sm font-medium text-foreground">Scroll down and tap "Add to Home Screen"</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 text-sm font-bold text-primary">3</div>
+                <p className="text-sm font-medium text-foreground">Tap "Add" to install</p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button onClick={() => setShowIOSGuide(false)} className="w-full">Got it!</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {isMobile ? (
         <div className="space-y-3">
           {/* Wallet Hero */}
