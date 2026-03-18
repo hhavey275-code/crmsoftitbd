@@ -14,6 +14,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { Check, X, Search, Loader2 } from "lucide-react";
+import { logSystemAction } from "@/lib/systemLog";
 
 export function AdminRequests() {
   const { user } = useAuth();
@@ -122,6 +123,8 @@ export function AdminRequests() {
         reference_id: approveAdReq.id,
       });
 
+      const clientName = getProfile(approveAdReq.user_id)?.full_name || approveAdReq.email;
+      await logSystemAction("Ad Account Request Approved", `"${approveAdReq.account_name}" assigned to ${clientName}`, user!.id, user!.email);
       toast.success("Ad account request approved and assigned");
       setApproveAdReq(null);
       setSelectedAdAccount(null);
@@ -150,6 +153,7 @@ export function AdminRequests() {
         reference_id: req.id,
       });
 
+      await logSystemAction("Ad Account Request Rejected", `"${req.account_name}"`, user!.id, user!.email);
       toast.success("Request rejected");
       queryClient.invalidateQueries({ queryKey: ["admin-ad-requests"] });
     } catch (err: any) {
@@ -178,6 +182,7 @@ export function AdminRequests() {
         reference_id: req.id,
       });
 
+      await logSystemAction("BM Access Approved", `BM "${req.bm_name}" (${req.bm_id})`, user!.id, user!.email);
       toast.success("BM request approved — make sure you've shared partner access in Meta Business Manager");
       queryClient.invalidateQueries({ queryKey: ["admin-bm-requests"] });
     } catch (err: any) {
@@ -202,6 +207,7 @@ export function AdminRequests() {
         reference_id: req.id,
       });
 
+      await logSystemAction("BM Access Rejected", `BM "${req.bm_name}" (${req.bm_id})`, user!.id, user!.email);
       toast.success("BM request rejected");
       queryClient.invalidateQueries({ queryKey: ["admin-bm-requests"] });
     } catch (err: any) {

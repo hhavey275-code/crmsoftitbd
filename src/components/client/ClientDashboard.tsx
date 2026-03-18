@@ -18,6 +18,7 @@ import { cn, friendlyEdgeError } from "@/lib/utils";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { logSystemAction } from "@/lib/systemLog";
 
 export function ClientDashboard() {
   const { user, profile } = useAuth();
@@ -58,6 +59,7 @@ export function ClientDashboard() {
         start_date: adReqForm.start_date || null,
       });
       if (error) throw error;
+      await logSystemAction("Ad Account Requested", `"${adReqForm.account_name}" by ${profile?.full_name || user!.email}`, user!.id, profile?.full_name || user!.email);
       toast.success("Ad account request submitted successfully!");
       setShowAdReqForm(false);
       setAdReqForm({ account_name: "", email: "", business_manager_id: "", monthly_spend: "", start_date: "" });

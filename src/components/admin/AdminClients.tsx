@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { logSystemAction } from "@/lib/systemLog";
 
 const ALL_MENU_KEYS = [
   { key: "dashboard", label: "Dashboard" },
@@ -65,6 +66,9 @@ export function AdminClients() {
       if (error) throw error;
     },
     onSuccess: async (_, { userId, newStatus }) => {
+      const clientProfile = clients?.find((c: any) => c.user_id === userId);
+      const clientName = clientProfile?.full_name || clientProfile?.email || userId.slice(0, 8);
+      await logSystemAction("Client Status Changed", `${clientName} → ${newStatus}`, undefined, undefined);
       toast.success(`Client ${newStatus === "active" ? "activated" : "deactivated"} successfully`);
       queryClient.invalidateQueries({ queryKey: ["admin-clients"] });
       

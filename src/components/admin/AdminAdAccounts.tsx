@@ -23,6 +23,7 @@ import { CardBrandIcon } from "@/components/CardBrandIcon";
 import { friendlyEdgeError } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { logSystemAction } from "@/lib/systemLog";
 
 const PAGE_SIZE = 20;
 
@@ -772,6 +773,9 @@ export function AdminAdAccounts() {
               await (supabase as any).from("user_ad_accounts").delete().in("ad_account_id", ids);
               const { error } = await (supabase as any).from("user_ad_accounts").insert(ids.map(adAccountId => ({ user_id: assignClientId, ad_account_id: adAccountId })));
               if (error) { toast.error(error.message); return; }
+              const assignedClientName = clients?.find((c: any) => c.user_id === assignClientId)?.full_name || assignClientId.slice(0, 8);
+              const accountNames = ids.map(id => accounts?.find((a: any) => a.id === id)?.account_name || id.slice(0, 8)).join(", ");
+              await logSystemAction("Ad Account Assigned", `${accountNames} → ${assignedClientName}`);
               toast.success(`${ids.length} account(s) assigned`);
               setShowAssignDialog(false);
               setSelectedIds(new Set());
@@ -796,6 +800,8 @@ export function AdminAdAccounts() {
               const ids = Array.from(selectedIds);
               const { error } = await (supabase as any).from("user_ad_accounts").delete().in("ad_account_id", ids);
               if (error) { toast.error(error.message); return; }
+              const unassignNames = ids.map(id => accounts?.find((a: any) => a.id === id)?.account_name || id.slice(0, 8)).join(", ");
+              await logSystemAction("Ad Account Unassigned", unassignNames);
               toast.success(`${ids.length} account(s) unassigned`);
               setSelectedIds(new Set());
               queryClient.invalidateQueries({ queryKey: ["admin-user-ad-accounts"] });
@@ -820,6 +826,8 @@ export function AdminAdAccounts() {
               await supabase.from("ad_account_insights").delete().in("ad_account_id", ids);
               const { error } = await supabase.from("ad_accounts").delete().in("id", ids);
               if (error) { toast.error(error.message); } else {
+                const deleteNames = ids.map(id => accounts?.find((a: any) => a.id === id)?.account_name || id.slice(0, 8)).join(", ");
+                logSystemAction("Ad Account Deleted", deleteNames);
                 toast.success(`${ids.length} ad account(s) deleted`);
                 setSelectedIds(new Set());
                 queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });

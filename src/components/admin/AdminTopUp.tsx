@@ -16,6 +16,7 @@ import { Check, X, Pause, ImageIcon, Radio, ChevronDown, ChevronUp, MessageSquar
 import { Link } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { logSystemAction } from "@/lib/systemLog";
 
 type ActionType = "approved" | "rejected" | "hold";
 
@@ -222,6 +223,12 @@ export function AdminTopUp() {
         message: action === "approved" ? `Your top-up of $${amount} has been approved.` : action === "rejected" ? `Your top-up of $${amount} was rejected.${adminNote ? " Reason: " + adminNote : ""}` : `Your top-up of $${amount} is on hold.${adminNote ? " Note: " + adminNote : ""}`,
         reference_id: id,
       } as any);
+
+      // System log
+      const actionLabel = action === "approved" ? "Top-Up Approved" : action === "rejected" ? "Top-Up Rejected" : "Top-Up On Hold";
+      const clientProfile = requests?.find((r: any) => r.id === id)?.profile;
+      const clientName = clientProfile?.full_name || clientProfile?.email || userId.slice(0, 8);
+      await logSystemAction(actionLabel, `$${amount} for ${clientName}${adminNote ? ` — ${adminNote}` : ""}`, user!.id, user!.email);
     },
     onSuccess: (_, { action }) => {
       toast.success(`Request ${action === "hold" ? "put on hold" : action}`);

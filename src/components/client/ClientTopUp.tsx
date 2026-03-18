@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { ArrowUpCircle, Banknote, DollarSign, MessageSquare, ImageIcon, X, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { logSystemAction } from "@/lib/systemLog";
 
 export function ClientTopUp() {
   const isMobile = useIsMobile();
@@ -240,6 +241,7 @@ export function ClientTopUp() {
     },
     onSuccess: () => {
       toast.success("Top-up request submitted! Verifying payment...");
+      logSystemAction("Top-Up Submitted", `$${usdEquivalent} (৳${bdtAmount})`, user!.id, profile?.full_name || user!.email);
       queryClient.invalidateQueries({ queryKey: ["client-pending-topups"] });
       queryClient.invalidateQueries({ queryKey: ["client-topup-history"] });
       setBdtAmount("");

@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { Plus, Trash2, UserPlus, Pencil, Building2 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { logSystemAction } from "@/lib/systemLog";
 
 const emptyForm = { bank_name: "", account_name: "", account_number: "", branch: "", routing_number: "" };
 
@@ -54,7 +55,7 @@ export function AdminBanks() {
       const { error } = await (supabase as any).from("bank_accounts").insert(form);
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Bank added!"); queryClient.invalidateQueries({ queryKey: ["admin-banks"] }); setShowAdd(false); setForm(emptyForm); },
+    onSuccess: () => { logSystemAction("Bank Added", `${form.bank_name} — ${form.account_number}`); toast.success("Bank added!"); queryClient.invalidateQueries({ queryKey: ["admin-banks"] }); setShowAdd(false); setForm(emptyForm); },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -65,7 +66,7 @@ export function AdminBanks() {
       }).eq("id", editingBank.id);
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Bank updated!"); queryClient.invalidateQueries({ queryKey: ["admin-banks"] }); setEditingBank(null); setForm(emptyForm); },
+    onSuccess: () => { logSystemAction("Bank Updated", `${form.bank_name} — ${form.account_number}`); toast.success("Bank updated!"); queryClient.invalidateQueries({ queryKey: ["admin-banks"] }); setEditingBank(null); setForm(emptyForm); },
     onError: (e: any) => toast.error(e.message),
   });
 
