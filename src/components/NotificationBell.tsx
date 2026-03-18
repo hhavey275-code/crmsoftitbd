@@ -40,6 +40,14 @@ export function NotificationBell() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const { isSupported, isSubscribed, permission, subscribe } = usePushNotifications();
+
+  // Auto-subscribe to push on first visit if permission already granted
+  useEffect(() => {
+    if (isSupported && !isSubscribed && permission === "granted" && user) {
+      subscribe();
+    }
+  }, [isSupported, isSubscribed, permission, user, subscribe]);
 
   const { data: notifications } = useQuery({
     queryKey: ["notifications", user?.id],
