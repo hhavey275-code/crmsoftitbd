@@ -396,6 +396,12 @@ export function ClientDashboard() {
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base md:text-lg font-semibold text-foreground">My Ad Accounts</h2>
+          <Button size="sm" className="gap-1.5" onClick={() => setShowAdReqForm(true)}>
+            <Plus className="h-3.5 w-3.5" />
+            {isMobile ? "Request" : "Request New Ad Account"}
+          </Button>
+        </div>
+        <div className="flex items-center justify-between mb-3">
           {!isMobile && (
             <div className="relative w-64">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
