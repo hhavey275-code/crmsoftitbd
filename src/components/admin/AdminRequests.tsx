@@ -14,6 +14,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { Check, X, Search, Loader2 } from "lucide-react";
+import { logSystemAction } from "@/lib/systemLog";
 
 export function AdminRequests() {
   const { user } = useAuth();
