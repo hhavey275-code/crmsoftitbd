@@ -78,8 +78,14 @@ export function ClientTopUp() {
   const { data: usdRate } = useQuery({
     queryKey: ["usd-rate", user?.id],
     queryFn: async () => {
-      const clientRate = (profile as any)?.usd_rate;
-      if (clientRate) return Number(clientRate);
+      // Always fetch fresh profile to get latest usd_rate
+      const { data: freshProfile } = await supabase
+        .from("profiles")
+        .select("usd_rate")
+        .eq("user_id", user!.id)
+        .single();
+      const clientRate = freshProfile?.usd_rate;
+      if (clientRate != null && clientRate > 0) return Number(clientRate);
       const { data } = await supabase.from("site_settings").select("value").eq("key", "usd_rate").single();
       return Number(data?.value ?? 120);
     },
