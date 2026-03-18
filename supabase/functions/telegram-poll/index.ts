@@ -209,6 +209,14 @@ Deno.serve(async (req) => {
 
       try {
         await processUpdates(updates);
+        // Auto-verify immediately after each batch of new messages
+        try {
+          const verified = await autoVerifyPending();
+          if (verified > 0) totalProcessed += 0; // just log
+          console.log(`Auto-verified ${verified} requests after batch`);
+        } catch (e) {
+          console.error('Auto-verify after batch failed:', e);
+        }
       } catch (e) {
         return new Response(JSON.stringify({ error: (e as Error).message }), { status: 500, headers: corsHeaders });
       }
