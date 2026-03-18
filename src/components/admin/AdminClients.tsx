@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Users, Search, Clock, CheckCircle, Shield, LogIn } from "lucide-react";
+import { Users, Search, Clock, CheckCircle, Shield, LogIn, UserCheck, UserX, Hourglass } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -154,55 +154,88 @@ export function AdminClients() {
   const pendingClients = filtered?.filter((c: any) => c.status === "pending") ?? [];
   const activeClients = filtered?.filter((c: any) => c.status !== "pending") ?? [];
 
+  // Counts for metrics
+  const totalClients = clients?.length ?? 0;
+  const activeCount = clients?.filter((c: any) => c.status === "active").length ?? 0;
+  const pendingCount = clients?.filter((c: any) => c.status === "pending").length ?? 0;
+  const inactiveCount = clients?.filter((c: any) => c.status === "inactive").length ?? 0;
+
   const renderMobileCards = (items: any[]) => (
-    <div className="space-y-2.5">
+    <div className="space-y-3">
       {items.map((client: any) => {
         const isActive = (client.status ?? "active") === "active";
         const isPending = client.status === "pending";
         const userRole = isSuperAdmin ? getUserRole(client.user_id) : null;
         return (
-          <Card key={client.id} className="border border-border/60 shadow-sm cursor-pointer active:scale-[0.98] transition-transform" onClick={() => navigate(`/clients/${client.user_id}`)}>
-            <CardContent className="p-3">
-              <div className="flex items-start justify-between gap-2">
+          <Card
+            key={client.id}
+            className="border border-border/60 shadow-sm cursor-pointer active:scale-[0.98] transition-transform"
+            onClick={() => navigate(`/clients/${client.user_id}`)}
+          >
+            <CardContent className="p-4">
+              {/* Header: Name + Status */}
+              <div className="flex items-start justify-between mb-1">
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold truncate">{client.full_name || "—"}</p>
-                    <StatusBadge status={isPending ? "pending" : isActive ? "active" : "inactive"} />
-                  </div>
-                  {client.company && <p className="text-xs text-muted-foreground mt-0.5">{client.company}</p>}
-                  <p className="text-xs text-muted-foreground truncate">{client.email || "—"}</p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">{format(new Date(client.created_at), "MMM d, yyyy")}</p>
+                  <p className="font-semibold text-sm text-foreground truncate">{client.full_name || "—"}</p>
+                  {client.company && (
+                    <p className="text-xs text-muted-foreground mt-0.5">{client.company}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <StatusBadge status={isPending ? "pending" : isActive ? "active" : "inactive"} />
                   {isSuperAdmin && userRole && (
-                    <span className="inline-block capitalize text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-muted mt-1">{userRole}</span>
+                    <span className="capitalize text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-muted">{userRole}</span>
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-1.5 mt-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
+
+              {/* Info */}
+              <div className="space-y-0.5 mt-2">
+                <p className="text-xs text-muted-foreground truncate">{client.email || "—"}</p>
+                <p className="text-[11px] text-muted-foreground">{format(new Date(client.created_at), "MMM d, yyyy")}</p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-1.5 mt-3 flex-wrap" onClick={(e) => e.stopPropagation()}>
                 {isPending ? (
-                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white h-7 text-xs" onClick={() => toggleStatusMutation.mutate({ userId: client.user_id, newStatus: "active" })} disabled={toggleStatusMutation.isPending}>
-                    <CheckCircle className="h-3 w-3 mr-1" />
+                  <Button
+                    size="sm"
+                    className="gap-1 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-md shadow-emerald-500/25 rounded-full px-4 font-semibold text-xs h-8"
+                    onClick={() => toggleStatusMutation.mutate({ userId: client.user_id, newStatus: "active" })}
+                    disabled={toggleStatusMutation.isPending}
+                  >
+                    <CheckCircle className="h-3 w-3" />
                     Approve
                   </Button>
                 ) : (
-                  <Button size="sm" variant={isActive ? "destructive" : "default"} className="h-7 text-xs" onClick={() => toggleStatusMutation.mutate({ userId: client.user_id, newStatus: isActive ? "inactive" : "active" })} disabled={toggleStatusMutation.isPending}>
+                  <Button
+                    size="sm"
+                    variant={isActive ? "destructive" : "default"}
+                    className={cn(
+                      "rounded-full px-4 font-semibold text-xs h-8",
+                      !isActive && "bg-gradient-to-r from-primary to-blue-500 text-primary-foreground shadow-md shadow-primary/25"
+                    )}
+                    onClick={() => toggleStatusMutation.mutate({ userId: client.user_id, newStatus: isActive ? "inactive" : "active" })}
+                    disabled={toggleStatusMutation.isPending}
+                  >
                     {isActive ? "Deactivate" : "Activate"}
                   </Button>
                 )}
                 {isSuperAdmin && userRole === "client" && !isPending && (
-                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => promoteToAdminMutation.mutate(client.user_id)} disabled={promoteToAdminMutation.isPending}>
+                  <Button size="sm" variant="outline" className="rounded-full h-8 text-xs" onClick={() => promoteToAdminMutation.mutate(client.user_id)} disabled={promoteToAdminMutation.isPending}>
                     Make Admin
                   </Button>
                 )}
                 {isSuperAdmin && userRole === "admin" && (
                   <>
-                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => demoteToClientMutation.mutate(client.user_id)} disabled={demoteToClientMutation.isPending}>Demote</Button>
-                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setPermDialogUser(client); setSelectedMenuKeys([]); }}>
+                    <Button size="sm" variant="outline" className="rounded-full h-8 text-xs" onClick={() => demoteToClientMutation.mutate(client.user_id)} disabled={demoteToClientMutation.isPending}>Demote</Button>
+                    <Button size="sm" variant="outline" className="rounded-full h-8 text-xs" onClick={() => { setPermDialogUser(client); setSelectedMenuKeys([]); }}>
                       <Shield className="h-3 w-3 mr-1" />Menus
                     </Button>
                   </>
                 )}
                 {isSuperAdmin && !isPending && userRole === "client" && (
-                  <Button size="sm" variant="outline" className="h-7 text-xs text-blue-600 border-blue-300" onClick={() => impersonateMutation.mutate(client.user_id)} disabled={impersonateMutation.isPending}>
+                  <Button size="sm" variant="outline" className="rounded-full h-8 text-xs text-blue-600 border-blue-300" onClick={() => impersonateMutation.mutate(client.user_id)} disabled={impersonateMutation.isPending}>
                     <LogIn className="h-3 w-3 mr-1" />Login
                   </Button>
                 )}
@@ -294,6 +327,7 @@ export function AdminClients() {
 
   return (
     <div className="space-y-4 md:space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className={cn("font-bold flex items-center gap-2", isMobile ? "text-xl" : "text-2xl")}>
           <Users className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} />
@@ -301,6 +335,51 @@ export function AdminClients() {
         </h1>
       </div>
 
+      {/* Mobile Hero Metrics */}
+      {isMobile && (
+        <div className="space-y-3">
+          {/* Hero card */}
+          <Card className="bg-gradient-to-br from-primary/90 to-blue-600 text-primary-foreground border-0 shadow-lg shadow-primary/20">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-primary-foreground/70">Total Clients</p>
+                  <p className="text-3xl font-bold">{totalClients}</p>
+                </div>
+                <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center">
+                  <Users className="h-6 w-6" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          {/* 3-column metrics */}
+          <div className="grid grid-cols-3 gap-2">
+            <Card className="bg-card border border-border/60">
+              <CardContent className="p-3 text-center">
+                <UserCheck className="h-4 w-4 text-emerald-500 mx-auto mb-1" />
+                <p className="text-[10px] text-muted-foreground font-medium">Active</p>
+                <p className="text-lg font-bold text-foreground">{activeCount}</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-card border border-border/60">
+              <CardContent className="p-3 text-center">
+                <Hourglass className="h-4 w-4 text-amber-500 mx-auto mb-1" />
+                <p className="text-[10px] text-muted-foreground font-medium">Pending</p>
+                <p className="text-lg font-bold text-foreground">{pendingCount}</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-card border border-border/60">
+              <CardContent className="p-3 text-center">
+                <UserX className="h-4 w-4 text-destructive mx-auto mb-1" />
+                <p className="text-[10px] text-muted-foreground font-medium">Inactive</p>
+                <p className="text-lg font-bold text-foreground">{inactiveCount}</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Search */}
       <div className={cn("relative", isMobile ? "w-full" : "max-w-sm")}>
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input placeholder="Search clients..." value={search} onChange={(e) => setSearch(e.target.value)} className={cn("pl-9", isMobile && "rounded-full")} />

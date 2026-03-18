@@ -14,6 +14,8 @@ import { Plus, RefreshCw, Building2, ChevronDown, ChevronRight, Clock, AlertCirc
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 interface SyncedAccount {
   account_id: string;
@@ -27,6 +29,7 @@ interface SyncedAccount {
 
 export function AdminBusinessManagers() {
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const [bmId, setBmId] = useState("");
   const [bmName, setBmName] = useState("");
@@ -156,18 +159,14 @@ export function AdminBusinessManagers() {
         toast.info("No accounts found from Meta");
         return;
       }
-      // Load existing account_ids to detect duplicates
       const { data: existing } = await supabase.from("ad_accounts").select("account_id");
       const existingIds = new Set((existing ?? []).map((a: any) => a.account_id));
       setExistingAccountIds(existingIds);
-
-      // Only show accounts that are NOT already imported
       setSyncedAccounts(accounts);
       setSelectedImportIds(new Set());
       setImportStatusFilter("all");
       setImportSearch("");
       setImportDialogOpen(true);
-
       queryClient.invalidateQueries({ queryKey: ["admin-business-managers"] });
       queryClient.invalidateQueries({ queryKey: ["admin-sync-logs"] });
     },
@@ -254,26 +253,18 @@ export function AdminBusinessManagers() {
 
   const deleteBmMutation = useMutation({
     mutationFn: async (bmId: string) => {
-      // Get all ad account IDs under this BM
       const { data: accounts } = await supabase
         .from("ad_accounts")
         .select("id")
         .eq("business_manager_id", bmId);
       const accountIds = (accounts ?? []).map((a: any) => a.id);
-
       if (accountIds.length > 0) {
-        // Delete assignments
         await (supabase as any).from("user_ad_accounts").delete().in("ad_account_id", accountIds);
-        // Delete insights
         await supabase.from("ad_account_insights").delete().in("ad_account_id", accountIds);
-        // Delete top-up requests referencing these accounts
         await supabase.from("top_up_requests").delete().in("ad_account_id", accountIds);
-        // Delete ad accounts
         await supabase.from("ad_accounts").delete().eq("business_manager_id", bmId);
       }
-      // Delete sync logs
       await (supabase as any).from("sync_logs").delete().eq("business_manager_id", bmId);
-      // Delete BM
       const { error } = await supabase.from("business_managers").delete().eq("id", bmId);
       if (error) throw error;
     },
@@ -310,7 +301,7 @@ export function AdminBusinessManagers() {
     return assignments?.find((a: any) => a.ad_account_id === accountId)?.user_id ?? null;
   };
 
-  const bmAccounts = (bmId: string) => {
+  const bmAccountsList = (bmId: string) => {
     const accounts = adAccounts?.filter((a: any) => a.business_manager_id === bmId) ?? [];
     const statusOrder: Record<string, number> = { active: 0, pending: 1, disabled: 2 };
     return accounts.sort((a: any, b: any) => (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3));
@@ -413,226 +404,377 @@ export function AdminBusinessManagers() {
     onError: (err: any) => toast.error(err.message),
   });
 
+  const getAssignedUserName = (accountId: string) => {
+    const userId = getAssignedUserId(accountId);
+    if (!userId) return null;
+    const client = clients?.find((c: any) => c.user_id === userId);
+    return client?.full_name || client?.email || userId;
+  };
+
+  // --- Mobile account card renderer ---
+  const renderMobileAccountCards = (accounts: any[]) => (
+    <div className="space-y-2.5 pt-2">
+      {accounts.map((a: any) => {
+        const remaining = Math.max(0, Number(a.spend_cap) - Number(a.amount_spent));
+        const ratio = Number(a.spend_cap) > 0 ? Number(a.amount_spent) / Number(a.spend_cap) : 0;
+        const percentage = Math.min(ratio * 100, 100);
+        const barColor = ratio >= 0.8 ? "bg-destructive" : ratio >= 0.5 ? "bg-yellow-500" : "bg-primary";
+
+        return (
+          <div key={a.id} className="border border-border/60 rounded-lg p-3 bg-card">
+            {/* Header */}
+            <div className="flex items-start justify-between mb-1">
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-sm text-foreground truncate">{a.account_name}</p>
+                <p className="text-[11px] text-muted-foreground font-mono">{a.account_id}</p>
+              </div>
+              <StatusBadge status={a.status} />
+            </div>
+
+            {/* Remaining + Progress */}
+            <div className="mt-2">
+              <p className="text-sm font-medium text-foreground">
+                Remaining: <span className="font-bold">${remaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </p>
+              <div className="h-2 w-full rounded-full bg-muted overflow-hidden mt-1.5">
+                <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${percentage}%` }} />
+              </div>
+            </div>
+
+            {/* Spent / Limit */}
+            <div className="flex gap-4 text-xs text-muted-foreground mt-2">
+              <span>Spent: <span className="font-medium text-foreground">${Number(a.amount_spent).toLocaleString()}</span></span>
+              <span>Limit: <span className="font-medium text-foreground">${Number(a.spend_cap).toLocaleString()}</span></span>
+            </div>
+
+            {/* Assigned To */}
+            <div className="mt-2.5">
+              <Select
+                value={getAssignedUserId(a.id) || "unassigned"}
+                onValueChange={(val) => assignMutation.mutate({ accountId: a.id, userId: val === "unassigned" ? null : val })}
+              >
+                <SelectTrigger className="w-full h-8 text-xs">
+                  <SelectValue placeholder="Unassigned" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  {clients?.map((c: any) => (
+                    <SelectItem key={c.user_id} value={c.user_id}>
+                      {c.full_name || c.email || c.user_id}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        );
+      })}
+      {accounts.length === 0 && (
+        <p className="text-center text-xs text-muted-foreground py-4">No accounts imported. Tap "Sync" to fetch from Meta.</p>
+      )}
+    </div>
+  );
+
+  // --- Mobile import card renderer ---
+  const renderMobileImportCards = () => (
+    <div className="space-y-2">
+      {filteredSyncedAccounts.map((a) => {
+        const alreadyExists = existingAccountIds.has(a.account_id);
+        return (
+          <div key={a.account_id} className={cn("border border-border/60 rounded-lg p-3 bg-card", alreadyExists && "opacity-50")}>
+            <div className="flex items-start gap-3">
+              <Checkbox
+                checked={selectedImportIds.has(a.account_id)}
+                onCheckedChange={() => toggleImportSelect(a.account_id)}
+                disabled={alreadyExists}
+                className="mt-0.5"
+              />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{a.account_name}</p>
+                    <p className="text-[11px] text-muted-foreground font-mono">{a.account_id.replace(/^act_/, "")}</p>
+                    {alreadyExists && <p className="text-[10px] text-muted-foreground">(already imported)</p>}
+                  </div>
+                  <StatusBadge status={a.status} />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Cap: ${a.spend_cap.toLocaleString()}</p>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+      {filteredSyncedAccounts.length === 0 && (
+        <p className="text-center text-muted-foreground py-8 text-sm">No accounts match your filters</p>
+      )}
+    </div>
+  );
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Business Managers</h1>
+    <div className={cn("space-y-4", !isMobile && "space-y-6")}>
+      {/* Header */}
+      <div className={cn("flex items-center justify-between", isMobile && "flex-col items-start gap-3")}>
+        <h1 className={cn("font-bold flex items-center gap-2", isMobile ? "text-xl" : "text-2xl")}>
+          <Building2 className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} />
+          Business Managers
+        </h1>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => encryptExistingMutation.mutate()}
-            disabled={encryptExistingMutation.isPending}
-          >
-            <ShieldCheck className="mr-1 h-4 w-4" />
-            {encryptExistingMutation.isPending ? "Encrypting..." : "Encrypt Tokens"}
-          </Button>
+          {!isMobile && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => encryptExistingMutation.mutate()}
+              disabled={encryptExistingMutation.isPending}
+            >
+              <ShieldCheck className="mr-1 h-4 w-4" />
+              {encryptExistingMutation.isPending ? "Encrypting..." : "Encrypt Tokens"}
+            </Button>
+          )}
           {bms && bms.length > 0 && (
             <Button
               variant="outline"
+              size={isMobile ? "sm" : "default"}
               onClick={() => syncAllMutation.mutate()}
               disabled={syncAllMutation.isPending}
             >
-              <RefreshCw className={`mr-2 h-4 w-4 ${syncAllMutation.isPending ? "animate-spin" : ""}`} />
-              {syncAllMutation.isPending ? "Syncing All..." : "Sync All"}
+              <RefreshCw className={cn("h-4 w-4", syncAllMutation.isPending && "animate-spin", !isMobile && "mr-2")} />
+              {!isMobile && (syncAllMutation.isPending ? "Syncing All..." : "Sync All")}
             </Button>
           )}
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button><Plus className="mr-2 h-4 w-4" /> Connect BM</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Connect Business Manager</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Business Manager ID</Label>
-                <Input value={bmId} onChange={(e) => setBmId(e.target.value)} placeholder="123456789012345" />
-              </div>
-              <div className="space-y-2">
-                <Label>Name</Label>
-                <Input value={bmName} onChange={(e) => setBmName(e.target.value)} placeholder="My Business" />
-              </div>
-              <div className="space-y-2">
-                <Label>Access Token</Label>
-                <Input type="password" value={accessToken} onChange={(e) => setAccessToken(e.target.value)} placeholder="EAA..." />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-              <Button onClick={() => addBmMutation.mutate()} disabled={!bmId || !bmName || !accessToken || addBmMutation.isPending}>
-                {addBmMutation.isPending ? "Connecting..." : "Connect"}
+              <Button size={isMobile ? "sm" : "default"}>
+                <Plus className={cn("h-4 w-4", !isMobile && "mr-2")} />
+                {isMobile ? "Add BM" : "Connect BM"}
               </Button>
-            </DialogFooter>
-          </DialogContent>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Connect Business Manager</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Business Manager ID</Label>
+                  <Input value={bmId} onChange={(e) => setBmId(e.target.value)} placeholder="123456789012345" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Name</Label>
+                  <Input value={bmName} onChange={(e) => setBmName(e.target.value)} placeholder="My Business" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Access Token</Label>
+                  <Input type="password" value={accessToken} onChange={(e) => setAccessToken(e.target.value)} placeholder="EAA..." />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                <Button onClick={() => addBmMutation.mutate()} disabled={!bmId || !bmName || !accessToken || addBmMutation.isPending}>
+                  {addBmMutation.isPending ? "Connecting..." : "Connect"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
           </Dialog>
         </div>
       </div>
 
-      {bms?.map((bm: any) => (
-        <Card key={bm.id}>
-          <CardHeader className="cursor-pointer" onClick={() => setExpandedBm(expandedBm === bm.id ? null : bm.id)}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {expandedBm === bm.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                <Building2 className="h-5 w-5 text-primary" />
-                <div>
-                  <CardTitle className="text-lg">{bm.name}</CardTitle>
-                  <div className="flex items-center gap-3 mt-0.5">
-                    <p className="text-xs text-muted-foreground font-mono">ID: {bm.bm_id}</p>
-                    {bm.last_synced_at && (
-                      <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        Synced {formatDistanceToNow(new Date(bm.last_synced_at), { addSuffix: true })}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground">
-                      {bmAccounts(bm.id).length} account{bmAccounts(bm.id).length !== 1 ? "s" : ""}
-                    </p>
+      {/* BM List */}
+      {bms?.map((bm: any) => {
+        const accounts = bmAccountsList(bm.id);
+        const isExpanded = expandedBm === bm.id;
+        const isShowingLogs = showLogs === bm.id;
+
+        return (
+          <Card key={bm.id} className="border border-border/60">
+            {/* BM Header */}
+            <CardHeader
+              className={cn("cursor-pointer", isMobile ? "p-3" : "p-6")}
+              onClick={() => setExpandedBm(isExpanded ? null : bm.id)}
+            >
+              {isMobile ? (
+                /* Mobile BM Header */
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    {isExpanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
+                    <Building2 className="h-4 w-4 text-primary shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-sm truncate">{bm.name}</p>
+                        <StatusBadge status={bm.status} />
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <p className="text-[10px] text-muted-foreground font-mono">ID: {bm.bm_id}</p>
+                        <span className="text-[10px] text-muted-foreground">· {accounts.length} acct{accounts.length !== 1 ? "s" : ""}</span>
+                      </div>
+                      {bm.last_synced_at && (
+                        <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                          <Clock className="h-2.5 w-2.5" />
+                          {formatDistanceToNow(new Date(bm.last_synced_at), { addSuffix: true })}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {/* Mobile action buttons - icon only */}
+                  <div className="flex items-center gap-1.5 pl-6" onClick={(e) => e.stopPropagation()}>
+                    <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={() => {
+                      setEditBmId(bm.id); setEditName(bm.name); setEditMetaId(bm.bm_id); setEditAccessToken(""); setEditOpen(true);
+                    }}>
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteBmId(bm.id)}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={() => setShowLogs(isShowingLogs ? null : bm.id)}>
+                      <Clock className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 w-7 p-0"
+                      onClick={() => syncMutation.mutate(bm.id)}
+                      disabled={syncMutation.isPending}
+                    >
+                      <RefreshCw className={cn("h-3 w-3", syncingBmId === bm.id && syncMutation.isPending && "animate-spin")} />
+                    </Button>
                   </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <StatusBadge status={bm.status} />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setEditBmId(bm.id);
-                    setEditName(bm.name);
-                    setEditMetaId(bm.bm_id);
-                    setEditAccessToken("");
-                    setEditOpen(true);
-                  }}
-                >
-                  <Pencil className="mr-1 h-3 w-3" />
-                  Edit
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-destructive hover:text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDeleteBmId(bm.id);
-                  }}
-                >
-                  <Trash2 className="mr-1 h-3 w-3" />
-                  Remove
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowLogs(showLogs === bm.id ? null : bm.id);
-                  }}
-                >
-                  <Clock className="mr-1 h-3 w-3" />
-                  Logs
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={(e) => { e.stopPropagation(); syncMutation.mutate(bm.id); }}
-                  disabled={syncMutation.isPending}
-                >
-                  <RefreshCw className={`mr-1 h-3 w-3 ${syncingBmId === bm.id && syncMutation.isPending ? "animate-spin" : ""}`} />
-                  {syncingBmId === bm.id && syncMutation.isPending ? "Syncing..." : "Sync"}
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-
-          {showLogs === bm.id && (
-            <CardContent className="border-t bg-muted/30">
-              <h3 className="text-sm font-semibold mb-3">Sync History</h3>
-              {syncLogs && syncLogs.length > 0 ? (
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {syncLogs.map((log: any) => (
-                    <div key={log.id} className="flex items-center justify-between text-sm rounded-md border p-2 bg-background">
-                      <div className="flex items-center gap-2">
-                        {log.status === "success" ? (
-                          <CheckCircle2 className="h-4 w-4 text-primary" />
-                        ) : (
-                          <AlertCircle className="h-4 w-4 text-destructive" />
+              ) : (
+                /* Desktop BM Header */
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    <Building2 className="h-5 w-5 text-primary" />
+                    <div>
+                      <CardTitle className="text-lg">{bm.name}</CardTitle>
+                      <div className="flex items-center gap-3 mt-0.5">
+                        <p className="text-xs text-muted-foreground font-mono">ID: {bm.bm_id}</p>
+                        {bm.last_synced_at && (
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            Synced {formatDistanceToNow(new Date(bm.last_synced_at), { addSuffix: true })}
+                          </p>
                         )}
-                        <span>
-                          {log.status === "success"
-                            ? `Synced ${log.synced_count}/${log.total_count} accounts`
-                            : log.error_message || "Sync failed"}
+                        <p className="text-xs text-muted-foreground">
+                          {accounts.length} account{accounts.length !== 1 ? "s" : ""}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    <StatusBadge status={bm.status} />
+                    <Button size="sm" variant="outline" onClick={() => {
+                      setEditBmId(bm.id); setEditName(bm.name); setEditMetaId(bm.bm_id); setEditAccessToken(""); setEditOpen(true);
+                    }}>
+                      <Pencil className="mr-1 h-3 w-3" />Edit
+                    </Button>
+                    <Button size="sm" variant="outline" className="text-destructive hover:text-destructive" onClick={() => setDeleteBmId(bm.id)}>
+                      <Trash2 className="mr-1 h-3 w-3" />Remove
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setShowLogs(isShowingLogs ? null : bm.id)}>
+                      <Clock className="mr-1 h-3 w-3" />Logs
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => syncMutation.mutate(bm.id)} disabled={syncMutation.isPending}>
+                      <RefreshCw className={cn("mr-1 h-3 w-3", syncingBmId === bm.id && syncMutation.isPending && "animate-spin")} />
+                      {syncingBmId === bm.id && syncMutation.isPending ? "Syncing..." : "Sync"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardHeader>
+
+            {/* Sync Logs */}
+            {isShowingLogs && (
+              <CardContent className={cn("border-t bg-muted/30", isMobile ? "px-3 py-2" : "")}>
+                <h3 className="text-sm font-semibold mb-2">Sync History</h3>
+                {syncLogs && syncLogs.length > 0 ? (
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {syncLogs.map((log: any) => (
+                      <div key={log.id} className={cn("flex items-center justify-between rounded-md border p-2 bg-background", isMobile ? "text-xs gap-2" : "text-sm")}>
+                        <div className="flex items-center gap-2">
+                          {log.status === "success" ? (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                          ) : (
+                            <AlertCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
+                          )}
+                          <span className={cn(isMobile && "truncate")}>
+                            {log.status === "success"
+                              ? `${log.synced_count}/${log.total_count} synced`
+                              : log.error_message || "Failed"}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                          {format(new Date(log.created_at), isMobile ? "MMM d HH:mm" : "MMM d, yyyy HH:mm")}
                         </span>
                       </div>
-                      <span className="text-xs text-muted-foreground">
-                        {format(new Date(log.created_at), "MMM d, yyyy HH:mm")}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No sync logs yet.</p>
-              )}
-            </CardContent>
-          )}
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No sync logs yet.</p>
+                )}
+              </CardContent>
+            )}
 
-          {expandedBm === bm.id && (
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Account Name</TableHead>
-                    <TableHead>Account ID</TableHead>
-                    <TableHead>Business Name</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Spend Cap</TableHead>
-                    <TableHead>Spent</TableHead>
-                    <TableHead>Assigned To</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {bmAccounts(bm.id).map((a: any) => (
-                    <TableRow key={a.id}>
-                      <TableCell className="font-medium">{a.account_name}</TableCell>
-                      <TableCell className="font-mono text-sm">{a.account_id}</TableCell>
-                      <TableCell>{a.business_name || "—"}</TableCell>
-                      <TableCell><StatusBadge status={a.status} /></TableCell>
-                      <TableCell>${Number(a.spend_cap).toLocaleString()}</TableCell>
-                      <TableCell>${Number(a.amount_spent).toLocaleString()}</TableCell>
-                      <TableCell>
-                        <Select
-                          value={getAssignedUserId(a.id) || "unassigned"}
-                          onValueChange={(val) => assignMutation.mutate({ accountId: a.id, userId: val === "unassigned" ? null : val })}
-                        >
-                          <SelectTrigger className="w-[180px]">
-                            <SelectValue placeholder="Unassigned" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="unassigned">Unassigned</SelectItem>
-                            {clients?.map((c: any) => (
-                              <SelectItem key={c.user_id} value={c.user_id}>
-                                {c.full_name || c.email || c.user_id}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {bmAccounts(bm.id).length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground">
-                        No accounts imported. Click "Sync" to fetch from Meta.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          )}
-        </Card>
-      ))}
+            {/* Expanded Accounts */}
+            {isExpanded && (
+              <CardContent className={cn(isMobile ? "px-3 pb-3 pt-0" : "")}>
+                {isMobile ? (
+                  renderMobileAccountCards(accounts)
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Account Name</TableHead>
+                        <TableHead>Account ID</TableHead>
+                        <TableHead>Business Name</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Spend Cap</TableHead>
+                        <TableHead>Spent</TableHead>
+                        <TableHead>Assigned To</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {accounts.map((a: any) => (
+                        <TableRow key={a.id}>
+                          <TableCell className="font-medium">{a.account_name}</TableCell>
+                          <TableCell className="font-mono text-sm">{a.account_id}</TableCell>
+                          <TableCell>{a.business_name || "—"}</TableCell>
+                          <TableCell><StatusBadge status={a.status} /></TableCell>
+                          <TableCell>${Number(a.spend_cap).toLocaleString()}</TableCell>
+                          <TableCell>${Number(a.amount_spent).toLocaleString()}</TableCell>
+                          <TableCell>
+                            <Select
+                              value={getAssignedUserId(a.id) || "unassigned"}
+                              onValueChange={(val) => assignMutation.mutate({ accountId: a.id, userId: val === "unassigned" ? null : val })}
+                            >
+                              <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Unassigned" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="unassigned">Unassigned</SelectItem>
+                                {clients?.map((c: any) => (
+                                  <SelectItem key={c.user_id} value={c.user_id}>
+                                    {c.full_name || c.email || c.user_id}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {accounts.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-muted-foreground">
+                            No accounts imported. Click "Sync" to fetch from Meta.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            )}
+          </Card>
+        );
+      })}
 
       {(!bms || bms.length === 0) && (
         <Card>
@@ -646,15 +788,18 @@ export function AdminBusinessManagers() {
 
       {/* Import Selection Dialog */}
       <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+        <DialogContent className={cn(
+          "flex flex-col",
+          isMobile ? "max-w-[95vw] max-h-[90vh]" : "max-w-3xl max-h-[80vh]"
+        )}>
           <DialogHeader>
-            <DialogTitle>Select Accounts to Import</DialogTitle>
-            <p className="text-sm text-muted-foreground">
-              {syncedAccounts.length} accounts found · {newAccountsCount} new · {alreadyImportedCount} already imported
+            <DialogTitle className={cn(isMobile && "text-base")}>Select Accounts to Import</DialogTitle>
+            <p className="text-xs text-muted-foreground">
+              {syncedAccounts.length} found · {newAccountsCount} new · {alreadyImportedCount} imported
             </p>
           </DialogHeader>
-          <div className="flex items-center gap-2 mt-2">
-            <div className="relative flex-1">
+          <div className={cn("flex items-center gap-2 mt-2", isMobile && "flex-col")}>
+            <div className="relative flex-1 w-full">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search accounts..."
@@ -664,7 +809,7 @@ export function AdminBusinessManagers() {
               />
             </div>
             <Select value={importStatusFilter} onValueChange={setImportStatusFilter}>
-              <SelectTrigger className="w-[130px] h-9">
+              <SelectTrigger className={cn("h-9", isMobile ? "w-full" : "w-[130px]")}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -675,62 +820,98 @@ export function AdminBusinessManagers() {
               </SelectContent>
             </Select>
           </div>
+
+          {/* Select all toggle */}
+          {!isMobile && (
+            <div className="flex items-center gap-2 mt-1">
+              <Checkbox
+                checked={
+                  filteredSyncedAccounts.filter((a) => !existingAccountIds.has(a.account_id)).length > 0 &&
+                  filteredSyncedAccounts
+                    .filter((a) => !existingAccountIds.has(a.account_id))
+                    .every((a) => selectedImportIds.has(a.account_id))
+                }
+                onCheckedChange={toggleSelectAllImport}
+              />
+              <span className="text-xs text-muted-foreground">Select all new accounts</span>
+            </div>
+          )}
+
           <div className="flex-1 overflow-y-auto mt-2 border rounded-md">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[40px]">
-                    <Checkbox
-                      checked={
-                        filteredSyncedAccounts.filter((a) => !existingAccountIds.has(a.account_id)).length > 0 &&
-                        filteredSyncedAccounts
-                          .filter((a) => !existingAccountIds.has(a.account_id))
-                          .every((a) => selectedImportIds.has(a.account_id))
-                      }
-                      onCheckedChange={toggleSelectAllImport}
-                    />
-                  </TableHead>
-                  <TableHead>Account Name</TableHead>
-                  <TableHead>Account ID</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Spend Cap</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredSyncedAccounts.map((a) => {
-                  const alreadyExists = existingAccountIds.has(a.account_id);
-                  return (
-                    <TableRow key={a.account_id} className={alreadyExists ? "opacity-50" : ""}>
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedImportIds.has(a.account_id)}
-                          onCheckedChange={() => toggleImportSelect(a.account_id)}
-                          disabled={alreadyExists}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <span className="text-sm">{a.account_name}</span>
-                          {alreadyExists && (
-                            <span className="ml-2 text-xs text-muted-foreground">(already imported)</span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">{a.account_id.replace(/^act_/, "")}</TableCell>
-                      <TableCell><StatusBadge status={a.status} /></TableCell>
-                      <TableCell>${a.spend_cap.toLocaleString()}</TableCell>
-                    </TableRow>
-                  );
-                })}
-                {filteredSyncedAccounts.length === 0 && (
+            {isMobile ? (
+              <div className="p-2">
+                {/* Mobile select all */}
+                <div className="flex items-center gap-2 mb-2 pb-2 border-b">
+                  <Checkbox
+                    checked={
+                      filteredSyncedAccounts.filter((a) => !existingAccountIds.has(a.account_id)).length > 0 &&
+                      filteredSyncedAccounts
+                        .filter((a) => !existingAccountIds.has(a.account_id))
+                        .every((a) => selectedImportIds.has(a.account_id))
+                    }
+                    onCheckedChange={toggleSelectAllImport}
+                  />
+                  <span className="text-xs text-muted-foreground">Select all new</span>
+                </div>
+                {renderMobileImportCards()}
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                      No accounts match your filters
-                    </TableCell>
+                    <TableHead className="w-[40px]">
+                      <Checkbox
+                        checked={
+                          filteredSyncedAccounts.filter((a) => !existingAccountIds.has(a.account_id)).length > 0 &&
+                          filteredSyncedAccounts
+                            .filter((a) => !existingAccountIds.has(a.account_id))
+                            .every((a) => selectedImportIds.has(a.account_id))
+                        }
+                        onCheckedChange={toggleSelectAllImport}
+                      />
+                    </TableHead>
+                    <TableHead>Account Name</TableHead>
+                    <TableHead>Account ID</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Spend Cap</TableHead>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredSyncedAccounts.map((a) => {
+                    const alreadyExists = existingAccountIds.has(a.account_id);
+                    return (
+                      <TableRow key={a.account_id} className={alreadyExists ? "opacity-50" : ""}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedImportIds.has(a.account_id)}
+                            onCheckedChange={() => toggleImportSelect(a.account_id)}
+                            disabled={alreadyExists}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <span className="text-sm">{a.account_name}</span>
+                            {alreadyExists && (
+                              <span className="ml-2 text-xs text-muted-foreground">(already imported)</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">{a.account_id.replace(/^act_/, "")}</TableCell>
+                        <TableCell><StatusBadge status={a.status} /></TableCell>
+                        <TableCell>${a.spend_cap.toLocaleString()}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {filteredSyncedAccounts.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        No accounts match your filters
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            )}
           </div>
           <DialogFooter className="mt-4">
             <Button variant="outline" onClick={() => setImportDialogOpen(false)}>Cancel</Button>
@@ -753,28 +934,15 @@ export function AdminBusinessManagers() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Name</Label>
-              <Input
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                placeholder="Business Manager Name"
-              />
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Business Manager Name" />
             </div>
             <div className="space-y-2">
               <Label>Business Manager ID</Label>
-              <Input
-                value={editMetaId}
-                onChange={(e) => setEditMetaId(e.target.value)}
-                placeholder="123456789012345"
-              />
+              <Input value={editMetaId} onChange={(e) => setEditMetaId(e.target.value)} placeholder="123456789012345" />
             </div>
             <div className="space-y-2">
               <Label>Access Token <span className="text-xs text-muted-foreground">(leave empty to keep current)</span></Label>
-              <Input
-                type="password"
-                value={editAccessToken}
-                onChange={(e) => setEditAccessToken(e.target.value)}
-                placeholder="EAA... (encrypted at rest)"
-              />
+              <Input type="password" value={editAccessToken} onChange={(e) => setEditAccessToken(e.target.value)} placeholder="EAA... (encrypted at rest)" />
               <p className="text-xs text-muted-foreground">🔒 Token is encrypted with AES-256-GCM before storing</p>
             </div>
           </div>
