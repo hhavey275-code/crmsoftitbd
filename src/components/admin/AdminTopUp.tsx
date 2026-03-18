@@ -16,6 +16,7 @@ import { Check, X, Pause, ImageIcon, Radio, ChevronDown, ChevronUp, MessageSquar
 import { Link } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { logSystemAction } from "@/lib/systemLog";
 
 type ActionType = "approved" | "rejected" | "hold";
 
