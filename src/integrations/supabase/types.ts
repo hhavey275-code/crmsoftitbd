@@ -306,6 +306,47 @@ export type Database = {
           },
         ]
       }
+      failed_topups: {
+        Row: {
+          ad_account_id: string
+          amount: number
+          created_at: string
+          error_message: string | null
+          id: string
+          old_spend_cap: number | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          ad_account_id: string
+          amount: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          old_spend_cap?: number | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          ad_account_id?: string
+          amount?: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          old_spend_cap?: number | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "failed_topups_ad_account_id_fkey"
+            columns: ["ad_account_id"]
+            isOneToOne: false
+            referencedRelation: "ad_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           amount: number
