@@ -35,7 +35,7 @@ export function FailedTopUps() {
   const { data: profiles = [] } = useQuery({
     queryKey: ["failed-topup-profiles"],
     queryFn: async () => {
-      const userIds = [...new Set(failedTopups.map((ft: any) => ft.user_id))];
+      const userIds = [...new Set(failedTopups.map((ft: any) => ft.user_id))] as string[];
       if (userIds.length === 0) return [];
       const { data } = await supabase.from("profiles").select("user_id, full_name, email").in("user_id", userIds);
       return data ?? [];

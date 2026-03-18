@@ -29,3 +29,9 @@ verify_jwt = false
 
 [functions.impersonate-client]
 verify_jwt = false
+
+[functions.retry-failed-topup]
+verify_jwt = false
+
+[functions.resolve-failed-topup]
+verify_jwt = false
