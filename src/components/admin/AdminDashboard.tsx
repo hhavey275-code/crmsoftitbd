@@ -215,8 +215,14 @@ export function AdminDashboard() {
         body: { ad_account_ids: ids, source: "meta", date_from: fromStr, date_to: toStr },
       });
       if (error) throw error;
+      if (data?.rate_limited?.length) {
+        toast.warning(`Rate limited on ${data.rate_limited.length} account(s). Results may be partial.`);
+      }
       const insights = data?.insights ?? {};
-      const total = Object.values(insights).reduce((sum: number, ins: any) => sum + (Number(ins?.date_spend) || 0), 0) as number;
+      const total = Object.values(insights).reduce((sum: number, ins: any) => {
+        // date_spend is the primary field, fallback to today_spend for date range queries
+        return sum + (Number(ins?.date_spend) || Number(ins?.today_spend) || 0);
+      }, 0) as number;
       setDateSpend(total);
       sessionStorage.setItem(DATE_SPEND_SESSION_KEY, JSON.stringify({
         spend: total,
@@ -225,6 +231,7 @@ export function AdminDashboard() {
       }));
       setPickerOpen(false);
     } catch (err: any) {
+      console.error("Date range spend error:", err);
       toast.error("Failed to fetch spend: " + (err.message || "Unknown error"));
     } finally {
       setDateSpendLoading(false);
