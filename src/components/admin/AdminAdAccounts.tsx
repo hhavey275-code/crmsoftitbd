@@ -169,11 +169,8 @@ export function AdminAdAccounts() {
     mutationFn: async () => {
       if (!accounts || accounts.length === 0) return;
       const ids = accounts.map((a: any) => a.id);
-      const { data, error } = await supabase.functions.invoke("get-account-insights", {
-        body: { ad_account_ids: ids, source: "meta" },
-      });
-      if (error) throw error;
-      return data;
+      const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
+      return await chunkedMetaSync(ids);
     },
     onSuccess: (data) => {
       const rl = data?.rate_limited;
