@@ -372,6 +372,26 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Log API calls per BM
+    if (source === "meta") {
+      const bmCallMap: Record<string, { bmDbId: string; count: number }> = {};
+      for (const account of (accounts ?? [])) {
+        const bmDbId = account.business_manager_id;
+        if (bmDbId) {
+          if (!bmCallMap[bmDbId]) bmCallMap[bmDbId] = { bmDbId, count: 0 };
+          bmCallMap[bmDbId].count += 4; // ~3-4 API calls per account
+        }
+      }
+      const logRows = Object.values(bmCallMap).map(({ bmDbId, count }) => ({
+        business_manager_id: bmDbId,
+        function_name: "get-account-insights",
+        call_count: count,
+      }));
+      if (logRows.length > 0) {
+        await supabase.from("api_call_logs").insert(logRows);
+      }
+    }
+
     const now = new Date().toISOString();
     for (const key of Object.keys(insights)) {
       insights[key].updated_at = now;

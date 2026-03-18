@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, RefreshCw, Building2, ChevronDown, ChevronRight, Clock, AlertCircle, CheckCircle2, Search, Pencil, Trash2, ShieldCheck } from "lucide-react";
+import { Plus, RefreshCw, Building2, ChevronDown, ChevronRight, Clock, AlertCircle, CheckCircle2, Search, Pencil, Trash2, ShieldCheck, Activity } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
@@ -99,6 +99,32 @@ export function AdminBusinessManagers() {
       return (data as any[]) ?? [];
     },
     enabled: !!showLogs,
+  });
+
+  // API usage per BM (last 1 hour and last 24 hours)
+  const { data: apiUsage } = useQuery({
+    queryKey: ["admin-api-usage"],
+    queryFn: async () => {
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data } = await (supabase as any)
+        .from("api_call_logs")
+        .select("business_manager_id, call_count, created_at")
+        .gte("created_at", oneDayAgo)
+        .order("created_at", { ascending: false });
+      
+      const usage: Record<string, { lastHour: number; last24h: number }> = {};
+      for (const row of (data ?? [])) {
+        const bmId = row.business_manager_id;
+        if (!usage[bmId]) usage[bmId] = { lastHour: 0, last24h: 0 };
+        usage[bmId].last24h += row.call_count;
+        if (row.created_at >= oneHourAgo) {
+          usage[bmId].lastHour += row.call_count;
+        }
+      }
+      return usage;
+    },
+    refetchInterval: 30000,
   });
 
   const addBmMutation = useMutation({
@@ -605,6 +631,17 @@ export function AdminBusinessManagers() {
                         <p className="text-[10px] text-muted-foreground font-mono">ID: {bm.bm_id}</p>
                         <span className="text-[10px] text-muted-foreground">· {accounts.length} acct{accounts.length !== 1 ? "s" : ""}</span>
                       </div>
+                      {/* API Usage indicator */}
+                      {apiUsage?.[bm.id] && (
+                        <div className={cn(
+                          "flex items-center gap-1 mt-0.5 text-[10px]",
+                          (apiUsage[bm.id].lastHour >= 160) ? "text-destructive font-semibold" :
+                          (apiUsage[bm.id].lastHour >= 100) ? "text-amber-500" : "text-muted-foreground"
+                        )}>
+                          <Activity className="h-2.5 w-2.5" />
+                          {apiUsage[bm.id].lastHour}/hr · {apiUsage[bm.id].last24h}/24h
+                        </div>
+                      )}
                       {bm.last_synced_at && (
                         <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
                           <Clock className="h-2.5 w-2.5" />
@@ -656,6 +693,17 @@ export function AdminBusinessManagers() {
                         <p className="text-xs text-muted-foreground">
                           {accounts.length} account{accounts.length !== 1 ? "s" : ""}
                         </p>
+                        {/* API Usage indicator */}
+                        {apiUsage?.[bm.id] && (
+                          <div className={cn(
+                            "flex items-center gap-1 text-xs px-2 py-0.5 rounded-full",
+                            (apiUsage[bm.id].lastHour >= 160) ? "bg-destructive/10 text-destructive font-semibold" :
+                            (apiUsage[bm.id].lastHour >= 100) ? "bg-amber-500/10 text-amber-600" : "bg-muted text-muted-foreground"
+                          )}>
+                            <Activity className="h-3 w-3" />
+                            {apiUsage[bm.id].lastHour} calls/hr · {apiUsage[bm.id].last24h}/24h
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
