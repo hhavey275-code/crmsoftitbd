@@ -9,29 +9,43 @@ import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 
+// Base64 encoded short notification beep (works in background tabs unlike AudioContext)
+const NOTIFICATION_BEEP_DATA_URI = "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgipGKdF9yq62kb1Q+XpCok3hyeqOhj2RIQWB+lZOFcXCXn5FtUUVdf5WTh3Ryn52QblNGX4CVkoh2dJ6djW1QRGB/lJOIdXWdnI1uUkVff5STiHV1nZyNblJFX3+Uk4h1dZ2cjW5SRV9/lJOIdXWdnI1uUkVff5STiHV1nZyNblJFX3+Uk4h1dZ2cjW5SRV9/lJOIdXWdnI1uUkVff5STiHV1nZyNblJF";
+
+// Pre-create Audio element for reliable background-tab playback
+let _notifAudio: HTMLAudioElement | null = null;
+function getNotifAudio(src?: string): HTMLAudioElement {
+  const url = src || NOTIFICATION_BEEP_DATA_URI;
+  if (!_notifAudio || _notifAudio.src !== url) {
+    _notifAudio = new Audio(url);
+    _notifAudio.volume = 0.5;
+  }
+  return _notifAudio;
+}
+
 function playNotificationSound() {
   if (localStorage.getItem("notification_sound") === "false") return;
   const customUrl = localStorage.getItem("notification_sound_url");
-  if (customUrl) {
-    try {
-      const audio = new Audio(customUrl);
-      audio.volume = 0.5;
-      audio.play().catch(() => {});
-    } catch {}
-    return;
-  }
   try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.value = 800;
-    osc.type = "sine";
-    gain.gain.value = 0.3;
-    osc.start();
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-    osc.stop(ctx.currentTime + 0.3);
+    const audio = getNotifAudio(customUrl || undefined);
+    audio.currentTime = 0;
+    audio.play().catch(() => {
+      // Fallback: try AudioContext if Audio element fails
+      try {
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        if (ctx.state === "suspended") ctx.resume();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 800;
+        osc.type = "sine";
+        gain.gain.value = 0.3;
+        osc.start();
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+        osc.stop(ctx.currentTime + 0.3);
+      } catch {}
+    });
   } catch {}
 }
 
