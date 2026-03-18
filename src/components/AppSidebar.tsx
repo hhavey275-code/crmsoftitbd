@@ -11,6 +11,7 @@ import {
   Users,
   Receipt,
   MessageCircle,
+  ScrollText,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
