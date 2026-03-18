@@ -65,6 +65,8 @@ export function AdminAdAccounts() {
     },
   });
 
+  const [isAutoSyncing, setIsAutoSyncing] = useState(false);
+
   const { data: insights = {}, refetch: refetchInsights } = useQuery({
     queryKey: ["admin-insights-cache"],
     queryFn: async () => {
@@ -76,6 +78,8 @@ export function AdminAdAccounts() {
       return (data?.insights as Record<string, InsightsData>) ?? {};
     },
     enabled: !!accounts && accounts.length > 0,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   // Auto-refresh from Meta on mount (once per page load)
@@ -83,15 +87,28 @@ export function AdminAdAccounts() {
   useEffect(() => {
     if (!accounts || accounts.length === 0 || hasAutoRefreshed.current) return;
     hasAutoRefreshed.current = true;
+    setIsAutoSyncing(true);
     const ids = accounts.map((a: any) => a.id);
     supabase.functions.invoke("get-account-insights", {
       body: { ad_account_ids: ids, source: "meta" },
-    }).then(({ data }) => {
+    }).then(({ data, error }) => {
+      if (error) {
+        console.error("Auto-refresh error:", error);
+        toast.error("Failed to sync spend data from Meta");
+        return;
+      }
       if (data?.insights) {
         queryClient.setQueryData(["admin-insights-cache"], data.insights);
         queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
       }
-    }).catch(() => {});
+      if (data?.rate_limited?.length > 0) {
+        toast.warning(`${data.rate_limited.length} account(s) rate-limited by Meta`);
+      }
+    }).catch((err) => {
+      console.error("Auto-refresh failed:", err);
+    }).finally(() => {
+      setIsAutoSyncing(false);
+    });
   }, [accounts]);
 
   const { data: assignments } = useQuery({
@@ -358,6 +375,12 @@ export function AdminAdAccounts() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+          )}
+          {isAutoSyncing && (
+            <span className="text-xs text-primary flex items-center gap-1">
+              <RefreshCw className="h-3 w-3 animate-spin" />
+              Syncing...
+            </span>
           )}
           <Button variant="outline" size="sm" onClick={() => refreshAllMutation.mutate()} disabled={refreshAllMutation.isPending} className="text-xs">
             <RefreshCw className={`h-4 w-4 mr-1 ${refreshAllMutation.isPending ? 'animate-spin' : ''}`} />

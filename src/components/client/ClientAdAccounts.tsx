@@ -49,6 +49,7 @@ export function ClientAdAccounts() {
   const [cardFilter, setCardFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [lastMetaUpdate, setLastMetaUpdate] = useState<number>(0);
+  const [isAutoSyncing, setIsAutoSyncing] = useState(false);
 
   const isInactive = (profile as any)?.status === "inactive";
   const dueLimit = Number((profile as any)?.due_limit ?? 0);
@@ -80,6 +81,8 @@ export function ClientAdAccounts() {
       return (data?.insights as Record<string, InsightsData>) ?? {};
     },
     enabled: !!user && !!accounts && accounts.length > 0,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   // Auto-refresh from Meta on mount (once per page load)
@@ -87,15 +90,29 @@ export function ClientAdAccounts() {
   useEffect(() => {
     if (!accounts || accounts.length === 0 || hasAutoRefreshed.current) return;
     hasAutoRefreshed.current = true;
+    setIsAutoSyncing(true);
     const ids = accounts.map((a: any) => a.id);
     supabase.functions.invoke("get-account-insights", {
       body: { ad_account_ids: ids, source: "meta" },
-    }).then(({ data }) => {
+    }).then(({ data, error }) => {
+      if (error) {
+        console.error("Auto-refresh error:", error);
+        toast.error("Failed to sync spend data from Meta");
+        return;
+      }
       if (data?.insights) {
         queryClient.setQueryData(["client-insights-cache", user?.id], data.insights);
         queryClient.invalidateQueries({ queryKey: ["client-ad-accounts"] });
+        setLastMetaUpdate(Date.now());
       }
-    }).catch(() => {});
+      if (data?.rate_limited?.length > 0) {
+        toast.warning(`${data.rate_limited.length} account(s) rate-limited by Meta`);
+      }
+    }).catch((err) => {
+      console.error("Auto-refresh failed:", err);
+    }).finally(() => {
+      setIsAutoSyncing(false);
+    });
   }, [accounts]);
 
   const { data: wallet } = useQuery({
@@ -318,7 +335,13 @@ export function ClientAdAccounts() {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl md:text-2xl font-bold">Ad Accounts</h1>
         <div className="flex items-center gap-2 flex-wrap">
-          {lastUpdated && !isMobile && (
+          {isAutoSyncing && (
+            <span className="text-xs text-primary flex items-center gap-1">
+              <RefreshCw className="h-3 w-3 animate-spin" />
+              Syncing from Meta...
+            </span>
+          )}
+          {lastUpdated && !isMobile && !isAutoSyncing && (
             <span className="text-xs text-muted-foreground">
               Last synced: {lastUpdated.toLocaleString()}
             </span>
