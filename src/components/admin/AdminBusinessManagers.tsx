@@ -101,6 +101,32 @@ export function AdminBusinessManagers() {
     enabled: !!showLogs,
   });
 
+  // API usage per BM (last 1 hour and last 24 hours)
+  const { data: apiUsage } = useQuery({
+    queryKey: ["admin-api-usage"],
+    queryFn: async () => {
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data } = await (supabase as any)
+        .from("api_call_logs")
+        .select("business_manager_id, call_count, created_at")
+        .gte("created_at", oneDayAgo)
+        .order("created_at", { ascending: false });
+      
+      const usage: Record<string, { lastHour: number; last24h: number }> = {};
+      for (const row of (data ?? [])) {
+        const bmId = row.business_manager_id;
+        if (!usage[bmId]) usage[bmId] = { lastHour: 0, last24h: 0 };
+        usage[bmId].last24h += row.call_count;
+        if (row.created_at >= oneHourAgo) {
+          usage[bmId].lastHour += row.call_count;
+        }
+      }
+      return usage;
+    },
+    refetchInterval: 30000,
+  });
+
   const addBmMutation = useMutation({
     mutationFn: async () => {
       const { data: { session } } = await supabase.auth.getSession();
