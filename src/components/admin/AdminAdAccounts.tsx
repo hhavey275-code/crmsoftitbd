@@ -826,6 +826,8 @@ export function AdminAdAccounts() {
               await supabase.from("ad_account_insights").delete().in("ad_account_id", ids);
               const { error } = await supabase.from("ad_accounts").delete().in("id", ids);
               if (error) { toast.error(error.message); } else {
+                const deleteNames = ids.map(id => accounts?.find((a: any) => a.id === id)?.account_name || id.slice(0, 8)).join(", ");
+                logSystemAction("Ad Account Deleted", deleteNames);
                 toast.success(`${ids.length} ad account(s) deleted`);
                 setSelectedIds(new Set());
                 queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });

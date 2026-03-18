@@ -66,7 +66,7 @@ export function AdminBanks() {
       }).eq("id", editingBank.id);
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Bank updated!"); queryClient.invalidateQueries({ queryKey: ["admin-banks"] }); setEditingBank(null); setForm(emptyForm); },
+    onSuccess: () => { logSystemAction("Bank Updated", `${form.bank_name} — ${form.account_number}`); toast.success("Bank updated!"); queryClient.invalidateQueries({ queryKey: ["admin-banks"] }); setEditingBank(null); setForm(emptyForm); },
     onError: (e: any) => toast.error(e.message),
   });
 

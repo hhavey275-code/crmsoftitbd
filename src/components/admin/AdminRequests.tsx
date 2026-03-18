@@ -207,6 +207,7 @@ export function AdminRequests() {
         reference_id: req.id,
       });
 
+      await logSystemAction("BM Access Rejected", `BM "${req.bm_name}" (${req.bm_id})`, user!.id, user!.email);
       toast.success("BM request rejected");
       queryClient.invalidateQueries({ queryKey: ["admin-bm-requests"] });
     } catch (err: any) {
