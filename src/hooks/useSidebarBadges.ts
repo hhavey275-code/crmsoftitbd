@@ -36,7 +36,7 @@ export function useSidebarBadges(): Record<string, number> {
         "top-up": topUpRes.count || 0,
         "chat": chatRes.count || 0,
         "clients": clientsRes.count || 0,
-        "ad-accounts": failedRes.count || 0,
+        "failed-topups": failedRes.count || 0,
       });
     } else {
       // Client: show own failed topups count
