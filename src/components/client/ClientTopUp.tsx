@@ -241,6 +241,7 @@ export function ClientTopUp() {
     },
     onSuccess: () => {
       toast.success("Top-up request submitted! Verifying payment...");
+      logSystemAction("Top-Up Submitted", `$${usdEquivalent} (৳${bdtAmount})`, user!.id, profile?.full_name || user!.email);
       queryClient.invalidateQueries({ queryKey: ["client-pending-topups"] });
       queryClient.invalidateQueries({ queryKey: ["client-topup-history"] });
       setBdtAmount("");
