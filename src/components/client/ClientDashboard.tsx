@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { MetricCard } from "@/components/MetricCard";
 import { SpendProgressBar } from "@/components/SpendProgressBar";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Wallet, MonitorSmartphone, TrendingUp, CalendarIcon, AppWindow, ExternalLink, ArrowUpCircle, Search, Loader2, Download, Smartphone, Share, X } from "lucide-react";
+import { Wallet, MonitorSmartphone, TrendingUp, CalendarIcon, AppWindow, ExternalLink, ArrowUpCircle, Search, Loader2, Download, Smartphone, Share, X, Plus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -36,6 +36,37 @@ export function ClientDashboard() {
   const [topUpAccount, setTopUpAccount] = useState<any>(null);
   const [topUpAmount, setTopUpAmount] = useState("");
   const [topUpLoading, setTopUpLoading] = useState(false);
+
+  // Ad Account Request form
+  const [showAdReqForm, setShowAdReqForm] = useState(false);
+  const [adReqForm, setAdReqForm] = useState({ account_name: "", email: "", business_manager_id: "", monthly_spend: "", start_date: "" });
+  const [adReqLoading, setAdReqLoading] = useState(false);
+
+  const handleAdReqSubmit = async () => {
+    if (!adReqForm.account_name || !adReqForm.email || !adReqForm.business_manager_id) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+    setAdReqLoading(true);
+    try {
+      const { error } = await (supabase as any).from("ad_account_requests").insert({
+        user_id: user!.id,
+        account_name: adReqForm.account_name,
+        email: adReqForm.email,
+        business_manager_id: adReqForm.business_manager_id,
+        monthly_spend: adReqForm.monthly_spend || null,
+        start_date: adReqForm.start_date || null,
+      });
+      if (error) throw error;
+      toast.success("Ad account request submitted successfully!");
+      setShowAdReqForm(false);
+      setAdReqForm({ account_name: "", email: "", business_manager_id: "", monthly_spend: "", start_date: "" });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to submit request");
+    } finally {
+      setAdReqLoading(false);
+    }
+  };
 
   const { data: wallet } = useQuery({
     queryKey: ["client-wallet", user?.id],
@@ -365,6 +396,12 @@ export function ClientDashboard() {
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base md:text-lg font-semibold text-foreground">My Ad Accounts</h2>
+          <Button size="sm" className="gap-1.5" onClick={() => setShowAdReqForm(true)}>
+            <Plus className="h-3.5 w-3.5" />
+            {isMobile ? "Request" : "Request New Ad Account"}
+          </Button>
+        </div>
+        <div className="flex items-center justify-between mb-3">
           {!isMobile && (
             <div className="relative w-64">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -528,6 +565,45 @@ export function ClientDashboard() {
           </Card>
         )}
       </div>
+
+      {/* Ad Account Request Dialog */}
+      <Dialog open={showAdReqForm} onOpenChange={setShowAdReqForm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Request New Ad Account</DialogTitle>
+            <DialogDescription>Fill in the details to request a new ad account.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Account Name *</label>
+              <Input value={adReqForm.account_name} onChange={(e) => setAdReqForm(f => ({ ...f, account_name: e.target.value }))} placeholder="e.g. My Store Ads" />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Email *</label>
+              <Input type="email" value={adReqForm.email} onChange={(e) => setAdReqForm(f => ({ ...f, email: e.target.value }))} placeholder="your@email.com" />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Business Manager ID *</label>
+              <Input value={adReqForm.business_manager_id} onChange={(e) => setAdReqForm(f => ({ ...f, business_manager_id: e.target.value }))} placeholder="e.g. 123456789" />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Monthly Approx Spending</label>
+              <Input value={adReqForm.monthly_spend} onChange={(e) => setAdReqForm(f => ({ ...f, monthly_spend: e.target.value }))} placeholder="e.g. $500" />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">When will you start ads?</label>
+              <Input type="date" value={adReqForm.start_date} onChange={(e) => setAdReqForm(f => ({ ...f, start_date: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAdReqForm(false)}>Cancel</Button>
+            <Button onClick={handleAdReqSubmit} disabled={adReqLoading}>
+              {adReqLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              Submit Request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Spend Cap Increase Dialog */}
       <Dialog open={!!topUpAccount} onOpenChange={(open) => { if (!open) setTopUpAccount(null); }}>

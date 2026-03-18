@@ -67,6 +67,62 @@ export type Database = {
           },
         ]
       }
+      ad_account_requests: {
+        Row: {
+          account_name: string
+          admin_note: string | null
+          assigned_ad_account_id: string | null
+          business_manager_id: string
+          created_at: string
+          email: string
+          id: string
+          monthly_spend: string | null
+          reviewed_by: string | null
+          start_date: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_name: string
+          admin_note?: string | null
+          assigned_ad_account_id?: string | null
+          business_manager_id: string
+          created_at?: string
+          email: string
+          id?: string
+          monthly_spend?: string | null
+          reviewed_by?: string | null
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_name?: string
+          admin_note?: string | null
+          assigned_ad_account_id?: string | null
+          business_manager_id?: string
+          created_at?: string
+          email?: string
+          id?: string
+          monthly_spend?: string | null
+          reviewed_by?: string | null
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_account_requests_assigned_ad_account_id_fkey"
+            columns: ["assigned_ad_account_id"]
+            isOneToOne: false
+            referencedRelation: "ad_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ad_accounts: {
         Row: {
           account_id: string
@@ -184,6 +240,53 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      bm_access_requests: {
+        Row: {
+          ad_account_id: string
+          admin_note: string | null
+          bm_id: string
+          bm_name: string
+          created_at: string
+          id: string
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ad_account_id: string
+          admin_note?: string | null
+          bm_id: string
+          bm_name: string
+          created_at?: string
+          id?: string
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ad_account_id?: string
+          admin_note?: string | null
+          bm_id?: string
+          bm_name?: string
+          created_at?: string
+          id?: string
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bm_access_requests_ad_account_id_fkey"
+            columns: ["ad_account_id"]
+            isOneToOne: false
+            referencedRelation: "ad_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       business_managers: {
         Row: {

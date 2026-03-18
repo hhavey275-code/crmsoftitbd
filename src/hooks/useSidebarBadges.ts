@@ -12,7 +12,7 @@ export function useSidebarBadges(): Record<string, number> {
     if (!user) return;
 
     if (isAdminUser) {
-      const [topUpRes, chatRes, clientsRes, failedRes] = await Promise.all([
+      const [topUpRes, chatRes, clientsRes, failedRes, adReqRes, bmReqRes] = await Promise.all([
         (supabase as any)
           .from("top_up_requests")
           .select("*", { count: "exact", head: true })
@@ -30,6 +30,14 @@ export function useSidebarBadges(): Record<string, number> {
           .from("failed_topups")
           .select("*", { count: "exact", head: true })
           .eq("status", "pending"),
+        (supabase as any)
+          .from("ad_account_requests")
+          .select("*", { count: "exact", head: true })
+          .eq("status", "pending"),
+        (supabase as any)
+          .from("bm_access_requests")
+          .select("*", { count: "exact", head: true })
+          .eq("status", "pending"),
       ]);
 
       setBadges({
@@ -37,6 +45,7 @@ export function useSidebarBadges(): Record<string, number> {
         "chat": chatRes.count || 0,
         "clients": clientsRes.count || 0,
         "failed-topups": failedRes.count || 0,
+        "requests": (adReqRes.count || 0) + (bmReqRes.count || 0),
       });
     } else {
       // Client: show own failed topups count
@@ -61,7 +70,7 @@ export function useSidebarBadges(): Record<string, number> {
     if (!user) return;
 
     const tables = isAdminUser
-      ? ["top_up_requests", "chat_messages", "profiles", "failed_topups"]
+      ? ["top_up_requests", "chat_messages", "profiles", "failed_topups", "ad_account_requests", "bm_access_requests"]
       : ["failed_topups"];
 
     let channel = supabase.channel("sidebar-badges");

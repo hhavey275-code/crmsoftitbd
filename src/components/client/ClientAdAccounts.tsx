@@ -17,9 +17,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowUpCircle, ExternalLink, Wallet, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, AppWindow, Search, ListChecks, ChevronLeft, ChevronRight, DollarSign, ShoppingCart } from "lucide-react";
+import { ArrowUpCircle, ExternalLink, Wallet, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, AppWindow, Search, ListChecks, ChevronLeft, ChevronRight, DollarSign, ShoppingCart, MoreVertical } from "lucide-react";
 import { CardBrandIcon } from "@/components/CardBrandIcon";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 const PAGE_SIZE = 20;
 
@@ -50,6 +51,32 @@ export function ClientAdAccounts() {
   const [currentPage, setCurrentPage] = useState(1);
   const [lastMetaUpdate, setLastMetaUpdate] = useState<number>(0);
   const [isAutoSyncing, setIsAutoSyncing] = useState(false);
+
+  // BM Request state
+  const [bmReqAccount, setBmReqAccount] = useState<any>(null);
+  const [bmReqForm, setBmReqForm] = useState({ bm_name: "", bm_id: "" });
+  const [bmReqLoading, setBmReqLoading] = useState(false);
+
+  const handleBmReqSubmit = async () => {
+    if (!bmReqForm.bm_name || !bmReqForm.bm_id || !bmReqAccount) return;
+    setBmReqLoading(true);
+    try {
+      const { error } = await (supabase as any).from("bm_access_requests").insert({
+        user_id: user!.id,
+        ad_account_id: bmReqAccount.id,
+        bm_name: bmReqForm.bm_name,
+        bm_id: bmReqForm.bm_id,
+      });
+      if (error) throw error;
+      toast.success("BM access request submitted!");
+      setBmReqAccount(null);
+      setBmReqForm({ bm_name: "", bm_id: "" });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to submit request");
+    } finally {
+      setBmReqLoading(false);
+    }
+  };
 
   const isInactive = (profile as any)?.status === "inactive";
   const dueLimit = Number((profile as any)?.due_limit ?? 0);
@@ -494,17 +521,29 @@ export function ClientAdAccounts() {
                         </div>
                       )}
 
-                      {/* Top Up button */}
-                      <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                      {/* Top Up + Actions */}
+                      <div className="mt-2 flex gap-2" onClick={(e) => e.stopPropagation()}>
                         <Button
                           size="sm"
-                          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs h-8"
+                          className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground text-xs h-8"
                           disabled={isInactive}
                           onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
                         >
                           <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
                           Top Up
                         </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="icon" className="h-8 w-8 flex-shrink-0">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => { setBmReqAccount(a); setBmReqForm({ bm_name: "", bm_id: "" }); }}>
+                              Request BM Access
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   </div>
@@ -598,16 +637,30 @@ export function ClientAdAccounts() {
                       </TableCell>
                       <TableCell><StatusBadge status={a.status} /></TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          size="sm"
-                          variant="default"
-                          className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                          disabled={isInactive}
-                          onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
-                        >
-                          <ArrowUpCircle className="h-4 w-4" />
-                          Top Up
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                            disabled={isInactive}
+                            onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
+                          >
+                            <ArrowUpCircle className="h-4 w-4" />
+                            Top Up
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => { setBmReqAccount(a); setBmReqForm({ bm_name: "", bm_id: "" }); }}>
+                                Request BM Access
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -714,6 +767,44 @@ export function ClientAdAccounts() {
               disabled={!topUpAmount || parsedAmount <= 0 || exceedsBalance || topUpMutation.isPending}
             >
               {topUpMutation.isPending ? "Processing..." : "Top Up Now"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* BM Access Request Dialog */}
+      <Dialog open={!!bmReqAccount} onOpenChange={(open) => { if (!open) setBmReqAccount(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Request BM Access</DialogTitle>
+            <DialogDescription>
+              Request Business Manager partner access for <span className="font-medium text-foreground">{bmReqAccount?.account_name}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label>BM Name *</Label>
+              <Input
+                value={bmReqForm.bm_name}
+                onChange={(e) => setBmReqForm(f => ({ ...f, bm_name: e.target.value }))}
+                placeholder="Business Manager name"
+                className="mt-1.5"
+              />
+            </div>
+            <div>
+              <Label>BM ID *</Label>
+              <Input
+                value={bmReqForm.bm_id}
+                onChange={(e) => setBmReqForm(f => ({ ...f, bm_id: e.target.value }))}
+                placeholder="e.g. 123456789"
+                className="mt-1.5"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBmReqAccount(null)}>Cancel</Button>
+            <Button onClick={handleBmReqSubmit} disabled={bmReqLoading || !bmReqForm.bm_name || !bmReqForm.bm_id}>
+              {bmReqLoading ? "Submitting..." : "Submit Request"}
             </Button>
           </DialogFooter>
         </DialogContent>
