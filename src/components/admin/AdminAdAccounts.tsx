@@ -625,6 +625,7 @@ export function AdminAdAccounts() {
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
+                    </TableRow>
                   );
                 })}
                 {(!accounts || accounts.length === 0) && (
