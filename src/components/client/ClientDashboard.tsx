@@ -18,6 +18,7 @@ import { cn, friendlyEdgeError } from "@/lib/utils";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { logSystemAction } from "@/lib/systemLog";
 
 export function ClientDashboard() {
   const { user, profile } = useAuth();
