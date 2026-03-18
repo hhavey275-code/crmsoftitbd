@@ -44,7 +44,7 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
-    dedupe: ["react", "react-dom", "react/jsx-runtime", "@tanstack/react-query"],
+    dedupe: ["react", "react-dom", "react/jsx-runtime", "@tanstack/react-query", "@swc/core"],
   },
   optimizeDeps: {
     include: ["@tanstack/react-query"],
