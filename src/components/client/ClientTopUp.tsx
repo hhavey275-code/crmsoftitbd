@@ -90,6 +90,8 @@ export function ClientTopUp() {
       return Number(data?.value ?? 120);
     },
     enabled: !!user,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   const { data: assignedBanks } = useQuery({
