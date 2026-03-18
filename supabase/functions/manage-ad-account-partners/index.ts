@@ -90,27 +90,82 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Add partner agency (partial access - ADVERTISE)
+    // Add partner agency (partial access - ADVERTISE) with 3-step fallback
     if (action === "add_partner") {
       const { partner_bm_id } = body;
       if (!partner_bm_id) throw new Error("partner_bm_id is required");
 
-      const url = `https://graph.facebook.com/v24.0/${actId}/agencies`;
-      const resp = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          business: partner_bm_id,
-          permitted_tasks: JSON.stringify(["ADVERTISE"]),
-          access_token: bmToken,
-        }),
-      });
-      const data = await resp.json();
-      if (data.error) throw new Error(data.error.message || "Failed to add partner");
+      const ownerBmId = bm.bm_id;
+      const errors: string[] = [];
+      const makeSuccess = (method: string) =>
+        new Response(JSON.stringify({ success: true, added_bm_id: partner_bm_id, method }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
 
-      return new Response(JSON.stringify({ success: true, added_bm_id: partner_bm_id }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      // Attempt 1: POST /{owner_bm_id}/managed_businesses
+      try {
+        console.log(`Attempt 1: managed_businesses (ownerBm=${ownerBmId}, partner=${partner_bm_id})`);
+        const resp = await fetch(`https://graph.facebook.com/v24.0/${ownerBmId}/managed_businesses`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            existing_client_business_id: partner_bm_id,
+            access_token: bmToken,
+          }),
+        });
+        const data = await resp.json();
+        if (!data.error) return makeSuccess("managed_businesses");
+        errors.push(`managed_businesses: ${data.error.message}`);
+        console.log(`Attempt 1 failed:`, data.error.message);
+      } catch (e: any) {
+        errors.push(`managed_businesses: ${e.message}`);
+        console.log(`Attempt 1 exception:`, e.message);
+      }
+
+      // Attempt 2: POST /{owner_bm_id}/client_ad_accounts
+      try {
+        console.log(`Attempt 2: client_ad_accounts (ownerBm=${ownerBmId}, act=${actId}, partner=${partner_bm_id})`);
+        const resp = await fetch(`https://graph.facebook.com/v24.0/${ownerBmId}/client_ad_accounts`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            adaccount_id: actId,
+            permitted_tasks: JSON.stringify(["ADVERTISE"]),
+            business: partner_bm_id,
+            access_token: bmToken,
+          }),
+        });
+        const data = await resp.json();
+        if (!data.error) return makeSuccess("client_ad_accounts");
+        errors.push(`client_ad_accounts: ${data.error.message}`);
+        console.log(`Attempt 2 failed:`, data.error.message);
+      } catch (e: any) {
+        errors.push(`client_ad_accounts: ${e.message}`);
+        console.log(`Attempt 2 exception:`, e.message);
+      }
+
+      // Attempt 3: Original POST /{act_id}/agencies (fallback)
+      try {
+        console.log(`Attempt 3: agencies (act=${actId}, partner=${partner_bm_id})`);
+        const resp = await fetch(`https://graph.facebook.com/v24.0/${actId}/agencies`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            business: partner_bm_id,
+            permitted_tasks: JSON.stringify(["ADVERTISE"]),
+            access_token: bmToken,
+          }),
+        });
+        const data = await resp.json();
+        if (!data.error) return makeSuccess("agencies");
+        errors.push(`agencies: ${data.error.message}`);
+        console.log(`Attempt 3 failed:`, data.error.message);
+      } catch (e: any) {
+        errors.push(`agencies: ${e.message}`);
+        console.log(`Attempt 3 exception:`, e.message);
+      }
+
+      throw new Error(`All 3 methods failed: ${errors.join(" | ")}`);
     }
 
     // Remove partner agency
