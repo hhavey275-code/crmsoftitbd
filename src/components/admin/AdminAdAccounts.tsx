@@ -721,16 +721,19 @@ export function AdminAdAccounts() {
       )}
 
 
-      {/* Top Up Dialog */}
-      <Dialog open={!!topUpAccount} onOpenChange={(open) => !open && setTopUpAccount(null)}>
-        <DialogContent>
+      {/* Top Up / Withdraw Tabbed Dialog */}
+      <Dialog open={!!topUpAccount} onOpenChange={(open) => { if (!open) { setTopUpAccount(null); setDialogTab("topup"); setWithdrawMeta(null); setWithdrawAmount(""); } }}>
+        <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
-            <DialogTitle>Increase Spend Limit</DialogTitle>
-            <DialogDescription>
-              Top up <span className="font-semibold">{topUpAccount?.account_name}</span> ({topUpAccount?.account_id?.replace(/^act_/, '')})
-            </DialogDescription>
+            <DialogTitle>{topUpAccount?.account_name}</DialogTitle>
+            <DialogDescription>{topUpAccount?.account_id?.replace(/^act_/, '')}</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+          <Tabs value={dialogTab} onValueChange={(v) => { const tab = v as "topup" | "withdraw"; setDialogTab(tab); if (tab === "withdraw" && !withdrawMeta && !fetchingWithdrawMeta && topUpAccount) { fetchWithdrawMeta(topUpAccount); } }}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="topup">Increase Limit</TabsTrigger>
+              <TabsTrigger value="withdraw">Withdraw</TabsTrigger>
+            </TabsList>
+            <TabsContent value="topup" className="space-y-4 pt-2">
             {assignedUserId ? (
               <div className="p-3 rounded-lg bg-muted space-y-2">
                 <div className="flex justify-between items-center text-sm">
