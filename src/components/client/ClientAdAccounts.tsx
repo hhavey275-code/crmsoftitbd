@@ -521,17 +521,29 @@ export function ClientAdAccounts() {
                         </div>
                       )}
 
-                      {/* Top Up button */}
-                      <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                      {/* Top Up + Actions */}
+                      <div className="mt-2 flex gap-2" onClick={(e) => e.stopPropagation()}>
                         <Button
                           size="sm"
-                          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs h-8"
+                          className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground text-xs h-8"
                           disabled={isInactive}
                           onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
                         >
                           <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
                           Top Up
                         </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="icon" className="h-8 w-8 flex-shrink-0">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => { setBmReqAccount(a); setBmReqForm({ bm_name: "", bm_id: "" }); }}>
+                              Request BM Access
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   </div>
