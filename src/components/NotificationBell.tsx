@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,39 +14,68 @@ const NOTIFICATION_BEEP_DATA_URI = "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IB
 
 // Pre-create Audio element for reliable background-tab playback
 let _notifAudio: HTMLAudioElement | null = null;
-function getNotifAudio(src?: string): HTMLAudioElement {
-  const url = src || NOTIFICATION_BEEP_DATA_URI;
-  if (!_notifAudio || _notifAudio.src !== url) {
-    _notifAudio = new Audio(url);
+
+function getPreferredSoundSource(): string {
+  return localStorage.getItem("notification_sound_url") || NOTIFICATION_BEEP_DATA_URI;
+}
+
+function getNotifAudio(src: string): HTMLAudioElement {
+  if (!_notifAudio || _notifAudio.src !== src) {
+    _notifAudio = new Audio(src);
     _notifAudio.volume = 0.5;
+    _notifAudio.preload = "auto";
   }
   return _notifAudio;
 }
 
+function playOscillatorFallback() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    if (ctx.state === "suspended") ctx.resume();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 800;
+    osc.type = "sine";
+    gain.gain.value = 0.3;
+    osc.start();
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc.stop(ctx.currentTime + 0.3);
+  } catch {}
+}
+
 function playNotificationSound() {
   if (localStorage.getItem("notification_sound") === "false") return;
-  const customUrl = localStorage.getItem("notification_sound_url");
+
+  const preferredSrc = getPreferredSoundSource();
+  const hasCustomSound = preferredSrc !== NOTIFICATION_BEEP_DATA_URI;
+
   try {
-    const audio = getNotifAudio(customUrl || undefined);
-    audio.currentTime = 0;
-    audio.play().catch(() => {
-      // Fallback: try AudioContext if Audio element fails
+    const audio = getNotifAudio(preferredSrc);
+
+    if (audio.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
       try {
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-        if (ctx.state === "suspended") ctx.resume();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.frequency.value = 800;
-        osc.type = "sine";
-        gain.gain.value = 0.3;
-        osc.start();
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-        osc.stop(ctx.currentTime + 0.3);
+        audio.currentTime = 0;
       } catch {}
+    }
+
+    audio.play().catch(() => {
+      if (hasCustomSound) {
+        const fallbackAudio = getNotifAudio(NOTIFICATION_BEEP_DATA_URI);
+        if (fallbackAudio.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+          try {
+            fallbackAudio.currentTime = 0;
+          } catch {}
+        }
+        fallbackAudio.play().catch(() => playOscillatorFallback());
+      } else {
+        playOscillatorFallback();
+      }
     });
-  } catch {}
+  } catch {
+    playOscillatorFallback();
+  }
 }
 
 export function NotificationBell() {
@@ -55,6 +84,7 @@ export function NotificationBell() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const { isSupported, isSubscribed, permission, subscribe } = usePushNotifications();
+  const lastNotifiedIdRef = useRef<string | null>(null);
 
   // Auto-subscribe to push on first visit if permission already granted
   useEffect(() => {
@@ -63,7 +93,7 @@ export function NotificationBell() {
     }
   }, [isSupported, isSubscribed, permission, user, subscribe]);
 
-  const { data: notifications } = useQuery({
+  const { data: notifications = [] } = useQuery({
     queryKey: ["notifications", user?.id],
     queryFn: async () => {
       const { data } = await (supabase as any)
@@ -75,25 +105,55 @@ export function NotificationBell() {
       return (data as any[]) ?? [];
     },
     enabled: !!user,
+    refetchInterval: user ? 5000 : false,
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: true,
   });
 
-  const unreadCount = notifications?.filter((n: any) => !n.is_read).length ?? 0;
+  const unreadCount = notifications.filter((n: any) => !n.is_read).length;
+
+  // Polling fallback sound trigger (handles missed realtime events)
+  useEffect(() => {
+    if (!notifications.length) return;
+
+    const latestId = notifications[0]?.id as string | undefined;
+    if (!latestId) return;
+
+    if (!lastNotifiedIdRef.current) {
+      lastNotifiedIdRef.current = latestId;
+      return;
+    }
+
+    if (latestId !== lastNotifiedIdRef.current) {
+      lastNotifiedIdRef.current = latestId;
+      playNotificationSound();
+    }
+  }, [notifications]);
 
   // Realtime subscription
   useEffect(() => {
     if (!user) return;
+
     const channel = supabase
       .channel("notifications-realtime")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
-        () => {
-          playNotificationSound();
+        (payload: any) => {
+          const insertedId = payload?.new?.id as string | undefined;
+          if (insertedId && insertedId !== lastNotifiedIdRef.current) {
+            lastNotifiedIdRef.current = insertedId;
+            playNotificationSound();
+          }
+
           queryClient.invalidateQueries({ queryKey: ["notifications", user.id] });
         }
       )
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user, queryClient]);
 
   const markAllRead = useMutation({
@@ -110,11 +170,15 @@ export function NotificationBell() {
   });
 
   const handleClick = (n: any) => {
-    (supabase as any).from("notifications").update({ is_read: true }).eq("id", n.id).then(() => {
-      queryClient.invalidateQueries({ queryKey: ["notifications", user?.id] });
-    });
+    (supabase as any)
+      .from("notifications")
+      .update({ is_read: true })
+      .eq("id", n.id)
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["notifications", user?.id] });
+      });
     setOpen(false);
-    
+
     // Smart routing based on notification type
     const type = n.type as string;
     if (type === "chat_message") {
@@ -160,10 +224,8 @@ export function NotificationBell() {
           )}
         </div>
         <div className="max-h-80 overflow-y-auto">
-          {notifications?.length === 0 && (
-            <p className="p-4 text-center text-sm text-muted-foreground">No notifications</p>
-          )}
-          {notifications?.map((n: any) => (
+          {notifications.length === 0 && <p className="p-4 text-center text-sm text-muted-foreground">No notifications</p>}
+          {notifications.map((n: any) => (
             <button
               key={n.id}
               onClick={() => handleClick(n)}
