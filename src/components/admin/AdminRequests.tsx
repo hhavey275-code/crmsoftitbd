@@ -25,9 +25,8 @@ export function AdminRequests() {
     queryFn: async () => {
       const { data } = await (supabase as any)
         .from("ad_account_requests")
-        .select("*, profiles!ad_account_requests_user_id_fkey(full_name, email)")
+        .select("*")
         .order("created_at", { ascending: false });
-      // profiles join may fail due to no FK, fetch separately
       return data ?? [];
     },
   });
