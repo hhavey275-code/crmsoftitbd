@@ -194,13 +194,20 @@ export function ClientDashboard() {
   return (
     <div className="space-y-4 md:space-y-6">
       {/* Welcome Banner */}
-      <div>
-        <h1 className="text-base md:text-lg font-bold text-foreground">
-          {greeting()}, {profile?.full_name || "there"}! 👋
-        </h1>
-        <p className="text-xs text-muted-foreground">
-          {format(new Date(), "EEEE, MMMM d, yyyy")}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-base md:text-lg font-bold text-foreground">
+            {greeting()}, {profile?.full_name || "there"}! 👋
+          </h1>
+          <p className="text-xs text-muted-foreground">
+            {format(new Date(), "EEEE, MMMM d, yyyy")}
+          </p>
+        </div>
+        <Button size="icon" className="h-8 w-8 rounded-md" asChild>
+          <Link to="/top-up">
+            <Plus className="h-4 w-4" />
+          </Link>
+        </Button>
       </div>
 
       {isInactive && (
