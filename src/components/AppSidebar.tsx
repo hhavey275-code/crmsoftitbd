@@ -58,6 +58,7 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const { signOut, profile, role, isAdmin, isSuperAdmin, user } = useAuth();
   const { logoUrl, siteName } = useSiteSettings();
+  const badges = useSidebarBadges();
 
   // Fetch menu permissions for admin (non-superadmin) users
   const { data: menuPermissions } = useQuery({
