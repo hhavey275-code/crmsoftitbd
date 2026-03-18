@@ -194,13 +194,20 @@ export function ClientDashboard() {
   return (
     <div className="space-y-4 md:space-y-6">
       {/* Welcome Banner */}
-      <div>
-        <h1 className="text-base md:text-lg font-bold text-foreground">
-          {greeting()}, {profile?.full_name || "there"}! 👋
-        </h1>
-        <p className="text-xs text-muted-foreground">
-          {format(new Date(), "EEEE, MMMM d, yyyy")}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-base md:text-lg font-bold text-foreground">
+            {greeting()}, {profile?.full_name || "there"}! 👋
+          </h1>
+          <p className="text-xs text-muted-foreground">
+            {format(new Date(), "EEEE, MMMM d, yyyy")}
+          </p>
+        </div>
+        <Button size="icon" className="h-8 w-8 rounded-md" asChild>
+          <Link to="/top-up">
+            <Plus className="h-4 w-4" />
+          </Link>
+        </Button>
       </div>
 
       {isInactive && (
@@ -293,16 +300,8 @@ export function ClientDashboard() {
                   ${Number(wallet?.balance ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
               </div>
-              <div className="flex flex-col items-center gap-2">
-                <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center">
-                  <Wallet className="h-6 w-6" />
-                </div>
-                <Button size="sm" variant="secondary" className="rounded-full text-xs px-3 gap-1" asChild>
-                  <Link to="/top-up">
-                    <Plus className="h-3 w-3" />
-                    Add Balance
-                  </Link>
-                </Button>
+              <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center">
+                <Wallet className="h-6 w-6" />
               </div>
             </div>
           </div>
@@ -342,14 +341,6 @@ export function ClientDashboard() {
                   iconBg="bg-violet-50 dark:bg-violet-900/30"
                   iconColor="text-violet-600"
                   className="border-0 shadow-none bg-violet-50/40 dark:bg-violet-900/10"
-                  action={
-                    <Button size="sm" variant="outline" className="rounded-full text-xs gap-1 border-violet-300 text-violet-700 hover:bg-violet-100 dark:border-violet-700 dark:text-violet-400 dark:hover:bg-violet-900/30" asChild>
-                      <Link to="/top-up">
-                        <Plus className="h-3 w-3" />
-                        Add Balance
-                      </Link>
-                    </Button>
-                  }
                 />
                 <MetricCard
                   title="Total Ad Accounts"
