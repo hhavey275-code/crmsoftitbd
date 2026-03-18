@@ -117,6 +117,38 @@ export type Database = {
           },
         ]
       }
+      api_call_logs: {
+        Row: {
+          business_manager_id: string
+          call_count: number
+          created_at: string
+          function_name: string
+          id: string
+        }
+        Insert: {
+          business_manager_id: string
+          call_count?: number
+          created_at?: string
+          function_name: string
+          id?: string
+        }
+        Update: {
+          business_manager_id?: string
+          call_count?: number
+          created_at?: string
+          function_name?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_call_logs_business_manager_id_fkey"
+            columns: ["business_manager_id"]
+            isOneToOne: false
+            referencedRelation: "business_managers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bank_accounts: {
         Row: {
           account_name: string
