@@ -183,6 +183,11 @@ async function processAccount(
 
     const todaySpend = todayData?.data?.[0]?.spend ? parseFloat(todayData.data[0].spend) : 0;
     const yesterdaySpend = yesterdayData?.data?.[0]?.spend ? parseFloat(yesterdayData.data[0].spend) : 0;
+
+    // Debug: log raw account data for first account to diagnose missing fields
+    console.log(`[${actId}] accountData keys: ${JSON.stringify(Object.keys(accountData || {}))}`);
+    console.log(`[${actId}] balance=${accountData?.balance}, daily_spend_limit=${accountData?.daily_spend_limit}, min_billing_threshold=${accountData?.min_billing_threshold}`);
+
     const balance = accountData?.balance ? parseFloat(accountData.balance) / 100 : 0;
     const dailySpendLimit = accountData?.daily_spend_limit ? parseFloat(accountData.daily_spend_limit) / 100 : 0;
     const billingThreshold = accountData?.min_billing_threshold ? parseFloat(accountData.min_billing_threshold) / 100 : 0;
