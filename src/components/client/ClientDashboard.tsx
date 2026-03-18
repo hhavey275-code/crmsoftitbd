@@ -23,6 +23,9 @@ export function ClientDashboard() {
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
+  const { canInstall, isInstalled, isIOS, promptInstall } = useInstallPrompt();
+  const [showIOSGuide, setShowIOSGuide] = useState(false);
+  const [dismissedInstall, setDismissedInstall] = useState(() => localStorage.getItem("pwa-install-dismissed") === "true");
   const isInactive = (profile as any)?.status === "inactive";
 
   const [adSearch, setAdSearch] = useState("");
