@@ -258,6 +258,15 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Limit accounts per request to prevent timeout
+    const MAX_ACCOUNTS = 100;
+    if (source === "meta" && ad_account_ids.length > MAX_ACCOUNTS) {
+      return new Response(JSON.stringify({ error: `Too many accounts (${ad_account_ids.length}). Maximum ${MAX_ACCOUNTS} per request. Please use smaller batches.` }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);

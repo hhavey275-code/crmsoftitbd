@@ -142,7 +142,12 @@ export default function AdAccountDetailPage() {
       if (!isAdmin) setLastMetaUpdate(Date.now());
       toast.success("Data updated from Meta");
     } catch (err: any) {
-      toast.error(err.message || "Failed to update");
+      const msg = err?.message || "";
+      if (msg.includes("non-2xx")) {
+        toast.error("Meta API request failed. Please try again.");
+      } else {
+        toast.error(msg || "Failed to update from Meta");
+      }
     } finally {
       setUpdatingMeta(false);
     }

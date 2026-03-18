@@ -19,7 +19,9 @@ export type Database = {
           active_campaigns: number | null
           ad_account_id: string
           balance: number | null
+          billing_threshold: number | null
           cards: Json | null
+          daily_spend_limit: number | null
           id: string
           today_messages: number | null
           today_orders: number | null
@@ -33,7 +35,9 @@ export type Database = {
           active_campaigns?: number | null
           ad_account_id: string
           balance?: number | null
+          billing_threshold?: number | null
           cards?: Json | null
+          daily_spend_limit?: number | null
           id?: string
           today_messages?: number | null
           today_orders?: number | null
@@ -47,7 +51,9 @@ export type Database = {
           active_campaigns?: number | null
           ad_account_id?: string
           balance?: number | null
+          billing_threshold?: number | null
           cards?: Json | null
+          daily_spend_limit?: number | null
           id?: string
           today_messages?: number | null
           today_orders?: number | null

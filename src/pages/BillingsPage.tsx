@@ -23,6 +23,7 @@ interface InsightsData {
 }
 
 const PAGE_SIZE = 20;
+const SYNC_CHUNK_SIZE = 50;
 
 export default function BillingsPage() {
   const { user } = useAuth();
@@ -32,6 +33,7 @@ export default function BillingsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [cardFilter, setCardFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [syncProgress, setSyncProgress] = useState("");
   const queryClient = useQueryClient();
 
   const { data: accounts } = useQuery({
@@ -60,20 +62,33 @@ export default function BillingsPage() {
     mutationFn: async () => {
       if (!accounts || accounts.length === 0) return;
       const ids = accounts.map((a: any) => a.id);
-      const { data, error } = await supabase.functions.invoke("get-account-insights", {
-        body: { ad_account_ids: ids, source: "meta" },
-      });
-      if (error) throw error;
-      return data;
+      const totalCount = ids.length;
+      let synced = 0;
+
+      for (let i = 0; i < ids.length; i += SYNC_CHUNK_SIZE) {
+        const chunk = ids.slice(i, i + SYNC_CHUNK_SIZE);
+        setSyncProgress(`Syncing ${Math.min(i + SYNC_CHUNK_SIZE, totalCount)}/${totalCount}...`);
+        const { data, error } = await supabase.functions.invoke("get-account-insights", {
+          body: { ad_account_ids: chunk, source: "meta" },
+        });
+        if (error) throw error;
+        synced += chunk.length;
+        // Refresh cache after each batch so UI updates incrementally
+        queryClient.invalidateQueries({ queryKey: ["billings-insights"] });
+        queryClient.invalidateQueries({ queryKey: ["billings-accounts"] });
+      }
+      return { synced };
     },
     onSuccess: () => {
+      setSyncProgress("");
       queryClient.invalidateQueries({ queryKey: ["billings-insights"] });
       queryClient.invalidateQueries({ queryKey: ["billings-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
       toast.success("Data updated from Meta");
     },
-    onError: () => {
-      toast.error("Failed to update from Meta");
+    onError: (err: any) => {
+      setSyncProgress("");
+      toast.error(err?.message || "Failed to update from Meta");
     },
   });
 
@@ -155,7 +170,7 @@ export default function BillingsPage() {
             className="self-start"
           >
             <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${syncMutation.isPending ? "animate-spin" : ""}`} />
-            {isMobile ? "Update" : "Update from Meta"}
+            {syncProgress || (isMobile ? "Update" : "Update from Meta")}
           </Button>
         </div>
 
