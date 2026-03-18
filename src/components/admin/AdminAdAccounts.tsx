@@ -309,8 +309,6 @@ export function AdminAdAccounts() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      {/* Failed Top-Ups */}
-      <FailedTopUps />
       {/* Header */}
       <div className={cn("flex gap-2", isMobile ? "flex-col" : "items-center justify-between")}>
         <h1 className="text-xl md:text-2xl font-bold">All Ad Accounts</h1>
