@@ -335,7 +335,13 @@ export function ClientAdAccounts() {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl md:text-2xl font-bold">Ad Accounts</h1>
         <div className="flex items-center gap-2 flex-wrap">
-          {lastUpdated && !isMobile && (
+          {isAutoSyncing && (
+            <span className="text-xs text-primary flex items-center gap-1">
+              <RefreshCw className="h-3 w-3 animate-spin" />
+              Syncing from Meta...
+            </span>
+          )}
+          {lastUpdated && !isMobile && !isAutoSyncing && (
             <span className="text-xs text-muted-foreground">
               Last synced: {lastUpdated.toLocaleString()}
             </span>
