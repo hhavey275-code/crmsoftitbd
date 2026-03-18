@@ -24,6 +24,7 @@ export default function AdAccountDetailPage() {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
 
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState("");
