@@ -88,6 +88,66 @@ export function AdminAdAccounts() {
   });
 
 
+  const openWithdrawDialog = async (account: any) => {
+    setWithdrawAccount(account);
+    setWithdrawAmount("");
+    setWithdrawMeta(null);
+    setFetchingWithdrawMeta(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("spend-cap-withdraw", {
+        body: { ad_account_id: account.id, amount: 0.001 },
+      });
+      // We expect a validation error with meta info
+      if (data?.max_withdrawable !== undefined) {
+        setWithdrawMeta({
+          real_amount_spent: data.real_amount_spent,
+          current_spend_cap: data.current_spend_cap,
+          max_withdrawable: data.max_withdrawable,
+        });
+      } else if (data?.error && data?.max_withdrawable !== undefined) {
+        setWithdrawMeta({
+          real_amount_spent: data.real_amount_spent,
+          current_spend_cap: data.current_spend_cap,
+          max_withdrawable: data.max_withdrawable,
+        });
+      } else {
+        // Fallback to local data
+        setWithdrawMeta({
+          real_amount_spent: Number(account.amount_spent),
+          current_spend_cap: Number(account.spend_cap),
+          max_withdrawable: Math.max(0, Number(account.spend_cap) - Number(account.amount_spent)),
+        });
+      }
+    } catch {
+      setWithdrawMeta({
+        real_amount_spent: Number(account.amount_spent),
+        current_spend_cap: Number(account.spend_cap),
+        max_withdrawable: Math.max(0, Number(account.spend_cap) - Number(account.amount_spent)),
+      });
+    }
+    setFetchingWithdrawMeta(false);
+  };
+
+  const withdrawMutation = useMutation({
+    mutationFn: async () => {
+      const amt = parseFloat(withdrawAmount);
+      const { data, error } = await supabase.functions.invoke("spend-cap-withdraw", {
+        body: { ad_account_id: withdrawAccount.id, amount: amt },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data) => {
+      toast.success(`Withdrawn $${parseFloat(withdrawAmount).toLocaleString()} — Cap: $${Number(data.old_spend_cap).toLocaleString()} → $${Number(data.new_spend_cap).toLocaleString()}`);
+      setWithdrawAccount(null);
+      setWithdrawAmount("");
+      setWithdrawMeta(null);
+      queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-all-wallets"] });
+    },
+    onError: (err: any) => toast.error(friendlyEdgeError(err)),
+  });
 
   const { data: assignments } = useQuery({
     queryKey: ["admin-user-ad-accounts"],
