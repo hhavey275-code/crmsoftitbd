@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { friendlyEdgeError } from "@/lib/utils";
+import { FailedTopUps } from "@/components/FailedTopUps";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
