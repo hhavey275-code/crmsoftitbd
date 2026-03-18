@@ -278,11 +278,11 @@ export function AdminDashboard() {
         {!isMobile && (
           <MetricCard title="Platform Balance" value={`$${totalBalance.toLocaleString()}`} icon={Wallet} iconBg="bg-emerald-50 dark:bg-emerald-900/30" iconColor="text-emerald-600" />
         )}
-        <MetricCard title="Total Clients" value={profiles?.length ?? 0} icon={Users} iconBg="bg-blue-50 dark:bg-blue-900/30" iconColor="text-blue-600" size={isMobile ? "sm" : "default"} />
-        <MetricCard title="Pending Top-Ups" value={pendingRequests?.length ?? 0} icon={Clock} iconBg="bg-amber-50 dark:bg-amber-900/30" iconColor="text-amber-600" size={isMobile ? "sm" : "default"} />
-        <MetricCard title="Active Accounts" value={activeAccounts.length} icon={Activity} iconBg="bg-teal-50 dark:bg-teal-900/30" iconColor="text-teal-600" size={isMobile ? "sm" : "default"} />
-        <MetricCard title="Disabled" value={disabledAccounts.length} icon={Ban} iconBg="bg-red-50 dark:bg-red-900/30" iconColor="text-red-500" size={isMobile ? "sm" : "default"} />
-        <MetricCard title="Remaining Limit" value={`$${remainingLimit.toLocaleString()}`} icon={TrendingUp} iconBg="bg-violet-50 dark:bg-violet-900/30" iconColor="text-violet-600" size={isMobile ? "sm" : "default"} className={isMobile ? "col-span-2" : ""} />
+        <MetricCard title="Total Clients" value={profiles?.length ?? 0} icon={Users} iconBg="bg-blue-50 dark:bg-blue-900/30" iconColor="text-blue-600" size={isMobile ? "xs" : "default"} />
+        <MetricCard title="Pending Top-Ups" value={pendingRequests?.length ?? 0} icon={Clock} iconBg="bg-amber-50 dark:bg-amber-900/30" iconColor="text-amber-600" size={isMobile ? "xs" : "default"} />
+        <MetricCard title="Active Accounts" value={activeAccounts.length} icon={Activity} iconBg="bg-teal-50 dark:bg-teal-900/30" iconColor="text-teal-600" size={isMobile ? "xs" : "default"} />
+        <MetricCard title="Disabled" value={disabledAccounts.length} icon={Ban} iconBg="bg-red-50 dark:bg-red-900/30" iconColor="text-red-500" size={isMobile ? "xs" : "default"} />
+        <MetricCard title="Remaining Limit" value={`$${remainingLimit.toLocaleString()}`} icon={TrendingUp} iconBg="bg-violet-50 dark:bg-violet-900/30" iconColor="text-violet-600" size={isMobile ? "xs" : "default"} className={isMobile ? "col-span-2" : ""} />
       </div>
 
       {/* Spend Overview */}
