@@ -82,34 +82,7 @@ export function AdminAdAccounts() {
     refetchOnMount: "always",
   });
 
-  // Auto-refresh from Meta on mount (once per page load)
-  const hasAutoRefreshed = useRef(false);
-  useEffect(() => {
-    if (!accounts || accounts.length === 0 || hasAutoRefreshed.current) return;
-    hasAutoRefreshed.current = true;
-    setIsAutoSyncing(true);
-    const ids = accounts.map((a: any) => a.id);
-    supabase.functions.invoke("get-account-insights", {
-      body: { ad_account_ids: ids, source: "meta" },
-    }).then(({ data, error }) => {
-      if (error) {
-        console.error("Auto-refresh error:", error);
-        toast.error("Failed to sync spend data from Meta");
-        return;
-      }
-      if (data?.insights) {
-        queryClient.setQueryData(["admin-insights-cache"], data.insights);
-        queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
-      }
-      if (data?.rate_limited?.length > 0) {
-        toast.warning(`${data.rate_limited.length} account(s) rate-limited by Meta`);
-      }
-    }).catch((err) => {
-      console.error("Auto-refresh failed:", err);
-    }).finally(() => {
-      setIsAutoSyncing(false);
-    });
-  }, [accounts]);
+
 
   const { data: assignments } = useQuery({
     queryKey: ["admin-user-ad-accounts"],
