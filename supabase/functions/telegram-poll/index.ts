@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const MAX_RUNTIME_MS = 55_000;
+const MAX_RUNTIME_MS = 280_000;
 const MIN_REMAINING_MS = 5_000;
 
 type TelegramPayload = {
