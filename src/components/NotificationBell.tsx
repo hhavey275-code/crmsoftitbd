@@ -4,9 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { Bell, CheckCheck } from "lucide-react";
+import { Bell, CheckCheck, BellRing } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 function playNotificationSound() {
   if (localStorage.getItem("notification_sound") === "false") return;
@@ -39,6 +40,14 @@ export function NotificationBell() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const { isSupported, isSubscribed, permission, subscribe } = usePushNotifications();
+
+  // Auto-subscribe to push on first visit if permission already granted
+  useEffect(() => {
+    if (isSupported && !isSubscribed && permission === "granted" && user) {
+      subscribe();
+    }
+  }, [isSupported, isSubscribed, permission, user, subscribe]);
 
   const { data: notifications } = useQuery({
     queryKey: ["notifications", user?.id],
@@ -118,6 +127,16 @@ export function NotificationBell() {
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="end">
+        {/* Push notification prompt */}
+        {isSupported && !isSubscribed && permission !== "denied" && (
+          <div className="flex items-center gap-2 border-b bg-primary/5 px-4 py-2.5">
+            <BellRing className="h-4 w-4 text-primary shrink-0" />
+            <p className="text-xs text-muted-foreground flex-1">Enable push notifications to get alerts on your phone</p>
+            <Button variant="outline" size="sm" className="h-7 text-xs shrink-0" onClick={() => subscribe()}>
+              Enable
+            </Button>
+          </div>
+        )}
         <div className="flex items-center justify-between border-b px-4 py-3">
           <p className="text-sm font-semibold">Notifications</p>
           {unreadCount > 0 && (
