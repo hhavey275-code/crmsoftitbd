@@ -276,6 +276,8 @@ export function ClientAdAccounts() {
 
   return (
     <div className="space-y-4 md:space-y-6">
+      {/* Failed Top-Ups */}
+      <FailedTopUps />
       {/* Today's Performance Summary */}
       <div className="grid gap-3 grid-cols-2">
         <MetricCard
