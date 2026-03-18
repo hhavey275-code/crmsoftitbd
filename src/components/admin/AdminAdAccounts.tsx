@@ -24,6 +24,7 @@ import { friendlyEdgeError } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { logSystemAction } from "@/lib/systemLog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const PAGE_SIZE = 20;
 
