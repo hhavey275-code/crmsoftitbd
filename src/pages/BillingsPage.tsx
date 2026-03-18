@@ -170,7 +170,7 @@ export default function BillingsPage() {
             className="self-start"
           >
             <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${syncMutation.isPending ? "animate-spin" : ""}`} />
-            {isMobile ? "Update" : "Update from Meta"}
+            {syncProgress || (isMobile ? "Update" : "Update from Meta")}
           </Button>
         </div>
 
