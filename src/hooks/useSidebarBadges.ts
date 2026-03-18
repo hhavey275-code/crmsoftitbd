@@ -14,7 +14,7 @@ export function useSidebarBadges(): Record<string, number> {
     const promises: Promise<any>[] = [];
 
     if (isAdminUser) {
-      promises.push(
+      const [topUpRes, chatRes, clientsRes, failedRes] = await Promise.all([
         (supabase as any)
           .from("top_up_requests")
           .select("*", { count: "exact", head: true })
@@ -28,14 +28,11 @@ export function useSidebarBadges(): Record<string, number> {
           .from("profiles")
           .select("*", { count: "exact", head: true })
           .eq("status", "pending"),
-        // Admin sees all pending failed topups
         (supabase as any)
           .from("failed_topups")
           .select("*", { count: "exact", head: true })
           .eq("status", "pending"),
-      );
-
-      const [topUpRes, chatRes, clientsRes, failedRes] = await Promise.all(promises);
+      ]);
 
       setBadges({
         "top-up": topUpRes.count || 0,
