@@ -64,9 +64,21 @@ export function AdminClients() {
       const { error } = await supabase.from("profiles").update({ status: newStatus }).eq("user_id", userId);
       if (error) throw error;
     },
-    onSuccess: (_, { newStatus }) => {
+    onSuccess: async (_, { userId, newStatus }) => {
       toast.success(`Client ${newStatus === "active" ? "activated" : "deactivated"} successfully`);
       queryClient.invalidateQueries({ queryKey: ["admin-clients"] });
+      
+      // Send notification to the client
+      const title = newStatus === "active" ? "Account Approved" : "Account Deactivated";
+      const message = newStatus === "active"
+        ? "Your account has been approved! You can now access all features."
+        : "Your account has been deactivated. Please contact support for more information.";
+      await (supabase as any).from("notifications").insert({
+        user_id: userId,
+        type: "client_status",
+        title,
+        message,
+      });
     },
     onError: (err: any) => toast.error(err.message),
   });

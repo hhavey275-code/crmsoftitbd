@@ -132,7 +132,14 @@ export function AppSidebar() {
                       className="hover:bg-sidebar-accent"
                       activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
                     >
-                      <item.icon className="mr-2 h-4 w-4" />
+                      <div className="relative mr-2">
+                        <item.icon className="h-4 w-4" />
+                        {(badges[item.key] ?? 0) > 0 && (
+                          <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-0.5 text-[9px] font-bold text-destructive-foreground">
+                            {badges[item.key] > 9 ? "9+" : badges[item.key]}
+                          </span>
+                        )}
+                      </div>
                       {!collapsed && <span>{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>

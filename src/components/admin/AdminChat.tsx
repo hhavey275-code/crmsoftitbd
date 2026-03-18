@@ -170,6 +170,18 @@ export function AdminChat() {
       .from("chat_conversations")
       .update({ last_message_at: new Date().toISOString() })
       .eq("id", selectedId);
+    
+    // Send notification to the client
+    if (selected) {
+      await (supabase as any).from("notifications").insert({
+        user_id: selected.client_id,
+        type: "chat_message",
+        title: "New Message from Support",
+        message: reply.trim().substring(0, 100),
+        reference_id: selectedId,
+      });
+    }
+    
     setReply("");
     setSending(false);
   };
