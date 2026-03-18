@@ -610,6 +610,9 @@ export function ClientAdAccounts() {
         </div>
       )}
 
+      {/* Failed Top-Ups */}
+      <FailedTopUps />
+
       {/* Top Up Dialog */}
       <Dialog open={!!topUpAccount} onOpenChange={(open) => !open && setTopUpAccount(null)}>
         <DialogContent>
