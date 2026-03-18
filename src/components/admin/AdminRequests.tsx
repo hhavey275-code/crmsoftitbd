@@ -123,6 +123,8 @@ export function AdminRequests() {
         reference_id: approveAdReq.id,
       });
 
+      const clientName = getProfile(approveAdReq.user_id)?.full_name || approveAdReq.email;
+      await logSystemAction("Ad Account Request Approved", `"${approveAdReq.account_name}" assigned to ${clientName}`, user!.id, user!.email);
       toast.success("Ad account request approved and assigned");
       setApproveAdReq(null);
       setSelectedAdAccount(null);
