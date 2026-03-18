@@ -5,6 +5,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 
 export default function Dashboard() {
   const { isAdmin } = useAuth();
+
   return (
     <DashboardLayout>
       {isAdmin ? <AdminDashboard /> : <ClientDashboard />}
