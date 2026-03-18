@@ -23,6 +23,7 @@ const ClientDetailPage = lazy(() => import("./pages/ClientDetailPage"));
 const BillingsPage = lazy(() => import("./pages/BillingsPage"));
 const ChatPage = lazy(() => import("./pages/ChatPage"));
 const SystemLogsPage = lazy(() => import("./pages/SystemLogsPage"));
+const FailedTopUpsPage = lazy(() => import("./pages/FailedTopUpsPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -64,6 +65,7 @@ const App = () => (
               <Route path="/billings" element={<ProtectedRoute><BillingsPage /></ProtectedRoute>} />
               <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
               <Route path="/system-logs" element={<ProtectedRoute><SystemLogsPage /></ProtectedRoute>} />
+              <Route path="/failed-topups" element={<ProtectedRoute><FailedTopUpsPage /></ProtectedRoute>} />
               <Route path="/invoice/:requestId" element={<ProtectedRoute><InvoicePage /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
