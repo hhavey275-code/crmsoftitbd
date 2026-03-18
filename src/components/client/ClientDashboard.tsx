@@ -203,9 +203,10 @@ export function ClientDashboard() {
             {format(new Date(), "EEEE, MMMM d, yyyy")}
           </p>
         </div>
-        <Button size="icon" className="h-8 w-8 rounded-md" asChild>
+        <Button size="sm" className="h-7 px-2.5 text-[11px] rounded-md gap-1" asChild>
           <Link to="/top-up">
-            <Plus className="h-4 w-4" />
+            <Plus className="h-3 w-3" />
+            Add Balance
           </Link>
         </Button>
       </div>
