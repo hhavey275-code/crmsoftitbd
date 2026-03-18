@@ -215,8 +215,14 @@ export function AdminDashboard() {
         body: { ad_account_ids: ids, source: "meta", date_from: fromStr, date_to: toStr },
       });
       if (error) throw error;
+      if (data?.rate_limited?.length) {
+        toast.warning(`Rate limited on ${data.rate_limited.length} account(s). Results may be partial.`);
+      }
       const insights = data?.insights ?? {};
-      const total = Object.values(insights).reduce((sum: number, ins: any) => sum + (Number(ins?.date_spend) || 0), 0) as number;
+      const total = Object.values(insights).reduce((sum: number, ins: any) => {
+        // date_spend is the primary field, fallback to today_spend for date range queries
+        return sum + (Number(ins?.date_spend) || Number(ins?.today_spend) || 0);
+      }, 0) as number;
       setDateSpend(total);
       sessionStorage.setItem(DATE_SPEND_SESSION_KEY, JSON.stringify({
         spend: total,
@@ -225,6 +231,7 @@ export function AdminDashboard() {
       }));
       setPickerOpen(false);
     } catch (err: any) {
+      console.error("Date range spend error:", err);
       toast.error("Failed to fetch spend: " + (err.message || "Unknown error"));
     } finally {
       setDateSpendLoading(false);
@@ -293,14 +300,14 @@ export function AdminDashboard() {
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start" side="bottom">
                 {isMobile ? (
-                  <div className="p-3 space-y-3">
-                    <div className="space-y-1">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Presets</p>
-                      <RadioGroup value={selectedPreset} onValueChange={handlePresetChange}>
+                  <div className="p-2 space-y-2 max-w-[320px]">
+                    <div className="space-y-0.5">
+                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Presets</p>
+                      <RadioGroup value={selectedPreset} onValueChange={handlePresetChange} className="grid grid-cols-2 gap-x-2 gap-y-0.5">
                         {DATE_PRESETS.map((preset) => (
-                          <div key={preset.label} className="flex items-center space-x-2">
-                            <RadioGroupItem value={preset.label} id={`preset-${preset.label}`} className="h-3.5 w-3.5" />
-                            <Label htmlFor={`preset-${preset.label}`} className="text-sm cursor-pointer font-normal">{preset.label}</Label>
+                          <div key={preset.label} className="flex items-center space-x-1.5">
+                            <RadioGroupItem value={preset.label} id={`preset-${preset.label}`} className="h-3 w-3" />
+                            <Label htmlFor={`preset-${preset.label}`} className="text-xs cursor-pointer font-normal">{preset.label}</Label>
                           </div>
                         ))}
                       </RadioGroup>
@@ -311,7 +318,7 @@ export function AdminDashboard() {
                       onSelect={(range) => { setDateRange(range); setSelectedPreset(""); }}
                       numberOfMonths={1}
                       disabled={(d) => d > new Date()}
-                      className="pointer-events-auto"
+                      className="pointer-events-auto p-1 text-xs [&_table]:text-xs [&_td]:p-0 [&_th]:p-0 [&_td]:h-7 [&_td]:w-7 [&_th]:w-7 [&_button]:h-7 [&_button]:w-7 [&_button]:text-xs [&_.rdp-caption_label]:text-xs [&_.rdp-nav_button]:h-6 [&_.rdp-nav_button]:w-6"
                     />
                   </div>
                 ) : (
