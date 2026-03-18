@@ -187,11 +187,8 @@ export function ClientAdAccounts() {
       if (!checkCooldown()) throw new Error("cooldown");
       const ids = Array.from(selectedIds);
       if (ids.length === 0) return;
-      const { data, error } = await supabase.functions.invoke("get-account-insights", {
-        body: { ad_account_ids: ids, source: "meta" },
-      });
-      if (error) throw error;
-      return data;
+      const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
+      return await chunkedMetaSync(ids);
     },
     onSuccess: (data) => {
       setLastMetaUpdate(Date.now());
