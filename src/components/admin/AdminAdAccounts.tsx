@@ -349,11 +349,6 @@ export function AdminAdAccounts() {
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          {isAutoSyncing && (
-            <span className="text-xs text-primary flex items-center gap-1">
-              <RefreshCw className="h-3 w-3 animate-spin" />
-              Syncing...
-            </span>
           )}
           <Button variant="outline" size="sm" onClick={() => refreshAllMutation.mutate()} disabled={refreshAllMutation.isPending} className="text-xs">
             <RefreshCw className={`h-4 w-4 mr-1 ${refreshAllMutation.isPending ? 'animate-spin' : ''}`} />
