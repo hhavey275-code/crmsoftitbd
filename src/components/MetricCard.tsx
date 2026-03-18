@@ -26,7 +26,7 @@ export function MetricCard({ title, value, subtitle, icon: Icon, iconBg, iconCol
           </div>
           <div className="min-w-0">
             <p className={cn("font-medium text-muted-foreground truncate", isSmall ? "text-xs" : "text-sm")}>{title}</p>
-            <p className={cn("font-bold tracking-tight text-foreground leading-tight truncate", isSmall ? "text-sm" : "text-xl")}>{value}</p>
+            <p className={cn("font-bold tracking-tight text-foreground leading-tight", isSmall ? "text-base" : "text-xl")}>{value}</p>
             {subtitle && <p className={cn("text-muted-foreground truncate", isSmall ? "text-[10px]" : "text-xs")}>{subtitle}</p>}
           </div>
         </div>
