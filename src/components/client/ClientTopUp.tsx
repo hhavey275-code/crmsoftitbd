@@ -168,8 +168,8 @@ export function ClientTopUp() {
   };
 
   const verifyWithRetry = async (requestId: string, attempt = 1) => {
-    const maxRetries = 5;
-    const retryDelayMs = 5 * 60 * 1000; // 5 minutes
+    const maxRetries = 4;
+    const retryDelayMs = 3 * 60 * 1000; // 3 minutes
 
     // Fetch Telegram messages before each verify attempt
     await fetchTelegramFirst();
