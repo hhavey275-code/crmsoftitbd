@@ -23,6 +23,7 @@ interface InsightsData {
 }
 
 const PAGE_SIZE = 20;
+const SYNC_CHUNK_SIZE = 50;
 
 export default function BillingsPage() {
   const { user } = useAuth();
@@ -32,6 +33,7 @@ export default function BillingsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [cardFilter, setCardFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [syncProgress, setSyncProgress] = useState("");
   const queryClient = useQueryClient();
 
   const { data: accounts } = useQuery({
