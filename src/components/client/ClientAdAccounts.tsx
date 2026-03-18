@@ -771,6 +771,44 @@ export function ClientAdAccounts() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* BM Access Request Dialog */}
+      <Dialog open={!!bmReqAccount} onOpenChange={(open) => { if (!open) setBmReqAccount(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Request BM Access</DialogTitle>
+            <DialogDescription>
+              Request Business Manager partner access for <span className="font-medium text-foreground">{bmReqAccount?.account_name}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label>BM Name *</Label>
+              <Input
+                value={bmReqForm.bm_name}
+                onChange={(e) => setBmReqForm(f => ({ ...f, bm_name: e.target.value }))}
+                placeholder="Business Manager name"
+                className="mt-1.5"
+              />
+            </div>
+            <div>
+              <Label>BM ID *</Label>
+              <Input
+                value={bmReqForm.bm_id}
+                onChange={(e) => setBmReqForm(f => ({ ...f, bm_id: e.target.value }))}
+                placeholder="e.g. 123456789"
+                className="mt-1.5"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBmReqAccount(null)}>Cancel</Button>
+            <Button onClick={handleBmReqSubmit} disabled={bmReqLoading || !bmReqForm.bm_name || !bmReqForm.bm_id}>
+              {bmReqLoading ? "Submitting..." : "Submit Request"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

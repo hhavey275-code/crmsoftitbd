@@ -90,6 +90,29 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Add partner agency (partial access - ADVERTISE)
+    if (action === "add_partner") {
+      const { partner_bm_id } = body;
+      if (!partner_bm_id) throw new Error("partner_bm_id is required");
+
+      const url = `https://graph.facebook.com/v24.0/${actId}/agencies`;
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          business: partner_bm_id,
+          permitted_tasks: JSON.stringify(["ADVERTISE"]),
+          access_token: bmToken,
+        }),
+      });
+      const data = await resp.json();
+      if (data.error) throw new Error(data.error.message || "Failed to add partner");
+
+      return new Response(JSON.stringify({ success: true, added_bm_id: partner_bm_id }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Remove partner agency
     if (action === "remove") {
       const { partner_bm_id } = body;
