@@ -207,12 +207,11 @@ export function AdminDashboard() {
       const ids = adAccounts.map((a: any) => a.id);
       const fromStr = format(dateRange.from, "yyyy-MM-dd");
       const toStr = format(dateRange.to, "yyyy-MM-dd");
-      const { data, error } = await supabase.functions.invoke("get-account-insights", {
-        body: { ad_account_ids: ids, source: "meta", date_from: fromStr, date_to: toStr },
-      });
-      if (error) throw error;
-      if (data?.rate_limited?.length) {
-        toast.warning(`Rate limited on ${data.rate_limited.length} account(s). Results may be partial.`);
+      const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
+      const result = await chunkedMetaSync(ids, { date_from: fromStr, date_to: toStr });
+      if (result.rate_limited?.length) {
+        toast.warning(`Rate limited on ${result.rate_limited.length} account(s). Results may be partial.`);
+      }
       }
       const insights = data?.insights ?? {};
       const total = Object.values(insights).reduce((sum: number, ins: any) => {
