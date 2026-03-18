@@ -121,21 +121,16 @@ export function ClientAdAccounts() {
     hasAutoRefreshed.current = true;
     setIsAutoSyncing(true);
     const ids = accounts.map((a: any) => a.id);
-    supabase.functions.invoke("get-account-insights", {
-      body: { ad_account_ids: ids, source: "meta" },
-    }).then(({ data, error }) => {
-      if (error) {
-        console.error("Auto-refresh error:", error);
-        toast.error("Failed to sync spend data from Meta");
-        return;
-      }
-      if (data?.insights) {
-        queryClient.setQueryData(["client-insights-cache", user?.id], data.insights);
+    import("@/lib/chunkedMetaSync").then(({ chunkedMetaSync }) =>
+      chunkedMetaSync(ids)
+    ).then((result) => {
+      if (result?.insights) {
+        queryClient.setQueryData(["client-insights-cache", user?.id], result.insights);
         queryClient.invalidateQueries({ queryKey: ["client-ad-accounts"] });
         setLastMetaUpdate(Date.now());
       }
-      if (data?.rate_limited?.length > 0) {
-        toast.warning(`${data.rate_limited.length} account(s) rate-limited by Meta`);
+      if (result?.rate_limited?.length > 0) {
+        toast.warning(`${result.rate_limited.length} account(s) rate-limited by Meta`);
       }
     }).catch((err) => {
       console.error("Auto-refresh failed:", err);
