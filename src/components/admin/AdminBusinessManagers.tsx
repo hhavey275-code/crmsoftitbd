@@ -631,6 +631,17 @@ export function AdminBusinessManagers() {
                         <p className="text-[10px] text-muted-foreground font-mono">ID: {bm.bm_id}</p>
                         <span className="text-[10px] text-muted-foreground">· {accounts.length} acct{accounts.length !== 1 ? "s" : ""}</span>
                       </div>
+                      {/* API Usage indicator */}
+                      {apiUsage?.[bm.id] && (
+                        <div className={cn(
+                          "flex items-center gap-1 mt-0.5 text-[10px]",
+                          (apiUsage[bm.id].lastHour >= 160) ? "text-destructive font-semibold" :
+                          (apiUsage[bm.id].lastHour >= 100) ? "text-amber-500" : "text-muted-foreground"
+                        )}>
+                          <Activity className="h-2.5 w-2.5" />
+                          {apiUsage[bm.id].lastHour}/hr · {apiUsage[bm.id].last24h}/24h
+                        </div>
+                      )}
                       {bm.last_synced_at && (
                         <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
                           <Clock className="h-2.5 w-2.5" />
