@@ -37,6 +37,37 @@ export function ClientDashboard() {
   const [topUpAmount, setTopUpAmount] = useState("");
   const [topUpLoading, setTopUpLoading] = useState(false);
 
+  // Ad Account Request form
+  const [showAdReqForm, setShowAdReqForm] = useState(false);
+  const [adReqForm, setAdReqForm] = useState({ account_name: "", email: "", business_manager_id: "", monthly_spend: "", start_date: "" });
+  const [adReqLoading, setAdReqLoading] = useState(false);
+
+  const handleAdReqSubmit = async () => {
+    if (!adReqForm.account_name || !adReqForm.email || !adReqForm.business_manager_id) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+    setAdReqLoading(true);
+    try {
+      const { error } = await (supabase as any).from("ad_account_requests").insert({
+        user_id: user!.id,
+        account_name: adReqForm.account_name,
+        email: adReqForm.email,
+        business_manager_id: adReqForm.business_manager_id,
+        monthly_spend: adReqForm.monthly_spend || null,
+        start_date: adReqForm.start_date || null,
+      });
+      if (error) throw error;
+      toast.success("Ad account request submitted successfully!");
+      setShowAdReqForm(false);
+      setAdReqForm({ account_name: "", email: "", business_manager_id: "", monthly_spend: "", start_date: "" });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to submit request");
+    } finally {
+      setAdReqLoading(false);
+    }
+  };
+
   const { data: wallet } = useQuery({
     queryKey: ["client-wallet", user?.id],
     queryFn: async () => {
