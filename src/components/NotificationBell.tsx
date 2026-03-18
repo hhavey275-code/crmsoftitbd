@@ -91,7 +91,18 @@ export function NotificationBell() {
       queryClient.invalidateQueries({ queryKey: ["notifications", user?.id] });
     });
     setOpen(false);
-    navigate("/top-up");
+    
+    // Smart routing based on notification type
+    const type = n.type as string;
+    if (type === "chat_message") {
+      navigate("/chat");
+    } else if (type === "client_status") {
+      navigate("/dashboard");
+    } else if (type === "new_signup") {
+      navigate("/clients");
+    } else {
+      navigate("/top-up");
+    }
   };
 
   return (
