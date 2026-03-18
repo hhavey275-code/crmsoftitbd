@@ -82,6 +82,22 @@ export function ClientAdAccounts() {
     enabled: !!user && !!accounts && accounts.length > 0,
   });
 
+  // Auto-refresh from Meta on mount (once per page load)
+  const hasAutoRefreshed = useRef(false);
+  useEffect(() => {
+    if (!accounts || accounts.length === 0 || hasAutoRefreshed.current) return;
+    hasAutoRefreshed.current = true;
+    const ids = accounts.map((a: any) => a.id);
+    supabase.functions.invoke("get-account-insights", {
+      body: { ad_account_ids: ids, source: "meta" },
+    }).then(({ data }) => {
+      if (data?.insights) {
+        queryClient.setQueryData(["client-insights-cache", user?.id], data.insights);
+        queryClient.invalidateQueries({ queryKey: ["client-ad-accounts"] });
+      }
+    }).catch(() => {});
+  }, [accounts]);
+
   const { data: wallet } = useQuery({
     queryKey: ["client-wallet", user?.id],
     queryFn: async () => {
