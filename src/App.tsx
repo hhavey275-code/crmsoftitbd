@@ -23,6 +23,7 @@ const ClientDetailPage = lazy(() => import("./pages/ClientDetailPage"));
 const BillingsPage = lazy(() => import("./pages/BillingsPage"));
 const ChatPage = lazy(() => import("./pages/ChatPage"));
 const SystemLogsPage = lazy(() => import("./pages/SystemLogsPage"));
+const FailedTopUpsPage = lazy(() => import("./pages/FailedTopUpsPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
