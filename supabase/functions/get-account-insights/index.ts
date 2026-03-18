@@ -114,7 +114,7 @@ async function processAccount(
     today_orders: 0, yesterday_orders: 0,
     active_campaigns: 0,
     today_messages: 0, yesterday_messages: 0,
-    balance: 0, cards: [],
+    balance: 0, daily_spend_limit: 0, billing_threshold: 0, cards: [],
   };
 
   const rawToken = account.business_managers?.access_token;
@@ -149,7 +149,7 @@ async function processAccount(
 
     const fetchPromises: Promise<Response>[] = [
       fetch(todayUrl),
-      fetch(`https://graph.facebook.com/v24.0/${actId}?fields=balance,amount_spent,spend_cap,funding_source_details&access_token=${accessToken}`),
+      fetch(`https://graph.facebook.com/v24.0/${actId}?fields=balance,amount_spent,spend_cap,funding_source_details,daily_spend_limit,min_billing_threshold&access_token=${accessToken}`),
       fetchActiveCampaignCount(actId, accessToken).then(c => ({ json: async () => c } as any)),
     ];
     if (yesterdayUrl) {
@@ -184,6 +184,8 @@ async function processAccount(
     const todaySpend = todayData?.data?.[0]?.spend ? parseFloat(todayData.data[0].spend) : 0;
     const yesterdaySpend = yesterdayData?.data?.[0]?.spend ? parseFloat(yesterdayData.data[0].spend) : 0;
     const balance = accountData?.balance ? parseFloat(accountData.balance) / 100 : 0;
+    const dailySpendLimit = accountData?.daily_spend_limit ? parseFloat(accountData.daily_spend_limit) / 100 : 0;
+    const billingThreshold = accountData?.min_billing_threshold ? parseFloat(accountData.min_billing_threshold) / 100 : 0;
 
     let adAccountUpdate: any = undefined;
     if (!isSingleDate && !isDateRange && accountData?.amount_spent !== undefined) {
@@ -218,6 +220,8 @@ async function processAccount(
         today_messages: extractMessages(todayData),
         yesterday_messages: extractMessages(yesterdayData),
         balance,
+        daily_spend_limit: dailySpendLimit,
+        billing_threshold: billingThreshold,
         cards,
       },
       adAccountUpdate,
@@ -271,6 +275,8 @@ Deno.serve(async (req) => {
           today_messages: Number(row.today_messages ?? 0),
           yesterday_messages: Number(row.yesterday_messages ?? 0),
           balance: Number(row.balance),
+          daily_spend_limit: Number(row.daily_spend_limit ?? 0),
+          billing_threshold: Number(row.billing_threshold ?? 0),
           cards: row.cards ?? [],
           updated_at: row.updated_at,
         };
@@ -307,7 +313,7 @@ Deno.serve(async (req) => {
             today_orders: 0, yesterday_orders: 0,
             active_campaigns: 0,
             today_messages: 0, yesterday_messages: 0,
-            balance: 0, cards: [],
+            balance: 0, daily_spend_limit: 0, billing_threshold: 0, cards: [],
           };
         }
         continue;
@@ -347,6 +353,8 @@ Deno.serve(async (req) => {
         today_messages: data.today_messages,
         yesterday_messages: data.yesterday_messages,
         balance: data.balance,
+        daily_spend_limit: data.daily_spend_limit,
+        billing_threshold: data.billing_threshold,
         cards: data.cards,
         updated_at: new Date().toISOString(),
       }));
