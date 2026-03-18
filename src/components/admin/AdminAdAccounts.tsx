@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ArrowUpCircle, ArrowDownCircle, ExternalLink, Wallet, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, AppWindow, Search, ListChecks, Trash2, ChevronLeft, ChevronRight, MoreHorizontal, Check, ChevronsUpDown, Loader2 } from "lucide-react";
+import { ArrowUpCircle, ExternalLink, Wallet, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, AppWindow, Search, ListChecks, Trash2, ChevronLeft, ChevronRight, MoreHorizontal, Check, ChevronsUpDown, Loader2 } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -24,6 +24,7 @@ import { friendlyEdgeError } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { logSystemAction } from "@/lib/systemLog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const PAGE_SIZE = 20;
 
@@ -54,9 +55,8 @@ export function AdminAdAccounts() {
   const [assignClientId, setAssignClientId] = useState("");
   const [clientSearch, setClientSearch] = useState("");
   const [showUnassignConfirm, setShowUnassignConfirm] = useState(false);
-  const [withdrawAccount, setWithdrawAccount] = useState<any>(null);
+  const [dialogTab, setDialogTab] = useState<"topup" | "withdraw">("topup");
   const [withdrawAmount, setWithdrawAmount] = useState("");
-  const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [withdrawMeta, setWithdrawMeta] = useState<{ real_amount_spent: number; current_spend_cap: number; max_withdrawable: number } | null>(null);
   const [fetchingWithdrawMeta, setFetchingWithdrawMeta] = useState(false);
   const { data: accounts } = useQuery({
@@ -88,30 +88,21 @@ export function AdminAdAccounts() {
   });
 
 
-  const openWithdrawDialog = async (account: any) => {
-    setWithdrawAccount(account);
+  const fetchWithdrawMeta = async (account: any) => {
     setWithdrawAmount("");
     setWithdrawMeta(null);
     setFetchingWithdrawMeta(true);
     try {
-      const { data, error } = await supabase.functions.invoke("spend-cap-withdraw", {
+      const { data } = await supabase.functions.invoke("spend-cap-withdraw", {
         body: { ad_account_id: account.id, amount: 0.001 },
       });
-      // We expect a validation error with meta info
       if (data?.max_withdrawable !== undefined) {
         setWithdrawMeta({
           real_amount_spent: data.real_amount_spent,
           current_spend_cap: data.current_spend_cap,
           max_withdrawable: data.max_withdrawable,
         });
-      } else if (data?.error && data?.max_withdrawable !== undefined) {
-        setWithdrawMeta({
-          real_amount_spent: data.real_amount_spent,
-          current_spend_cap: data.current_spend_cap,
-          max_withdrawable: data.max_withdrawable,
-        });
       } else {
-        // Fallback to local data
         setWithdrawMeta({
           real_amount_spent: Number(account.amount_spent),
           current_spend_cap: Number(account.spend_cap),
@@ -132,7 +123,7 @@ export function AdminAdAccounts() {
     mutationFn: async () => {
       const amt = parseFloat(withdrawAmount);
       const { data, error } = await supabase.functions.invoke("spend-cap-withdraw", {
-        body: { ad_account_id: withdrawAccount.id, amount: amt },
+        body: { ad_account_id: topUpAccount.id, amount: amt },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -140,9 +131,10 @@ export function AdminAdAccounts() {
     },
     onSuccess: (data) => {
       toast.success(`Withdrawn $${parseFloat(withdrawAmount).toLocaleString()} — Cap: $${Number(data.old_spend_cap).toLocaleString()} → $${Number(data.new_spend_cap).toLocaleString()}`);
-      setWithdrawAccount(null);
+      setTopUpAccount(null);
       setWithdrawAmount("");
       setWithdrawMeta(null);
+      setDialogTab("topup");
       queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["admin-all-wallets"] });
     },
@@ -507,23 +499,14 @@ export function AdminAdAccounts() {
                       <span>Spent: <span className="font-medium text-foreground">${Number(a.amount_spent).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
                       <span>Limit: <span className="font-medium text-foreground">${Number(a.spend_cap).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
                     </div>
-                    <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-1">
+                    <div onClick={(e) => e.stopPropagation()}>
                       <Button
                         size="sm"
-                        className="gap-1 bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-3 font-semibold text-xs h-8"
-                        onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
+                        className="gap-1 bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs h-8"
+                        onClick={() => { setTopUpAccount(a); setTopUpAmount(""); setDialogTab("topup"); }}
                       >
                         <ArrowUpCircle className="h-3.5 w-3.5" />
                         Top Up
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-1 rounded-full px-3 font-semibold text-xs h-8"
-                        onClick={() => openWithdrawDialog(a)}
-                      >
-                        <ArrowDownCircle className="h-3.5 w-3.5" />
-                        Withdraw
                       </Button>
                     </div>
                   </div>
@@ -676,23 +659,9 @@ export function AdminAdAccounts() {
                         })()}
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button size="icon" variant="ghost" className="h-8 w-8">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}>
-                              <ArrowUpCircle className="h-4 w-4 mr-2" />
-                              Top Up
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openWithdrawDialog(a)}>
-                              <ArrowDownCircle className="h-4 w-4 mr-2" />
-                              Withdraw
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <Button size="icon" variant="default" className="h-8 w-8" onClick={() => { setTopUpAccount(a); setTopUpAmount(""); setDialogTab("topup"); }} title="Top Up">
+                          <ArrowUpCircle className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   );
@@ -752,168 +721,121 @@ export function AdminAdAccounts() {
       )}
 
 
-      {/* Top Up Dialog */}
-      <Dialog open={!!topUpAccount} onOpenChange={(open) => !open && setTopUpAccount(null)}>
-        <DialogContent>
+      {/* Top Up / Withdraw Tabbed Dialog */}
+      <Dialog open={!!topUpAccount} onOpenChange={(open) => { if (!open) { setTopUpAccount(null); setDialogTab("topup"); setWithdrawMeta(null); setWithdrawAmount(""); setTopUpAmount(""); } }}>
+        <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
-            <DialogTitle>Increase Spend Limit</DialogTitle>
-            <DialogDescription>
-              Top up <span className="font-semibold">{topUpAccount?.account_name}</span> ({topUpAccount?.account_id?.replace(/^act_/, '')})
-            </DialogDescription>
+            <DialogTitle>{topUpAccount?.account_name}</DialogTitle>
+            <DialogDescription>{topUpAccount?.account_id?.replace(/^act_/, '')}</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            {assignedUserId ? (
-              <div className="p-3 rounded-lg bg-muted space-y-2">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-muted-foreground">Assigned Client</span>
-                  <span className="font-medium">{assignedClientName}</span>
+          <Tabs value={dialogTab} onValueChange={(v) => { const tab = v as "topup" | "withdraw"; setDialogTab(tab); if (tab === "withdraw" && !withdrawMeta && !fetchingWithdrawMeta && topUpAccount) fetchWithdrawMeta(topUpAccount); }}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="topup">Increase Limit</TabsTrigger>
+              <TabsTrigger value="withdraw">Withdraw</TabsTrigger>
+            </TabsList>
+            <TabsContent value="topup" className="space-y-4 pt-2">
+              {assignedUserId ? (
+                <div className="p-3 rounded-lg bg-muted space-y-2">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">Assigned Client</span>
+                    <span className="font-medium">{assignedClientName}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="flex items-center gap-2"><Wallet className="h-4 w-4" /> Client Wallet Balance</span>
+                    <span className={`font-semibold ${clientBalance < 0 ? 'text-destructive' : ''}`}>${clientBalance.toLocaleString()}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="flex items-center gap-2">
-                    <Wallet className="h-4 w-4" />
-                    Client Wallet Balance
-                  </span>
-                  <span className={`font-semibold ${clientBalance < 0 ? 'text-destructive' : ''}`}>
-                    ${clientBalance.toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className="p-3 rounded-lg bg-muted text-sm text-muted-foreground">
-                No client assigned — wallet will not be deducted
-              </div>
-            )}
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Current Spend Cap</span>
-              <span className="font-medium">${Number(topUpAccount?.spend_cap ?? 0).toLocaleString()}</span>
-            </div>
-            <div className="space-y-2">
-              <Label>Amount to Add (USD)</Label>
-              <Input type="number" min="1" step="0.01" value={topUpAmount} onChange={(e) => setTopUpAmount(e.target.value)} placeholder="500.00" />
-              {willGoNegative && parsedAmount > 0 && assignedUserId && (
-                <div className="flex items-center gap-2 text-sm text-yellow-600">
-                  <AlertTriangle className="h-4 w-4" />
-                  Client balance will go negative by ${(parsedAmount - clientBalance).toLocaleString()}
-                </div>
+              ) : (
+                <div className="p-3 rounded-lg bg-muted text-sm text-muted-foreground">No client assigned — wallet will not be deducted</div>
               )}
-            </div>
-            {parsedAmount > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">New Spend Cap</span>
-                <span className="font-medium text-primary">${(Number(topUpAccount?.spend_cap ?? 0) + parsedAmount).toLocaleString()}</span>
+                <span className="text-muted-foreground">Current Spend Cap</span>
+                <span className="font-medium">${Number(topUpAccount?.spend_cap ?? 0).toLocaleString()}</span>
               </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setTopUpAccount(null)}>Cancel</Button>
-            <Button onClick={() => topUpMutation.mutate()} disabled={!topUpAmount || parsedAmount <= 0 || topUpMutation.isPending}>
-              {topUpMutation.isPending ? "Processing..." : "Top Up Now"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Withdraw Dialog */}
-      <Dialog open={!!withdrawAccount} onOpenChange={(open) => { if (!open) { setWithdrawAccount(null); setWithdrawMeta(null); setWithdrawAmount(""); } }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Withdraw from Spend Cap</DialogTitle>
-            <DialogDescription>
-              Reduce spend cap of <span className="font-semibold">{withdrawAccount?.account_name}</span> ({withdrawAccount?.account_id?.replace(/^act_/, '')}) and credit wallet.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            {fetchingWithdrawMeta ? (
-              <div className="flex items-center justify-center py-6 gap-2 text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="text-sm">Fetching real-time data from Meta...</span>
-              </div>
-            ) : withdrawMeta ? (
-              <>
-                {(() => {
-                  const wUid = withdrawAccount ? getAssignedUserId(withdrawAccount.id) : null;
-                  const wWallet = getClientWallet(wUid);
-                  const wClientName = getClientName(wUid);
-                  return (
-                    <>
-                      {wUid ? (
-                        <div className="p-3 rounded-lg bg-muted space-y-2">
-                          <div className="flex justify-between items-center text-sm">
-                            <span className="text-muted-foreground">Assigned Client</span>
-                            <span className="font-medium">{wClientName}</span>
-                          </div>
-                          <div className="flex justify-between items-center text-sm">
-                            <span className="flex items-center gap-2">
-                              <Wallet className="h-4 w-4" />
-                              Client Wallet Balance
-                            </span>
-                            <span className="font-semibold">${Number(wWallet?.balance ?? 0).toLocaleString()}</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="p-3 rounded-lg bg-muted text-sm text-muted-foreground">
-                          No client assigned — wallet will not be credited
-                        </div>
-                      )}
-                    </>
-                  );
-                })()}
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Current Spend Cap (Meta)</span>
-                  <span className="font-medium">${withdrawMeta.current_spend_cap.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Amount Spent (Real-time)</span>
-                  <span className="font-medium">${withdrawMeta.real_amount_spent.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="flex justify-between text-sm font-semibold">
-                  <span className="text-muted-foreground">Max Withdrawable</span>
-                  <span className="text-primary">${withdrawMeta.max_withdrawable.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="space-y-2">
-                  <Label>Withdraw Amount (USD)</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max={withdrawMeta.max_withdrawable}
-                    step="0.01"
-                    value={withdrawAmount}
-                    onChange={(e) => setWithdrawAmount(e.target.value)}
-                    placeholder={`Max $${withdrawMeta.max_withdrawable.toFixed(2)}`}
-                  />
-                  {parseFloat(withdrawAmount) > withdrawMeta.max_withdrawable && (
-                    <div className="flex items-center gap-2 text-sm text-destructive">
-                      <AlertTriangle className="h-4 w-4" />
-                      Amount exceeds maximum withdrawable
-                    </div>
-                  )}
-                </div>
-                {parseFloat(withdrawAmount) > 0 && parseFloat(withdrawAmount) <= withdrawMeta.max_withdrawable && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">New Spend Cap</span>
-                    <span className="font-medium text-primary">${(withdrawMeta.current_spend_cap - parseFloat(withdrawAmount)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              <div className="space-y-2">
+                <Label>Amount to Add (USD)</Label>
+                <Input type="number" min="1" step="0.01" value={topUpAmount} onChange={(e) => setTopUpAmount(e.target.value)} placeholder="500.00" />
+                {willGoNegative && parsedAmount > 0 && assignedUserId && (
+                  <div className="flex items-center gap-2 text-sm text-yellow-600">
+                    <AlertTriangle className="h-4 w-4" />
+                    Client balance will go negative by ${(parsedAmount - clientBalance).toLocaleString()}
                   </div>
                 )}
-              </>
-            ) : null}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setWithdrawAccount(null); setWithdrawMeta(null); }}>Cancel</Button>
-            <Button
-              onClick={() => withdrawMutation.mutate()}
-              disabled={
-                !withdrawAmount ||
-                parseFloat(withdrawAmount) <= 0 ||
-                !withdrawMeta ||
-                parseFloat(withdrawAmount) > withdrawMeta.max_withdrawable ||
-                withdrawMutation.isPending ||
-                fetchingWithdrawMeta
-              }
-              variant="destructive"
-            >
-              {withdrawMutation.isPending ? "Processing..." : "Withdraw Now"}
-            </Button>
-          </DialogFooter>
+              </div>
+              {parsedAmount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">New Spend Cap</span>
+                  <span className="font-medium text-primary">${(Number(topUpAccount?.spend_cap ?? 0) + parsedAmount).toLocaleString()}</span>
+                </div>
+              )}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setTopUpAccount(null)}>Cancel</Button>
+                <Button onClick={() => topUpMutation.mutate()} disabled={!topUpAmount || parsedAmount <= 0 || topUpMutation.isPending}>
+                  {topUpMutation.isPending ? "Processing..." : "Top Up Now"}
+                </Button>
+              </DialogFooter>
+            </TabsContent>
+            <TabsContent value="withdraw" className="space-y-4 pt-2">
+              {fetchingWithdrawMeta ? (
+                <div className="flex items-center justify-center py-6 gap-2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm">Fetching real-time data from Meta...</span>
+                </div>
+              ) : withdrawMeta ? (
+                <>
+                  {assignedUserId ? (
+                    <div className="p-3 rounded-lg bg-muted space-y-2">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">Assigned Client</span>
+                        <span className="font-medium">{assignedClientName}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="flex items-center gap-2"><Wallet className="h-4 w-4" /> Client Wallet Balance</span>
+                        <span className="font-semibold">${clientBalance.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-lg bg-muted text-sm text-muted-foreground">No client assigned — wallet will not be credited</div>
+                  )}
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Current Spend Cap (Meta)</span>
+                    <span className="font-medium">${withdrawMeta.current_spend_cap.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Amount Spent (Real-time)</span>
+                    <span className="font-medium">${withdrawMeta.real_amount_spent.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-semibold">
+                    <span className="text-muted-foreground">Max Withdrawable</span>
+                    <span className="text-primary">${withdrawMeta.max_withdrawable.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Withdraw Amount (USD)</Label>
+                    <Input type="number" min="1" max={withdrawMeta.max_withdrawable} step="0.01" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} placeholder={`Max $${withdrawMeta.max_withdrawable.toFixed(2)}`} />
+                    {parseFloat(withdrawAmount) > withdrawMeta.max_withdrawable && (
+                      <div className="flex items-center gap-2 text-sm text-destructive">
+                        <AlertTriangle className="h-4 w-4" /> Amount exceeds maximum withdrawable
+                      </div>
+                    )}
+                  </div>
+                  {parseFloat(withdrawAmount) > 0 && parseFloat(withdrawAmount) <= withdrawMeta.max_withdrawable && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">New Spend Cap</span>
+                      <span className="font-medium text-primary">${(withdrawMeta.current_spend_cap - parseFloat(withdrawAmount)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setTopUpAccount(null)}>Cancel</Button>
+                    <Button onClick={() => withdrawMutation.mutate()} disabled={!withdrawAmount || parseFloat(withdrawAmount) <= 0 || !withdrawMeta || parseFloat(withdrawAmount) > withdrawMeta.max_withdrawable || withdrawMutation.isPending} variant="destructive">
+                      {withdrawMutation.isPending ? "Processing..." : "Withdraw Now"}
+                    </Button>
+                  </DialogFooter>
+                </>
+              ) : (
+                <div className="text-center py-6 text-sm text-muted-foreground">Unable to fetch data. Please try again.</div>
+              )}
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
 
