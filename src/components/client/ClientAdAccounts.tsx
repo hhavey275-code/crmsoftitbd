@@ -53,6 +53,32 @@ export function ClientAdAccounts() {
   const [lastMetaUpdate, setLastMetaUpdate] = useState<number>(0);
   const [isAutoSyncing, setIsAutoSyncing] = useState(false);
 
+  // BM Request state
+  const [bmReqAccount, setBmReqAccount] = useState<any>(null);
+  const [bmReqForm, setBmReqForm] = useState({ bm_name: "", bm_id: "" });
+  const [bmReqLoading, setBmReqLoading] = useState(false);
+
+  const handleBmReqSubmit = async () => {
+    if (!bmReqForm.bm_name || !bmReqForm.bm_id || !bmReqAccount) return;
+    setBmReqLoading(true);
+    try {
+      const { error } = await (supabase as any).from("bm_access_requests").insert({
+        user_id: user!.id,
+        ad_account_id: bmReqAccount.id,
+        bm_name: bmReqForm.bm_name,
+        bm_id: bmReqForm.bm_id,
+      });
+      if (error) throw error;
+      toast.success("BM access request submitted!");
+      setBmReqAccount(null);
+      setBmReqForm({ bm_name: "", bm_id: "" });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to submit request");
+    } finally {
+      setBmReqLoading(false);
+    }
+  };
+
   const isInactive = (profile as any)?.status === "inactive";
   const dueLimit = Number((profile as any)?.due_limit ?? 0);
   const META_COOLDOWN_MS = 15 * 60 * 1000;
