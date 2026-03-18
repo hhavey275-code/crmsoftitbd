@@ -184,13 +184,19 @@ async function processAccount(
     const todaySpend = todayData?.data?.[0]?.spend ? parseFloat(todayData.data[0].spend) : 0;
     const yesterdaySpend = yesterdayData?.data?.[0]?.spend ? parseFloat(yesterdayData.data[0].spend) : 0;
 
-    // Debug: log raw account data for first account to diagnose missing fields
-    console.log(`[${actId}] accountData: ${JSON.stringify(accountData).slice(0, 500)}`);
-    console.log(`[${actId}] todayData: ${JSON.stringify(todayData).slice(0, 300)}`);
-
     const balance = accountData?.balance ? parseFloat(accountData.balance) / 100 : 0;
-    const dailySpendLimit = accountData?.daily_spend_limit ? parseFloat(accountData.daily_spend_limit) / 100 : 0;
-    const billingThreshold = accountData?.min_billing_threshold ? parseFloat(accountData.min_billing_threshold) / 100 : 0;
+
+    // Fetch daily_spend_limit and min_billing_threshold separately as they may not exist on all accounts
+    let dailySpendLimit = 0;
+    let billingThreshold = 0;
+    try {
+      const extraRes = await fetch(`https://graph.facebook.com/v24.0/${actId}?fields=daily_spend_limit,min_billing_threshold&access_token=${accessToken}`);
+      const extraData = await extraRes.json();
+      if (!extraData?.error) {
+        dailySpendLimit = extraData?.daily_spend_limit ? parseFloat(extraData.daily_spend_limit) / 100 : 0;
+        billingThreshold = extraData?.min_billing_threshold ? parseFloat(extraData.min_billing_threshold) / 100 : 0;
+      }
+    } catch { /* silently ignore - these fields are optional */ }
 
     let adAccountUpdate: any = undefined;
     if (!isSingleDate && !isDateRange && accountData?.amount_spent !== undefined) {
