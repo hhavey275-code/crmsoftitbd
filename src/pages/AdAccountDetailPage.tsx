@@ -172,12 +172,13 @@ export default function AdAccountDetailPage() {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Back button & Update */}
-        <div className="flex items-center justify-between">
-          <Button variant="ghost" onClick={() => navigate("/ad-accounts")}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Ad Accounts
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <Button variant="ghost" size="sm" onClick={() => navigate("/ad-accounts")}>
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            <span className="hidden sm:inline">Back to Ad Accounts</span>
+            <span className="sm:hidden">Back</span>
           </Button>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-wrap">
             {insights?.updated_at && (
               <span className="text-xs text-muted-foreground">
                 Updated: {new Date(insights.updated_at).toLocaleString()}
@@ -185,7 +186,8 @@ export default function AdAccountDetailPage() {
             )}
             <Button onClick={handleUpdateFromMeta} disabled={updatingMeta} size="sm">
               <RefreshCw className={`h-4 w-4 mr-1 ${updatingMeta ? "animate-spin" : ""}`} />
-              Update from Meta
+              <span className="hidden sm:inline">Update from Meta</span>
+              <span className="sm:hidden">Update</span>
             </Button>
           </div>
         </div>
