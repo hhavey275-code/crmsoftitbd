@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -292,8 +293,16 @@ export function ClientDashboard() {
                   ${Number(wallet?.balance ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
               </div>
-              <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center">
-                <Wallet className="h-6 w-6" />
+              <div className="flex flex-col items-center gap-2">
+                <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center">
+                  <Wallet className="h-6 w-6" />
+                </div>
+                <Button size="sm" variant="secondary" className="rounded-full text-xs px-3 gap-1" asChild>
+                  <Link to="/top-up">
+                    <Plus className="h-3 w-3" />
+                    Add Balance
+                  </Link>
+                </Button>
               </div>
             </div>
           </div>
@@ -333,6 +342,14 @@ export function ClientDashboard() {
                   iconBg="bg-violet-50 dark:bg-violet-900/30"
                   iconColor="text-violet-600"
                   className="border-0 shadow-none bg-violet-50/40 dark:bg-violet-900/10"
+                  action={
+                    <Button size="sm" variant="outline" className="rounded-full text-xs gap-1 border-violet-300 text-violet-700 hover:bg-violet-100 dark:border-violet-700 dark:text-violet-400 dark:hover:bg-violet-900/30" asChild>
+                      <Link to="/top-up">
+                        <Plus className="h-3 w-3" />
+                        Add Balance
+                      </Link>
+                    </Button>
+                  }
                 />
                 <MetricCard
                   title="Total Ad Accounts"
