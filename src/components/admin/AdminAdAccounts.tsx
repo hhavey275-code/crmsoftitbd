@@ -659,23 +659,9 @@ export function AdminAdAccounts() {
                         })()}
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button size="icon" variant="ghost" className="h-8 w-8">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}>
-                              <ArrowUpCircle className="h-4 w-4 mr-2" />
-                              Top Up
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openWithdrawDialog(a)}>
-                              <ArrowDownCircle className="h-4 w-4 mr-2" />
-                              Withdraw
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <Button size="icon" variant="default" className="h-8 w-8" onClick={() => { setTopUpAccount(a); setTopUpAmount(""); setDialogTab("topup"); }} title="Top Up">
+                          <ArrowUpCircle className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   );
