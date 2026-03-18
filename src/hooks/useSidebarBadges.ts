@@ -70,7 +70,7 @@ export function useSidebarBadges(): Record<string, number> {
     if (!user) return;
 
     const tables = isAdminUser
-      ? ["top_up_requests", "chat_messages", "profiles", "failed_topups"]
+      ? ["top_up_requests", "chat_messages", "profiles", "failed_topups", "ad_account_requests", "bm_access_requests"]
       : ["failed_topups"];
 
     let channel = supabase.channel("sidebar-badges");
