@@ -32,6 +32,7 @@ const ACTION_COLORS: Record<string, string> = {
   "Failed Top-Up Retry": "bg-orange-500/10 text-orange-700 border-orange-200",
   "Failed Top-Up Refund": "bg-pink-500/10 text-pink-700 border-pink-200",
   "Meta Update": "bg-blue-500/10 text-blue-700 border-blue-200",
+  "Withdraw": "bg-amber-500/10 text-amber-700 border-amber-200",
 };
 
 export default function SystemLogsPage() {
