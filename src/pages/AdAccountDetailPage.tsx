@@ -243,7 +243,7 @@ export default function AdAccountDetailPage() {
                       <Input
                         value={newName}
                         onChange={(e) => setNewName(e.target.value)}
-                        className="h-8 w-[280px]"
+                        className="h-8 w-full max-w-[280px]"
                         placeholder="New account name"
                         autoFocus
                       />
