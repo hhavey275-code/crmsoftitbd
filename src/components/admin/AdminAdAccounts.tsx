@@ -387,81 +387,99 @@ export function AdminAdAccounts() {
 
       {/* Mobile Card Layout */}
       {isMobile ? (
-        <div className="space-y-2.5">
+        <div className="space-y-3">
           {paginatedAccounts.map((a: any) => {
             const ins = insights[a.id];
             const uid = getAssignedUserId(a.id);
             const clientName = getClientName(uid);
+            const remaining = Math.max(0, Number(a.spend_cap) - Number(a.amount_spent));
+            const ratio = Number(a.spend_cap) > 0 ? Number(a.amount_spent) / Number(a.spend_cap) : 0;
+            const percentage = Math.min(ratio * 100, 100);
+            const barColor = ratio >= 0.8 ? "bg-destructive" : ratio >= 0.5 ? "bg-yellow-500" : "bg-primary";
+
             return (
               <Card key={a.id} className="border border-border/60 shadow-sm cursor-pointer active:scale-[0.98] transition-transform" onClick={() => navigate(`/ad-accounts/${a.id}`)}>
-                <CardContent className="p-3">
-                  <div className="flex items-start gap-3">
+                <CardContent className="p-4">
+                  {/* Header: Name + Status */}
+                  <div className="flex items-start justify-between mb-1">
                     {showSelect && (
-                      <div className="pt-1" onClick={(e) => e.stopPropagation()}>
+                      <div className="pt-0.5 mr-2" onClick={(e) => e.stopPropagation()}>
                         <Checkbox checked={selectedIds.has(a.id)} onCheckedChange={() => toggleSelect(a.id)} />
                       </div>
                     )}
-                    <div className="flex-1 min-w-0">
-                      {/* Name + status */}
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold truncate">{a.account_name}</p>
-                          <div className="flex items-center gap-1 mt-0.5">
-                            <span className="text-[11px] text-muted-foreground font-mono">{a.account_id.replace(/^act_/, '')}</span>
-                            <a href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${a.account_id.replace(/^act_/, '')}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary" onClick={(e) => e.stopPropagation()}>
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                          </div>
-                        </div>
-                        <StatusBadge status={a.status} />
-                      </div>
-
-                      {/* Spend progress */}
-                      <div className="mt-2" onClick={(e) => e.stopPropagation()}>
-                        <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} />
-                      </div>
-
-                      {/* Insights grid */}
-                      {ins && (
-                        <div className="mt-2 grid grid-cols-3 gap-2 text-center">
-                          <div className="bg-muted/50 rounded-md p-1.5">
-                            <p className="text-[10px] text-muted-foreground">Balance</p>
-                            <p className="text-xs font-semibold">${Number(ins.balance ?? 0).toLocaleString()}</p>
-                          </div>
-                          <div className="bg-muted/50 rounded-md p-1.5">
-                            <p className="text-[10px] text-muted-foreground">Today</p>
-                            <p className="text-xs font-semibold">${Number(ins.today_spend ?? 0).toLocaleString()}</p>
-                          </div>
-                          <div className="bg-muted/50 rounded-md p-1.5">
-                            <p className="text-[10px] text-muted-foreground">Yesterday</p>
-                            <p className="text-xs font-semibold">${Number(ins.yesterday_spend ?? 0).toLocaleString()}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Client + Card */}
-                      <div className="mt-2 flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">
-                          {uid ? (
-                            <span className="text-primary cursor-pointer hover:underline" onClick={(e) => { e.stopPropagation(); navigate(`/clients/${uid}`); }}>{clientName}</span>
-                          ) : "Unassigned"}
-                        </span>
-                        {ins?.cards?.[0] && (
-                          <div className="flex items-center gap-1">
-                            <CardBrandIcon displayString={ins.cards[0].display_string} size="xs" />
-                            <span className="text-muted-foreground">{ins.cards[0].display_string}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Top Up button */}
-                      <div className="mt-2" onClick={(e) => e.stopPropagation()}>
-                        <Button size="sm" className="w-full text-xs h-8" onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}>
-                          <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
-                          Top Up
-                        </Button>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-sm text-foreground truncate">{a.account_name}</p>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span className="text-[11px] text-muted-foreground font-mono">{a.account_id.replace(/^act_/, '')}</span>
+                        <a href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${a.account_id.replace(/^act_/, '')}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary" onClick={(e) => e.stopPropagation()}>
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
                       </div>
                     </div>
+                    <StatusBadge status={a.status} />
+                  </div>
+
+                  {/* Remaining + Progress */}
+                  <div className="mt-3">
+                    <p className="text-sm font-medium text-foreground">
+                      Remaining: <span className="font-bold">${remaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </p>
+                    <div className="h-2 w-full rounded-full bg-muted overflow-hidden mt-1.5">
+                      <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${percentage}%` }} />
+                    </div>
+                  </div>
+
+                  {/* Spent / Limit */}
+                  <div className="flex items-center justify-between mt-2.5">
+                    <div className="flex gap-4 text-xs text-muted-foreground">
+                      <span>Spent: <span className="font-medium text-foreground">${Number(a.amount_spent).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
+                      <span>Limit: <span className="font-medium text-foreground">${Number(a.spend_cap).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
+                    </div>
+                  </div>
+
+                  {/* Insights row */}
+                  {ins && (
+                    <div className="mt-2.5 grid grid-cols-3 gap-2 text-center">
+                      <div className="bg-muted/50 rounded-md p-1.5">
+                        <p className="text-[10px] text-muted-foreground">Today Spend</p>
+                        <p className="text-xs font-semibold">${Number(ins.today_spend ?? 0).toLocaleString()}</p>
+                      </div>
+                      <div className="bg-muted/50 rounded-md p-1.5">
+                        <p className="text-[10px] text-muted-foreground">Yesterday</p>
+                        <p className="text-xs font-semibold">${Number(ins.yesterday_spend ?? 0).toLocaleString()}</p>
+                      </div>
+                      <div className="bg-muted/50 rounded-md p-1.5">
+                        <p className="text-[10px] text-muted-foreground">Balance</p>
+                        <p className="text-xs font-semibold">${Number(ins.balance ?? 0).toLocaleString()}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Client + Card info */}
+                  <div className="mt-2 flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">
+                      {uid ? (
+                        <span className="text-primary cursor-pointer hover:underline" onClick={(e) => { e.stopPropagation(); navigate(`/clients/${uid}`); }}>{clientName}</span>
+                      ) : "Unassigned"}
+                    </span>
+                    {ins?.cards?.[0] && (
+                      <div className="flex items-center gap-1">
+                        <CardBrandIcon displayString={ins.cards[0].display_string} size="xs" />
+                        <span className="text-muted-foreground">{ins.cards[0].display_string}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Top Up button */}
+                  <div className="mt-2.5" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      size="sm"
+                      className="w-full gap-1 bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs h-8"
+                      onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
+                    >
+                      <ArrowUpCircle className="h-3.5 w-3.5" />
+                      Top Up
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
