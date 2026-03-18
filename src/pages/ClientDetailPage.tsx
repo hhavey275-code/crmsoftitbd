@@ -27,11 +27,13 @@ import {
   Plus, Minus, ArrowUpCircle, CreditCard, Shield, Receipt, ShoppingCart, RefreshCw, ListChecks, Search, LayoutDashboard, FileText, LogIn
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function ClientDetailPage() {
   const { userId } = useParams<{ userId: string }>();
   const { user: currentUser, isSuperAdmin } = useAuth();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
 
   const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfMonth(new Date()));
   const [dateTo, setDateTo] = useState<Date | undefined>(endOfMonth(new Date()));
@@ -102,7 +104,6 @@ export default function ClientDetailPage() {
     enabled: !!userId,
   });
 
-  // All ad accounts for assign dialog
   const { data: allAdAccounts } = useQuery({
     queryKey: ["all-ad-accounts-for-assign"],
     queryFn: async () => {
@@ -180,7 +181,6 @@ export default function ClientDetailPage() {
     enabled: !!userId,
   });
 
-  // Fetch admin profiles for processed_by display
   const adminProfileIds = [
     ...new Set(
       (transactions ?? [])
@@ -210,7 +210,6 @@ export default function ClientDetailPage() {
     queryClient.invalidateQueries({ queryKey: ["client-detail-ad-accounts", userId] });
   };
 
-  // Save profile field mutation
   const saveProfileMutation = useMutation({
     mutationFn: async (fields: Record<string, any>) => {
       const { error } = await supabase.from("profiles").update(fields as any).eq("user_id", userId!);
@@ -223,7 +222,6 @@ export default function ClientDetailPage() {
     onError: (err: any) => toast.error(err.message),
   });
 
-  // Wallet adjust mutation
   const walletAdjustMutation = useMutation({
     mutationFn: async () => {
       const amt = parseFloat(walletAmount);
@@ -259,7 +257,6 @@ export default function ClientDetailPage() {
     onError: (err: any) => toast.error(err.message),
   });
 
-  // Top-up mutation (admin)
   const topUpMutation = useMutation({
     mutationFn: async () => {
       const amt = parseFloat(topUpAmount);
@@ -295,56 +292,220 @@ export default function ClientDetailPage() {
   const dueLimit = (profile as any)?.due_limit;
   const walletBalance = Number(wallet?.balance ?? 0);
 
+  const todaySpend = insights ? Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.today_spend ?? 0), 0) : 0;
+  const yesterdaySpend = insights ? Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.yesterday_spend ?? 0), 0) : 0;
+  const todayOrders = insights ? Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.today_orders ?? 0), 0) : 0;
+  const yesterdayOrders = insights ? Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.yesterday_orders ?? 0), 0) : 0;
+
+  // --- Mobile Ad Account Cards ---
+  const renderMobileAdAccountCards = () => (
+    <div className="space-y-3">
+      {adAccounts?.map((acc: any) => {
+        const remaining = Math.max(0, Number(acc.spend_cap) - Number(acc.amount_spent));
+        const ratio = Number(acc.spend_cap) > 0 ? Number(acc.amount_spent) / Number(acc.spend_cap) : 0;
+        const percentage = Math.min(ratio * 100, 100);
+        const barColor = ratio >= 0.8 ? "bg-destructive" : ratio >= 0.5 ? "bg-yellow-500" : "bg-primary";
+
+        return (
+          <Card key={acc.id} className="border border-border/60 shadow-sm">
+            <CardContent className="p-4">
+              {/* Header */}
+              <div className="flex items-start justify-between mb-1">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    {showUnassignCheckboxes && (
+                      <Checkbox
+                        checked={unassignSelectedIds.has(acc.id)}
+                        onCheckedChange={() => {
+                          setUnassignSelectedIds(prev => {
+                            const next = new Set(prev);
+                            if (next.has(acc.id)) next.delete(acc.id);
+                            else next.add(acc.id);
+                            return next;
+                          });
+                        }}
+                      />
+                    )}
+                    <p className="font-semibold text-sm text-foreground truncate">{acc.account_name}</p>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground font-mono mt-0.5">{acc.account_id}</p>
+                </div>
+                <StatusBadge status={acc.status} />
+              </div>
+
+              {/* Remaining + Progress */}
+              <div className="mt-3">
+                <p className="text-sm font-medium text-foreground">
+                  Remaining: <span className="font-bold">${remaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </p>
+                <div className="h-2 w-full rounded-full bg-muted overflow-hidden mt-1.5">
+                  <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${percentage}%` }} />
+                </div>
+              </div>
+
+              {/* Spent / Limit + Top Up */}
+              <div className="flex items-center justify-between mt-2.5">
+                <div className="flex gap-4 text-xs text-muted-foreground">
+                  <span>Spent: <span className="font-medium text-foreground">${Number(acc.amount_spent).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
+                  <span>Limit: <span className="font-medium text-foreground">${Number(acc.spend_cap).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
+                </div>
+                <Button
+                  size="sm"
+                  className="gap-1 bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs"
+                  onClick={() => { setSelectedAccountId(acc.id); setTopUpDialogOpen(true); setTopUpAmount(""); }}
+                >
+                  Top Up
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+      {(!adAccounts || adAccounts.length === 0) && (
+        <p className="text-sm text-muted-foreground py-6 text-center">No ad accounts assigned</p>
+      )}
+    </div>
+  );
+
+  // --- Mobile Transaction Cards ---
+  const renderMobileTransactionCards = () => (
+    <div className="space-y-2">
+      {transactions?.map((tx: any) => {
+        const linkedAccount = tx.reference_id && tx.type === "ad_topup"
+          ? adAccounts?.find((a: any) => a.id === tx.reference_id)
+          : null;
+        const desc = tx.description || "—";
+        const hasNewline = desc.includes("\n");
+        const [descName] = hasNewline ? desc.split("\n") : [desc];
+        const isPositive = Number(tx.amount) >= 0;
+
+        return (
+          <div key={tx.id} className="border border-border/60 rounded-lg p-3 bg-card">
+            <div className="flex items-start justify-between">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium capitalize">{tx.type.replace(/_/g, " ")}</p>
+                <p className="text-[11px] text-muted-foreground truncate">{descName}</p>
+                {linkedAccount && (
+                  <p className="text-[10px] text-muted-foreground font-mono mt-0.5">{linkedAccount.account_name}</p>
+                )}
+              </div>
+              <div className="text-right shrink-0">
+                <p className={cn("text-sm font-semibold", isPositive ? "text-emerald-600" : "text-destructive")}>
+                  {isPositive ? "+" : ""}${Math.abs(Number(tx.amount)).toLocaleString()}
+                </p>
+                <p className="text-[10px] text-muted-foreground">Bal: ${Number(tx.balance_after ?? 0).toLocaleString()}</p>
+              </div>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1">{format(new Date(tx.created_at), "MMM d, yyyy HH:mm")}</p>
+          </div>
+        );
+      })}
+      {(!transactions || transactions.length === 0) && (
+        <p className="text-center text-muted-foreground py-8 text-sm">No transactions yet</p>
+      )}
+    </div>
+  );
+
   return (
     <DashboardLayout>
-      <div className="space-y-5">
+      <div className={cn("space-y-5", isMobile && "space-y-4")}>
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-              <User className="h-5 w-5 text-primary" />
+        {isMobile ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 shrink-0">
+                <User className="h-5 w-5 text-primary" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-lg font-bold text-foreground truncate">{profile?.full_name || "Client"}</h1>
+                  <StatusBadge status={isActive ? "active" : "inactive"} />
+                </div>
+                <p className="text-xs text-muted-foreground truncate">{profile?.email || ""}</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-foreground">{profile?.full_name || "Client Details"}</h1>
-              <p className="text-xs text-muted-foreground">{profile?.email || ""}</p>
-            </div>
-            <StatusBadge status={isActive ? "active" : "inactive"} />
-          </div>
-          <div className="flex items-center gap-2">
-            {isSuperAdmin && (
+            <div className="flex items-center gap-2">
+              {isSuperAdmin && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-blue-600 border-blue-300 h-8 text-xs rounded-full"
+                  onClick={async () => {
+                    try {
+                      const res = await supabase.functions.invoke("impersonate-client", { body: { target_user_id: userId } });
+                      if (res.error) throw new Error(res.error.message);
+                      if (res.data?.error) throw new Error(res.data.error);
+                      if (res.data?.url) { window.open(res.data.url, "_blank"); toast.success("Opening client dashboard..."); }
+                    } catch (err: any) { toast.error(err.message || "Failed"); }
+                  }}
+                >
+                  <LogIn className="h-3 w-3 mr-1" />Login
+                </Button>
+              )}
+              <Button
+                size="sm"
+                className="bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs h-8"
+                onClick={() => { setTopUpDialogOpen(true); setSelectedAccountId(""); setTopUpAmount(""); }}
+              >
+                <ArrowUpCircle className="h-3 w-3 mr-1" />Top Up
+              </Button>
               <Button
                 size="sm"
                 variant="outline"
-                className="text-blue-600 border-blue-300 hover:bg-blue-50"
-                onClick={async () => {
-                  try {
-                    const res = await supabase.functions.invoke("impersonate-client", {
-                      body: { target_user_id: userId },
-                    });
-                    if (res.error) throw new Error(res.error.message);
-                    if (res.data?.error) throw new Error(res.data.error);
-                    if (res.data?.url) {
-                      window.open(res.data.url, "_blank");
-                      toast.success("Opening client dashboard in new tab...");
-                    }
-                  } catch (err: any) {
-                    toast.error(err.message || "Failed to impersonate");
-                  }
-                }}
+                className="h-8 text-xs rounded-full"
+                onClick={() => { setWalletDialogType("credit"); setWalletAmount(""); setWalletNote(""); }}
               >
-                <LogIn className="h-3.5 w-3.5 mr-1" />
-                Login as Client
+                <Plus className="h-3 w-3 mr-1" />Add
               </Button>
-            )}
-            <Button
-              className="bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-5 font-semibold"
-              onClick={() => { setTopUpDialogOpen(true); setSelectedAccountId(""); setTopUpAmount(""); }}
-            >
-              <ArrowUpCircle className="h-4 w-4 mr-2" />
-              Top Up
-            </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs rounded-full text-destructive"
+                onClick={() => { setWalletDialogType("debit"); setWalletAmount(""); setWalletNote(""); }}
+              >
+                <Minus className="h-3 w-3 mr-1" />Deduct
+              </Button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                <User className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-foreground">{profile?.full_name || "Client Details"}</h1>
+                <p className="text-xs text-muted-foreground">{profile?.email || ""}</p>
+              </div>
+              <StatusBadge status={isActive ? "active" : "inactive"} />
+            </div>
+            <div className="flex items-center gap-2">
+              {isSuperAdmin && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                  onClick={async () => {
+                    try {
+                      const res = await supabase.functions.invoke("impersonate-client", { body: { target_user_id: userId } });
+                      if (res.error) throw new Error(res.error.message);
+                      if (res.data?.error) throw new Error(res.data.error);
+                      if (res.data?.url) { window.open(res.data.url, "_blank"); toast.success("Opening client dashboard in new tab..."); }
+                    } catch (err: any) { toast.error(err.message || "Failed to impersonate"); }
+                  }}
+                >
+                  <LogIn className="h-3.5 w-3.5 mr-1" />Login as Client
+                </Button>
+              )}
+              <Button
+                className="bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-5 font-semibold"
+                onClick={() => { setTopUpDialogOpen(true); setSelectedAccountId(""); setTopUpAmount(""); }}
+              >
+                <ArrowUpCircle className="h-4 w-4 mr-2" />Top Up
+              </Button>
+            </div>
+          </div>
+        )}
 
         {!isActive && (
           <div className="rounded-lg bg-destructive/10 border border-destructive/30 p-3 text-sm text-destructive font-medium">
@@ -353,61 +514,63 @@ export default function ClientDetailPage() {
         )}
 
         {/* Date Range Filter */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground">Period:</span>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className={cn("w-[140px] justify-start text-left font-normal", !dateFrom && "text-muted-foreground")}>
-                <CalendarIcon className="mr-1 h-3 w-3" />
-                {dateFrom ? format(dateFrom, "MMM d, yyyy") : "From"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className="p-3 pointer-events-auto" />
-            </PopoverContent>
-          </Popover>
-          <span className="text-muted-foreground">—</span>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className={cn("w-[140px] justify-start text-left font-normal", !dateTo && "text-muted-foreground")}>
-                <CalendarIcon className="mr-1 h-3 w-3" />
-                {dateTo ? format(dateTo, "MMM d, yyyy") : "To"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className="p-3 pointer-events-auto" />
-            </PopoverContent>
-          </Popover>
-        </div>
+        {!isMobile && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-muted-foreground">Period:</span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className={cn("w-[140px] justify-start text-left font-normal", !dateFrom && "text-muted-foreground")}>
+                  <CalendarIcon className="mr-1 h-3 w-3" />
+                  {dateFrom ? format(dateFrom, "MMM d, yyyy") : "From"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
+            <span className="text-muted-foreground">—</span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className={cn("w-[140px] justify-start text-left font-normal", !dateTo && "text-muted-foreground")}>
+                  <CalendarIcon className="mr-1 h-3 w-3" />
+                  {dateTo ? format(dateTo, "MMM d, yyyy") : "To"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
+          </div>
+        )}
 
-        {/* Main Tabs: Client Info, Overview, Transactions */}
+        {/* Main Tabs */}
         <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList className="bg-muted/60 p-1 rounded-lg">
-            <TabsTrigger value="info" className="gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+          <TabsList className={cn("bg-muted/60 p-1 rounded-lg", isMobile && "w-full")}>
+            <TabsTrigger value="info" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "flex-1 text-xs")}>
               <User className="h-3.5 w-3.5" />
-              Client Info
+              {isMobile ? "Info" : "Client Info"}
             </TabsTrigger>
-            <TabsTrigger value="overview" className="gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            <TabsTrigger value="overview" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "flex-1 text-xs")}>
               <LayoutDashboard className="h-3.5 w-3.5" />
               Overview
             </TabsTrigger>
-            <TabsTrigger value="transactions" className="gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            <TabsTrigger value="transactions" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "flex-1 text-xs")}>
               <Receipt className="h-3.5 w-3.5" />
-              Transactions
+              {isMobile ? "Txns" : "Transactions"}
             </TabsTrigger>
           </TabsList>
 
           {/* Client Info Tab */}
           <TabsContent value="info" className="mt-0">
             <Card className={cn("border-border/40 shadow-[0_2px_12px_rgba(0,0,0,0.04)]", !isActive && "border-destructive/50 bg-destructive/5")}>
-              <CardHeader className="pb-4">
+              <CardHeader className={cn("pb-4", isMobile && "p-4 pb-3")}>
                 <CardTitle className="text-base flex items-center gap-2">
                   <User className="h-4 w-4 text-primary" />
                   Client Information
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              <CardContent className={cn(isMobile && "px-4 pb-4")}>
+                <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3")}>
                   {/* Full Name */}
                   <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-muted/30 p-4 transition-colors hover:bg-muted/50">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
@@ -419,7 +582,7 @@ export default function ClientDetailPage() {
                     </div>
                   </div>
 
-                  {/* Business Name - editable */}
+                  {/* Business Name */}
                   <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-muted/30 p-4 transition-colors hover:bg-muted/50">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/10">
                       <Building2 className="h-4 w-4 text-violet-600" />
@@ -429,22 +592,16 @@ export default function ClientDetailPage() {
                       {editingCompany ? (
                         <div className="flex items-center gap-1 mt-1">
                           <Input className="w-24 h-7 text-sm" value={companyInput} onChange={(e) => setCompanyInput(e.target.value)} />
-                          <Button size="icon" className="h-7 w-7" onClick={() => { saveProfileMutation.mutate({ company: companyInput }); setEditingCompany(false); }}>
-                            <Save className="h-3 w-3" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingCompany(false)}>
-                            <XCircle className="h-3 w-3" />
-                          </Button>
+                          <Button size="icon" className="h-7 w-7" onClick={() => { saveProfileMutation.mutate({ company: companyInput }); setEditingCompany(false); }}><Save className="h-3 w-3" /></Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingCompany(false)}><XCircle className="h-3 w-3" /></Button>
                         </div>
                       ) : (
-                        <p className="font-semibold text-sm cursor-pointer hover:text-primary transition-colors" onClick={() => { setCompanyInput(profile?.company ?? ""); setEditingCompany(true); }}>
-                          {profile?.company || "—"}
-                        </p>
+                        <p className="font-semibold text-sm cursor-pointer hover:text-primary transition-colors" onClick={() => { setCompanyInput(profile?.company ?? ""); setEditingCompany(true); }}>{profile?.company || "—"}</p>
                       )}
                     </div>
                   </div>
 
-                  {/* Phone - editable */}
+                  {/* Phone */}
                   <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-muted/30 p-4 transition-colors hover:bg-muted/50">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10">
                       <Phone className="h-4 w-4 text-emerald-600" />
@@ -454,17 +611,11 @@ export default function ClientDetailPage() {
                       {editingPhone ? (
                         <div className="flex items-center gap-1 mt-1">
                           <Input className="w-28 h-7 text-sm" value={phoneInput} onChange={(e) => setPhoneInput(e.target.value)} />
-                          <Button size="icon" className="h-7 w-7" onClick={() => { saveProfileMutation.mutate({ phone: phoneInput }); setEditingPhone(false); }}>
-                            <Save className="h-3 w-3" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingPhone(false)}>
-                            <XCircle className="h-3 w-3" />
-                          </Button>
+                          <Button size="icon" className="h-7 w-7" onClick={() => { saveProfileMutation.mutate({ phone: phoneInput }); setEditingPhone(false); }}><Save className="h-3 w-3" /></Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingPhone(false)}><XCircle className="h-3 w-3" /></Button>
                         </div>
                       ) : (
-                        <p className="font-semibold text-sm cursor-pointer hover:text-primary transition-colors" onClick={() => { setPhoneInput(profile?.phone ?? ""); setEditingPhone(true); }}>
-                          {profile?.phone || "—"}
-                        </p>
+                        <p className="font-semibold text-sm cursor-pointer hover:text-primary transition-colors" onClick={() => { setPhoneInput(profile?.phone ?? ""); setEditingPhone(true); }}>{profile?.phone || "—"}</p>
                       )}
                     </div>
                   </div>
@@ -476,13 +627,11 @@ export default function ClientDetailPage() {
                     </div>
                     <div>
                       <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Onboarding Date</p>
-                      <p className="font-semibold text-sm">
-                        {profile?.created_at ? format(new Date(profile.created_at), "MMM d, yyyy") : "—"}
-                      </p>
+                      <p className="font-semibold text-sm">{profile?.created_at ? format(new Date(profile.created_at), "MMM d, yyyy") : "—"}</p>
                     </div>
                   </div>
 
-                  {/* USD Rate - editable */}
+                  {/* USD Rate */}
                   <div className="flex items-center gap-3 rounded-xl border border-cyan-200/60 bg-cyan-50/40 dark:bg-cyan-950/20 dark:border-cyan-800/40 p-4 transition-colors hover:bg-cyan-50/60">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-cyan-500/10">
                       <DollarSign className="h-4 w-4 text-cyan-600" />
@@ -492,12 +641,8 @@ export default function ClientDetailPage() {
                       {editingRate ? (
                         <div className="flex items-center gap-1 mt-1">
                           <Input type="number" step="0.01" className="w-20 h-7 text-sm" value={rateInput} onChange={(e) => setRateInput(e.target.value)} placeholder="e.g. 125" />
-                          <Button size="icon" className="h-7 w-7" onClick={() => { saveProfileMutation.mutate({ usd_rate: rateInput.trim() === "" ? null : parseFloat(rateInput) }); setEditingRate(false); }}>
-                            <Save className="h-3 w-3" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingRate(false)}>
-                            <XCircle className="h-3 w-3" />
-                          </Button>
+                          <Button size="icon" className="h-7 w-7" onClick={() => { saveProfileMutation.mutate({ usd_rate: rateInput.trim() === "" ? null : parseFloat(rateInput) }); setEditingRate(false); }}><Save className="h-3 w-3" /></Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingRate(false)}><XCircle className="h-3 w-3" /></Button>
                         </div>
                       ) : (
                         <p className="font-semibold text-sm text-cyan-700 dark:text-cyan-400 cursor-pointer hover:text-cyan-500 transition-colors" onClick={() => { setRateInput(clientRate?.toString() ?? ""); setEditingRate(true); }}>
@@ -507,7 +652,7 @@ export default function ClientDetailPage() {
                     </div>
                   </div>
 
-                  {/* Due Limit - editable */}
+                  {/* Due Limit */}
                   <div className="flex items-center gap-3 rounded-xl border border-amber-200/60 bg-amber-50/40 dark:bg-amber-950/20 dark:border-amber-800/40 p-4 transition-colors hover:bg-amber-50/60">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/10">
                       <Shield className="h-4 w-4 text-amber-600" />
@@ -517,12 +662,8 @@ export default function ClientDetailPage() {
                       {editingDueLimit ? (
                         <div className="flex items-center gap-1 mt-1">
                           <Input type="number" step="1" className="w-20 h-7 text-sm" value={dueLimitInput} onChange={(e) => setDueLimitInput(e.target.value)} placeholder="e.g. 500" />
-                          <Button size="icon" className="h-7 w-7" onClick={() => { saveProfileMutation.mutate({ due_limit: dueLimitInput.trim() === "" ? null : parseFloat(dueLimitInput) } as any); setEditingDueLimit(false); }}>
-                            <Save className="h-3 w-3" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingDueLimit(false)}>
-                            <XCircle className="h-3 w-3" />
-                          </Button>
+                          <Button size="icon" className="h-7 w-7" onClick={() => { saveProfileMutation.mutate({ due_limit: dueLimitInput.trim() === "" ? null : parseFloat(dueLimitInput) } as any); setEditingDueLimit(false); }}><Save className="h-3 w-3" /></Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingDueLimit(false)}><XCircle className="h-3 w-3" /></Button>
                         </div>
                       ) : (
                         <p className="font-semibold text-sm text-amber-700 dark:text-amber-400 cursor-pointer hover:text-amber-500 transition-colors" onClick={() => { setDueLimitInput(dueLimit?.toString() ?? ""); setEditingDueLimit(true); }}>
@@ -537,9 +678,9 @@ export default function ClientDetailPage() {
           </TabsContent>
 
           {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-5 mt-0">
-            {/* Today's Performance */}
-            <div className="flex items-center justify-between">
+          <TabsContent value="overview" className="space-y-4 mt-0">
+            {/* Performance header */}
+            <div className={cn("flex items-center justify-between", isMobile && "flex-col items-start gap-2")}>
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Today's Performance</h3>
               <Button
                 variant="outline"
@@ -551,85 +692,119 @@ export default function ClientDetailPage() {
                   setInsightsLoading(true);
                   try {
                     const ids = adAccounts.map((a: any) => a.id);
-                    await supabase.functions.invoke("get-account-insights", {
-                      body: { ad_account_ids: ids, source: "meta" },
-                    });
+                    await supabase.functions.invoke("get-account-insights", { body: { ad_account_ids: ids, source: "meta" } });
                     await refetchInsights();
                     toast.success("Insights updated from Meta!");
-                  } catch {
-                    toast.error("Failed to update from Meta");
-                  } finally {
-                    setInsightsLoading(false);
-                  }
+                  } catch { toast.error("Failed to update from Meta"); } finally { setInsightsLoading(false); }
                 }}
               >
                 <RefreshCw className={cn("h-3.5 w-3.5 mr-1.5", insightsLoading && "animate-spin")} />
                 {insightsLoading ? "Updating..." : "Update from Meta"}
               </Button>
             </div>
-            <Card className="bg-card/50 border-border/40 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-              <CardContent className="p-4">
-                {/* Row 1: 5 cards */}
-                <div className="grid gap-2 grid-cols-2 lg:grid-cols-5">
-                  <div className="relative">
-                     <MetricCard
-                      title="Wallet Balance"
-                      value={`$${walletBalance.toLocaleString()}`}
-                      icon={Wallet}
-                      iconBg="bg-green-100 dark:bg-green-900/50"
-                      iconColor="text-green-600"
-                      size="sm"
-                    />
-                    <div className="absolute top-1.5 right-1.5 flex gap-0.5">
-                      <Button size="icon" variant="ghost" className="h-5 w-5 text-green-600 hover:bg-green-100" onClick={() => { setWalletDialogType("credit"); setWalletAmount(""); setWalletNote(""); }}>
-                        <Plus className="h-3 w-3" />
-                      </Button>
-                      <Button size="icon" variant="ghost" className="h-5 w-5 text-red-600 hover:bg-red-100" onClick={() => { setWalletDialogType("debit"); setWalletAmount(""); setWalletNote(""); }}>
-                        <Minus className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                  <MetricCard title="Total Ad Accounts" value={adAccounts?.length ?? 0} icon={MonitorSmartphone} iconBg="bg-blue-100 dark:bg-blue-900/50" iconColor="text-blue-600" size="sm" />
-                  <MetricCard title="Active Accounts" value={activeAccounts.length} icon={CheckCircle} iconBg="bg-emerald-100 dark:bg-emerald-900/50" iconColor="text-emerald-600" size="sm" />
-                  <MetricCard title="Disabled Accounts" value={disabledAccounts.length} icon={XCircle} iconBg="bg-red-100 dark:bg-red-900/50" iconColor="text-red-600" size="sm" />
-                  <MetricCard title="Remaining Balance" value={`$${totalRemaining.toLocaleString()}`} subtitle="All ad accounts" icon={Wallet} iconBg="bg-indigo-100 dark:bg-indigo-900/50" iconColor="text-indigo-600" size="sm" />
-                </div>
-                {/* Row 2: 4 cards */}
-                <div className="grid gap-2 grid-cols-2 lg:grid-cols-4 mt-2">
-                  <MetricCard
-                    title="Today's Spend"
-                    value={`$${(insights ? Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.today_spend ?? 0), 0) : 0).toLocaleString()}`}
-                    subtitle={`Yesterday: $${(insights ? Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.yesterday_spend ?? 0), 0) : 0).toLocaleString()}`}
-                    icon={DollarSign}
-                    iconBg="bg-emerald-100 dark:bg-emerald-900/50"
-                    iconColor="text-emerald-600"
-                    size="sm"
-                  />
-                  <MetricCard
-                    title="Today's Orders"
-                    value={(insights ? Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.today_orders ?? 0), 0) : 0).toLocaleString()}
-                    subtitle={`Yesterday: ${(insights ? Object.values(insights).reduce((sum: number, i: any) => sum + Number(i.yesterday_orders ?? 0), 0) : 0).toLocaleString()}`}
-                    icon={ShoppingCart}
-                    iconBg="bg-blue-100 dark:bg-blue-900/50"
-                    iconColor="text-blue-600"
-                    size="sm"
-                  />
-                  <MetricCard title="Total Top-Up" value={`$${Number(topUpTotal ?? 0).toLocaleString()}`} subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"} icon={TrendingUp} iconBg="bg-orange-100 dark:bg-orange-900/50" iconColor="text-orange-600" size="sm" />
-                  <MetricCard title="Total Spending" value={`$${(totalSpendingFiltered ?? totalSpending).toLocaleString()}`} subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"} icon={TrendingDown} iconBg="bg-purple-100 dark:bg-purple-900/50" iconColor="text-purple-600" size="sm" />
-                </div>
-              </CardContent>
-            </Card>
 
-            {/* Ad Accounts Table */}
-            <Card className="border-border/40 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-              <CardHeader className="flex flex-row items-center justify-between pb-3">
-                <CardTitle className="text-base font-semibold">Ad Accounts ({adAccounts?.length ?? 0})</CardTitle>
-                <div className="flex items-center gap-2">
+            {/* Metrics */}
+            {isMobile ? (
+              <div className="space-y-3">
+                {/* Wallet Hero */}
+                <Card className="bg-gradient-to-br from-primary/90 to-blue-600 text-primary-foreground border-0 shadow-lg shadow-primary/20">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-medium text-primary-foreground/70">Wallet Balance</p>
+                        <p className="text-3xl font-bold">${walletBalance.toLocaleString()}</p>
+                      </div>
+                      <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center">
+                        <Wallet className="h-6 w-6" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* 2x2 compact metrics */}
+                <div className="grid grid-cols-2 gap-2">
+                  <Card className="bg-card border border-border/60">
+                    <CardContent className="p-3 text-center">
+                      <p className="text-[10px] text-muted-foreground font-medium">Ad Accounts</p>
+                      <p className="text-lg font-bold text-foreground">{adAccounts?.length ?? 0}</p>
+                      <p className="text-[10px] text-muted-foreground">{activeAccounts.length} active</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-card border border-border/60">
+                    <CardContent className="p-3 text-center">
+                      <p className="text-[10px] text-muted-foreground font-medium">Remaining</p>
+                      <p className="text-lg font-bold text-foreground">${totalRemaining.toLocaleString()}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-card border border-border/60">
+                    <CardContent className="p-3 text-center">
+                      <p className="text-[10px] text-muted-foreground font-medium">Today Spend</p>
+                      <p className="text-lg font-bold text-foreground">${todaySpend.toLocaleString()}</p>
+                      <p className="text-[10px] text-muted-foreground">Y: ${yesterdaySpend.toLocaleString()}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-card border border-border/60">
+                    <CardContent className="p-3 text-center">
+                      <p className="text-[10px] text-muted-foreground font-medium">Today Orders</p>
+                      <p className="text-lg font-bold text-foreground">{todayOrders.toLocaleString()}</p>
+                      <p className="text-[10px] text-muted-foreground">Y: {yesterdayOrders.toLocaleString()}</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Bottom row: Top-Up + Spending */}
+                <div className="grid grid-cols-2 gap-2">
+                  <Card className="bg-card border border-border/60">
+                    <CardContent className="p-3 text-center">
+                      <p className="text-[10px] text-muted-foreground font-medium">Total Top-Up</p>
+                      <p className="text-lg font-bold text-foreground">${Number(topUpTotal ?? 0).toLocaleString()}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-card border border-border/60">
+                    <CardContent className="p-3 text-center">
+                      <p className="text-[10px] text-muted-foreground font-medium">Total Spending</p>
+                      <p className="text-lg font-bold text-foreground">${(totalSpendingFiltered ?? totalSpending).toLocaleString()}</p>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            ) : (
+              /* Desktop Metrics */
+              <Card className="bg-card/50 border-border/40 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+                <CardContent className="p-4">
+                  <div className="grid gap-2 grid-cols-2 lg:grid-cols-5">
+                    <div className="relative">
+                      <MetricCard title="Wallet Balance" value={`$${walletBalance.toLocaleString()}`} icon={Wallet} iconBg="bg-green-100 dark:bg-green-900/50" iconColor="text-green-600" size="sm" />
+                      <div className="absolute top-1.5 right-1.5 flex gap-0.5">
+                        <Button size="icon" variant="ghost" className="h-5 w-5 text-green-600 hover:bg-green-100" onClick={() => { setWalletDialogType("credit"); setWalletAmount(""); setWalletNote(""); }}><Plus className="h-3 w-3" /></Button>
+                        <Button size="icon" variant="ghost" className="h-5 w-5 text-red-600 hover:bg-red-100" onClick={() => { setWalletDialogType("debit"); setWalletAmount(""); setWalletNote(""); }}><Minus className="h-3 w-3" /></Button>
+                      </div>
+                    </div>
+                    <MetricCard title="Total Ad Accounts" value={adAccounts?.length ?? 0} icon={MonitorSmartphone} iconBg="bg-blue-100 dark:bg-blue-900/50" iconColor="text-blue-600" size="sm" />
+                    <MetricCard title="Active Accounts" value={activeAccounts.length} icon={CheckCircle} iconBg="bg-emerald-100 dark:bg-emerald-900/50" iconColor="text-emerald-600" size="sm" />
+                    <MetricCard title="Disabled Accounts" value={disabledAccounts.length} icon={XCircle} iconBg="bg-red-100 dark:bg-red-900/50" iconColor="text-red-600" size="sm" />
+                    <MetricCard title="Remaining Balance" value={`$${totalRemaining.toLocaleString()}`} subtitle="All ad accounts" icon={Wallet} iconBg="bg-indigo-100 dark:bg-indigo-900/50" iconColor="text-indigo-600" size="sm" />
+                  </div>
+                  <div className="grid gap-2 grid-cols-2 lg:grid-cols-4 mt-2">
+                    <MetricCard title="Today's Spend" value={`$${todaySpend.toLocaleString()}`} subtitle={`Yesterday: $${yesterdaySpend.toLocaleString()}`} icon={DollarSign} iconBg="bg-emerald-100 dark:bg-emerald-900/50" iconColor="text-emerald-600" size="sm" />
+                    <MetricCard title="Today's Orders" value={todayOrders.toLocaleString()} subtitle={`Yesterday: ${yesterdayOrders.toLocaleString()}`} icon={ShoppingCart} iconBg="bg-blue-100 dark:bg-blue-900/50" iconColor="text-blue-600" size="sm" />
+                    <MetricCard title="Total Top-Up" value={`$${Number(topUpTotal ?? 0).toLocaleString()}`} subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"} icon={TrendingUp} iconBg="bg-orange-100 dark:bg-orange-900/50" iconColor="text-orange-600" size="sm" />
+                    <MetricCard title="Total Spending" value={`$${(totalSpendingFiltered ?? totalSpending).toLocaleString()}`} subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"} icon={TrendingDown} iconBg="bg-purple-100 dark:bg-purple-900/50" iconColor="text-purple-600" size="sm" />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Ad Accounts */}
+            <div>
+              <div className={cn("flex items-center justify-between mb-3", isMobile && "mb-2")}>
+                <h2 className="text-base font-semibold text-foreground">Ad Accounts ({adAccounts?.length ?? 0})</h2>
+                <div className="flex items-center gap-1.5">
                   {showUnassignCheckboxes && unassignSelectedIds.size > 0 && (
                     <Button
                       variant="outline"
                       size="sm"
-                      className="rounded-full"
+                      className="rounded-full text-xs h-7"
                       onClick={async () => {
                         const ids = Array.from(unassignSelectedIds);
                         for (const adAccountId of ids) {
@@ -642,184 +817,179 @@ export default function ClientDetailPage() {
                         queryClient.invalidateQueries({ queryKey: ["admin-user-ad-accounts"] });
                       }}
                     >
-                      Unassign {unassignSelectedIds.size} Selected
+                      Unassign {unassignSelectedIds.size}
                     </Button>
                   )}
                   <Button
                     variant={showUnassignCheckboxes ? "secondary" : "ghost"}
                     size="icon"
-                    className="h-8 w-8 rounded-full"
-                    onClick={() => {
-                      setShowUnassignCheckboxes(v => !v);
-                      if (showUnassignCheckboxes) setUnassignSelectedIds(new Set());
-                    }}
-                    title="Toggle selection"
+                    className="h-7 w-7 rounded-full"
+                    onClick={() => { setShowUnassignCheckboxes(v => !v); if (showUnassignCheckboxes) setUnassignSelectedIds(new Set()); }}
                   >
-                    <ListChecks className="h-4 w-4" />
+                    <ListChecks className="h-3.5 w-3.5" />
                   </Button>
-                  <Button size="sm" className="rounded-full" onClick={() => { setShowAssignDialog(true); setAssignSelectedIds(new Set()); setAssignSearch(""); }}>
-                    <Plus className="h-3.5 w-3.5 mr-1" />
-                    Assign
+                  <Button size="sm" className="rounded-full h-7 text-xs" onClick={() => { setShowAssignDialog(true); setAssignSelectedIds(new Set()); setAssignSearch(""); }}>
+                    <Plus className="h-3 w-3 mr-1" />Assign
                   </Button>
                 </div>
-              </CardHeader>
-              <CardContent>
-                {adAccounts?.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-6 text-center">No ad accounts assigned</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="hover:bg-transparent">
-                          {showUnassignCheckboxes && (
-                            <TableHead className="w-[40px]">
-                              <Checkbox
-                                checked={adAccounts?.length > 0 && adAccounts?.every((a: any) => unassignSelectedIds.has(a.id))}
-                                onCheckedChange={() => {
-                                  if (adAccounts?.every((a: any) => unassignSelectedIds.has(a.id))) {
-                                    setUnassignSelectedIds(new Set());
-                                  } else {
-                                    setUnassignSelectedIds(new Set(adAccounts?.map((a: any) => a.id)));
-                                  }
-                                }}
-                              />
-                            </TableHead>
-                          )}
-                          <TableHead className="w-[35%]">Account</TableHead>
-                          <TableHead className="w-[20%]">Status</TableHead>
-                          <TableHead className="w-[30%]">Spend Progress</TableHead>
-                          <TableHead className="w-[15%] text-right">Action</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {adAccounts?.map((acc: any) => (
-                          <TableRow key={acc.id}>
-                            {showUnassignCheckboxes && (
-                              <TableCell>
-                                <Checkbox
-                                  checked={unassignSelectedIds.has(acc.id)}
-                                  onCheckedChange={() => {
-                                    setUnassignSelectedIds(prev => {
-                                      const next = new Set(prev);
-                                      if (next.has(acc.id)) next.delete(acc.id);
-                                      else next.add(acc.id);
-                                      return next;
-                                    });
-                                  }}
-                                />
-                              </TableCell>
-                            )}
-                            <TableCell>
-                              <p className="font-medium text-sm">{acc.account_name}</p>
-                              <p className="text-xs text-muted-foreground font-mono">{acc.account_id}</p>
-                            </TableCell>
-                            <TableCell><StatusBadge status={acc.status} /></TableCell>
-                            <TableCell>
-                              <SpendProgressBar amountSpent={Number(acc.amount_spent)} spendCap={Number(acc.spend_cap)} />
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                size="sm"
-                                className="rounded-full bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-sm px-3 text-xs font-semibold"
-                                onClick={() => { setSelectedAccountId(acc.id); setTopUpDialogOpen(true); setTopUpAmount(""); }}
-                              >
-                                <ArrowUpCircle className="h-3 w-3 mr-1" />
-                                Top Up
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+              </div>
+
+              {isMobile ? (
+                renderMobileAdAccountCards()
+              ) : (
+                <Card className="border-border/40 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+                  <CardContent className="p-0">
+                    {adAccounts?.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-6 text-center">No ad accounts assigned</p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="hover:bg-transparent">
+                              {showUnassignCheckboxes && (
+                                <TableHead className="w-[40px]">
+                                  <Checkbox
+                                    checked={adAccounts?.length > 0 && adAccounts?.every((a: any) => unassignSelectedIds.has(a.id))}
+                                    onCheckedChange={() => {
+                                      if (adAccounts?.every((a: any) => unassignSelectedIds.has(a.id))) setUnassignSelectedIds(new Set());
+                                      else setUnassignSelectedIds(new Set(adAccounts?.map((a: any) => a.id)));
+                                    }}
+                                  />
+                                </TableHead>
+                              )}
+                              <TableHead className="w-[35%]">Account</TableHead>
+                              <TableHead className="w-[20%]">Status</TableHead>
+                              <TableHead className="w-[30%]">Spend Progress</TableHead>
+                              <TableHead className="w-[15%] text-right">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {adAccounts?.map((acc: any) => (
+                              <TableRow key={acc.id} className="hover:bg-muted/30">
+                                {showUnassignCheckboxes && (
+                                  <TableCell>
+                                    <Checkbox
+                                      checked={unassignSelectedIds.has(acc.id)}
+                                      onCheckedChange={() => {
+                                        setUnassignSelectedIds(prev => {
+                                          const next = new Set(prev);
+                                          if (next.has(acc.id)) next.delete(acc.id);
+                                          else next.add(acc.id);
+                                          return next;
+                                        });
+                                      }}
+                                    />
+                                  </TableCell>
+                                )}
+                                <TableCell>
+                                  <p className="font-medium text-sm">{acc.account_name}</p>
+                                  <p className="text-xs text-muted-foreground font-mono">{acc.account_id}</p>
+                                </TableCell>
+                                <TableCell><StatusBadge status={acc.status} /></TableCell>
+                                <TableCell><SpendProgressBar amountSpent={Number(acc.amount_spent)} spendCap={Number(acc.spend_cap)} /></TableCell>
+                                <TableCell className="text-right">
+                                  <Button
+                                    size="sm"
+                                    className="rounded-full bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-sm px-3 text-xs font-semibold"
+                                    onClick={() => { setSelectedAccountId(acc.id); setTopUpDialogOpen(true); setTopUpAmount(""); }}
+                                  >
+                                    <ArrowUpCircle className="h-3 w-3 mr-1" />Top Up
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </TabsContent>
 
           {/* Transactions Tab */}
           <TabsContent value="transactions" className="mt-0">
-            <Card className="border-border/40 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-semibold">Transaction History</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="hover:bg-transparent">
-                        <TableHead>Date</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead>Ad Account</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Balance After</TableHead>
-                        <TableHead>Processed By</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {transactions?.map((tx: any) => {
-                        const linkedAccount = tx.reference_id && tx.type === "ad_topup"
-                          ? adAccounts?.find((a: any) => a.id === tx.reference_id)
-                          : null;
-                        const desc = tx.description || "—";
-                        const hasNewline = desc.includes("\n");
-                        const [descName, descId] = hasNewline ? desc.split("\n") : [desc, null];
-                        const pb = tx.processed_by || "";
-                        let processedByLabel = "—";
-                        if (pb === "system") processedByLabel = "Auto Approved by System";
-                        else if (pb.startsWith("admin:")) {
-                          const adminId = pb.split(":")[1];
-                          const adminProf = allProfiles?.find((p: any) => p.user_id === adminId);
-                          processedByLabel = adminProf?.full_name || adminProf?.email || adminId.slice(0, 8);
-                        } else if (pb.startsWith("client:")) {
-                          processedByLabel = profile?.full_name || profile?.email || "Client";
-                        }
-                        return (
-                          <TableRow key={tx.id}>
-                            <TableCell className="text-muted-foreground whitespace-nowrap text-xs">{format(new Date(tx.created_at), "MMM d, yyyy HH:mm")}</TableCell>
-                            <TableCell className="capitalize font-medium text-xs">{tx.type.replace(/_/g, " ")}</TableCell>
-                            <TableCell className="text-xs">
-                              {hasNewline ? (
-                                <div>
-                                  <span>{descName}</span>
-                                  <span className="block text-[11px] text-muted-foreground">{descId}</span>
-                                </div>
-                              ) : desc}
-                            </TableCell>
-                            <TableCell className="text-xs">
-                              {linkedAccount ? (
-                                <div>
-                                  <p className="font-medium">{linkedAccount.account_name}</p>
-                                  <p className="text-[11px] text-muted-foreground font-mono">{linkedAccount.account_id.replace(/^act_/, "")}</p>
-                                </div>
-                              ) : (
-                                <span className="text-muted-foreground">—</span>
-                              )}
-                            </TableCell>
-                            <TableCell className={cn("font-semibold text-xs", Number(tx.amount) >= 0 ? "text-green-600" : "text-red-600")}>
-                              {Number(tx.amount) >= 0 ? "+" : ""}${Math.abs(Number(tx.amount)).toLocaleString()}
-                            </TableCell>
-                            <TableCell className="font-medium text-xs">${Number(tx.balance_after ?? 0).toLocaleString()}</TableCell>
-                            <TableCell className="text-xs text-muted-foreground">{processedByLabel}</TableCell>
-                          </TableRow>
-                        );
-                      })}
-                      {(!transactions || transactions.length === 0) && (
-                        <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No transactions yet</TableCell></TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
+            {isMobile ? (
+              <div>
+                <h2 className="text-base font-semibold mb-3">Transaction History</h2>
+                {renderMobileTransactionCards()}
+              </div>
+            ) : (
+              <Card className="border-border/40 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base font-semibold">Transaction History</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead>Date</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead>Ad Account</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Balance After</TableHead>
+                          <TableHead>Processed By</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {transactions?.map((tx: any) => {
+                          const linkedAccount = tx.reference_id && tx.type === "ad_topup"
+                            ? adAccounts?.find((a: any) => a.id === tx.reference_id)
+                            : null;
+                          const desc = tx.description || "—";
+                          const hasNewline = desc.includes("\n");
+                          const [descName, descId] = hasNewline ? desc.split("\n") : [desc, null];
+                          const pb = tx.processed_by || "";
+                          let processedByLabel = "—";
+                          if (pb === "system") processedByLabel = "Auto Approved by System";
+                          else if (pb.startsWith("admin:")) {
+                            const adminId = pb.split(":")[1];
+                            const adminProf = allProfiles?.find((p: any) => p.user_id === adminId);
+                            processedByLabel = adminProf?.full_name || adminProf?.email || adminId.slice(0, 8);
+                          } else if (pb.startsWith("client:")) {
+                            processedByLabel = profile?.full_name || profile?.email || "Client";
+                          }
+                          return (
+                            <TableRow key={tx.id}>
+                              <TableCell className="text-muted-foreground whitespace-nowrap text-xs">{format(new Date(tx.created_at), "MMM d, yyyy HH:mm")}</TableCell>
+                              <TableCell className="capitalize font-medium text-xs">{tx.type.replace(/_/g, " ")}</TableCell>
+                              <TableCell className="text-xs">
+                                {hasNewline ? (
+                                  <div><span>{descName}</span><span className="block text-[11px] text-muted-foreground">{descId}</span></div>
+                                ) : desc}
+                              </TableCell>
+                              <TableCell className="text-xs">
+                                {linkedAccount ? (
+                                  <div><p className="font-medium">{linkedAccount.account_name}</p><p className="text-[11px] text-muted-foreground font-mono">{linkedAccount.account_id.replace(/^act_/, "")}</p></div>
+                                ) : (<span className="text-muted-foreground">—</span>)}
+                              </TableCell>
+                              <TableCell className={cn("font-semibold text-xs", Number(tx.amount) >= 0 ? "text-emerald-600" : "text-destructive")}>
+                                {Number(tx.amount) >= 0 ? "+" : ""}${Math.abs(Number(tx.amount)).toLocaleString()}
+                              </TableCell>
+                              <TableCell className="font-medium text-xs">${Number(tx.balance_after ?? 0).toLocaleString()}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground">{processedByLabel}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                        {(!transactions || transactions.length === 0) && (
+                          <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No transactions yet</TableCell></TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
       </div>
 
       {/* Assign Accounts Dialog */}
       <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
-        <DialogContent className="max-h-[80vh] overflow-y-auto">
+        <DialogContent className={cn("max-h-[80vh] overflow-y-auto", isMobile && "max-w-[95vw]")}>
           <DialogHeader>
             <DialogTitle>Assign Ad Accounts</DialogTitle>
             <DialogDescription>Select accounts to assign to this client.</DialogDescription>
@@ -827,12 +997,7 @@ export default function ClientDetailPage() {
           <div className="py-2 space-y-2">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name or ID..."
-                value={assignSearch}
-                onChange={(e) => setAssignSearch(e.target.value)}
-                className="pl-9 h-9"
-              />
+              <Input placeholder="Search by name or ID..." value={assignSearch} onChange={(e) => setAssignSearch(e.target.value)} className="pl-9 h-9" />
             </div>
             <div className="max-h-[50vh] overflow-y-auto space-y-1">
               {(() => {
@@ -894,9 +1059,7 @@ export default function ClientDetailPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{walletDialogType === "credit" ? "Add Balance" : "Deduct Balance"}</DialogTitle>
-            <DialogDescription>
-              Current balance: <span className="font-semibold">${walletBalance.toLocaleString()}</span>
-            </DialogDescription>
+            <DialogDescription>Current balance: <span className="font-semibold">${walletBalance.toLocaleString()}</span></DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
@@ -908,10 +1071,10 @@ export default function ClientDetailPage() {
               <Textarea value={walletNote} onChange={(e) => setWalletNote(e.target.value)} placeholder="Reason for adjustment..." rows={2} />
             </div>
             {walletDialogType === "credit" && parseFloat(walletAmount) > 0 && (
-              <p className="text-sm text-muted-foreground">New balance: <span className="font-semibold text-green-600">${(walletBalance + parseFloat(walletAmount)).toLocaleString()}</span></p>
+              <p className="text-sm text-muted-foreground">New balance: <span className="font-semibold text-emerald-600">${(walletBalance + parseFloat(walletAmount)).toLocaleString()}</span></p>
             )}
             {walletDialogType === "debit" && parseFloat(walletAmount) > 0 && (
-              <p className="text-sm text-muted-foreground">New balance: <span className={cn("font-semibold", (walletBalance - parseFloat(walletAmount)) < 0 ? "text-red-600" : "text-green-600")}>${(walletBalance - parseFloat(walletAmount)).toLocaleString()}</span></p>
+              <p className="text-sm text-muted-foreground">New balance: <span className={cn("font-semibold", (walletBalance - parseFloat(walletAmount)) < 0 ? "text-destructive" : "text-emerald-600")}>${(walletBalance - parseFloat(walletAmount)).toLocaleString()}</span></p>
             )}
           </div>
           <DialogFooter>
@@ -933,7 +1096,7 @@ export default function ClientDetailPage() {
           <div className="space-y-4 py-2">
             <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-muted">
               <span className="flex items-center gap-2"><Wallet className="h-4 w-4" /> Client Wallet</span>
-              <span className={cn("font-semibold", walletBalance < 0 ? "text-red-600" : "")}>${walletBalance.toLocaleString()}</span>
+              <span className={cn("font-semibold", walletBalance < 0 ? "text-destructive" : "")}>${walletBalance.toLocaleString()}</span>
             </div>
             <div className="space-y-2">
               <Label>Ad Account</Label>
@@ -941,9 +1104,7 @@ export default function ClientDetailPage() {
                 <SelectTrigger><SelectValue placeholder="Select ad account" /></SelectTrigger>
                 <SelectContent>
                   {adAccounts?.map((acc: any) => (
-                    <SelectItem key={acc.id} value={acc.id}>
-                      {acc.account_name} ({acc.account_id})
-                    </SelectItem>
+                    <SelectItem key={acc.id} value={acc.id}>{acc.account_name} ({acc.account_id})</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -964,7 +1125,7 @@ export default function ClientDetailPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Wallet After</span>
-                  <span className={cn("font-medium", (walletBalance - parseFloat(topUpAmount)) < 0 ? "text-red-600" : "")}>
+                  <span className={cn("font-medium", (walletBalance - parseFloat(topUpAmount)) < 0 ? "text-destructive" : "")}>
                     ${(walletBalance - parseFloat(topUpAmount)).toLocaleString()}
                   </span>
                 </div>
