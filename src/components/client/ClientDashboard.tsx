@@ -293,8 +293,16 @@ export function ClientDashboard() {
                   ${Number(wallet?.balance ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
               </div>
-              <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center">
-                <Wallet className="h-6 w-6" />
+              <div className="flex flex-col items-center gap-2">
+                <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center">
+                  <Wallet className="h-6 w-6" />
+                </div>
+                <Button size="sm" variant="secondary" className="rounded-full text-xs px-3 gap-1" asChild>
+                  <Link to="/top-up">
+                    <Plus className="h-3 w-3" />
+                    Add Balance
+                  </Link>
+                </Button>
               </div>
             </div>
           </div>
