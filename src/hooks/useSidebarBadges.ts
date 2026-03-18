@@ -47,7 +47,7 @@ export function useSidebarBadges(): Record<string, number> {
         .eq("user_id", user.id);
 
       setBadges({
-        "ad-accounts": failedRes.count || 0,
+        "failed-topups": failedRes.count || 0,
       });
     }
   }, [user, isAdminUser]);

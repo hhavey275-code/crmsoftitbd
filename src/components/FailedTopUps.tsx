@@ -100,7 +100,20 @@ export function FailedTopUps() {
     onError: (err: any) => toast.error(friendlyEdgeError(err)),
   });
 
-  if (isLoading || failedTopups.length === 0) return null;
+  if (isLoading) return null;
+  if (failedTopups.length === 0) return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+          Failed Top-Ups
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">No failed top-ups</p>
+      </CardContent>
+    </Card>
+  );
 
   return (
     <Card className="border-destructive/30 bg-destructive/5">
