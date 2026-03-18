@@ -800,6 +800,8 @@ export function AdminAdAccounts() {
               const ids = Array.from(selectedIds);
               const { error } = await (supabase as any).from("user_ad_accounts").delete().in("ad_account_id", ids);
               if (error) { toast.error(error.message); return; }
+              const unassignNames = ids.map(id => accounts?.find((a: any) => a.id === id)?.account_name || id.slice(0, 8)).join(", ");
+              await logSystemAction("Ad Account Unassigned", unassignNames);
               toast.success(`${ids.length} account(s) unassigned`);
               setSelectedIds(new Set());
               queryClient.invalidateQueries({ queryKey: ["admin-user-ad-accounts"] });
