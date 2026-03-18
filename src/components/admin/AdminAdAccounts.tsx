@@ -773,6 +773,9 @@ export function AdminAdAccounts() {
               await (supabase as any).from("user_ad_accounts").delete().in("ad_account_id", ids);
               const { error } = await (supabase as any).from("user_ad_accounts").insert(ids.map(adAccountId => ({ user_id: assignClientId, ad_account_id: adAccountId })));
               if (error) { toast.error(error.message); return; }
+              const assignedClientName = clients?.find((c: any) => c.user_id === assignClientId)?.full_name || assignClientId.slice(0, 8);
+              const accountNames = ids.map(id => accounts?.find((a: any) => a.id === id)?.account_name || id.slice(0, 8)).join(", ");
+              await logSystemAction("Ad Account Assigned", `${accountNames} → ${assignedClientName}`);
               toast.success(`${ids.length} account(s) assigned`);
               setShowAssignDialog(false);
               setSelectedIds(new Set());
