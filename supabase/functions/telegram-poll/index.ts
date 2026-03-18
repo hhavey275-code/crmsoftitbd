@@ -222,14 +222,12 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Auto-verify after long-polling loop ends
+    // Final auto-verify sweep when loop ends (catches any stragglers)
     let autoVerified = 0;
-    if (totalProcessed > 0) {
-      try {
-        autoVerified = await autoVerifyPending();
-      } catch (e) {
-        console.error('Auto-verify sweep failed:', e);
-      }
+    try {
+      autoVerified = await autoVerifyPending();
+    } catch (e) {
+      console.error('Auto-verify sweep failed:', e);
     }
 
     return new Response(JSON.stringify({ ok: true, processed: totalProcessed, finalOffset: currentOffset, auto_verified: autoVerified }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
