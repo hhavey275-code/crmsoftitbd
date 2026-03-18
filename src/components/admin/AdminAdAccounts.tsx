@@ -429,11 +429,21 @@ export function AdminAdAccounts() {
                     </div>
                   </div>
 
-                  {/* Spent / Limit */}
+                  {/* Spent / Limit + Top Up */}
                   <div className="flex items-center justify-between mt-2.5">
                     <div className="flex gap-4 text-xs text-muted-foreground">
                       <span>Spent: <span className="font-medium text-foreground">${Number(a.amount_spent).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
                       <span>Limit: <span className="font-medium text-foreground">${Number(a.spend_cap).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
+                    </div>
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        size="sm"
+                        className="gap-1 bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs h-8"
+                        onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
+                      >
+                        <ArrowUpCircle className="h-3.5 w-3.5" />
+                        Top Up
+                      </Button>
                     </div>
                   </div>
 
@@ -468,18 +478,6 @@ export function AdminAdAccounts() {
                         <span className="text-muted-foreground">{ins.cards[0].display_string}</span>
                       </div>
                     )}
-                  </div>
-
-                  {/* Top Up button */}
-                  <div className="mt-2.5" onClick={(e) => e.stopPropagation()}>
-                    <Button
-                      size="sm"
-                      className="w-full gap-1 bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs h-8"
-                      onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
-                    >
-                      <ArrowUpCircle className="h-3.5 w-3.5" />
-                      Top Up
-                    </Button>
                   </div>
                 </CardContent>
               </Card>
