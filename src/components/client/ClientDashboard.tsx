@@ -342,6 +342,14 @@ export function ClientDashboard() {
                   iconBg="bg-violet-50 dark:bg-violet-900/30"
                   iconColor="text-violet-600"
                   className="border-0 shadow-none bg-violet-50/40 dark:bg-violet-900/10"
+                  action={
+                    <Button size="sm" variant="outline" className="rounded-full text-xs gap-1 border-violet-300 text-violet-700 hover:bg-violet-100 dark:border-violet-700 dark:text-violet-400 dark:hover:bg-violet-900/30" asChild>
+                      <Link to="/top-up">
+                        <Plus className="h-3 w-3" />
+                        Add Balance
+                      </Link>
+                    </Button>
+                  }
                 />
                 <MetricCard
                   title="Total Ad Accounts"
