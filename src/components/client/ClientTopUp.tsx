@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { ArrowUpCircle, Banknote, DollarSign, MessageSquare, ImageIcon, X, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { logSystemAction } from "@/lib/systemLog";
 
 export function ClientTopUp() {
   const isMobile = useIsMobile();
