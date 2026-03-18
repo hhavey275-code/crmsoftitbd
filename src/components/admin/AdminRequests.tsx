@@ -153,6 +153,7 @@ export function AdminRequests() {
         reference_id: req.id,
       });
 
+      await logSystemAction("Ad Account Request Rejected", `"${req.account_name}"`, user!.id, user!.email);
       toast.success("Request rejected");
       queryClient.invalidateQueries({ queryKey: ["admin-ad-requests"] });
     } catch (err: any) {
