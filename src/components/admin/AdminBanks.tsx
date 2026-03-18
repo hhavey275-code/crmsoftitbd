@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { Plus, Trash2, UserPlus, Pencil, Building2 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { logSystemAction } from "@/lib/systemLog";
 
 const emptyForm = { bank_name: "", account_name: "", account_number: "", branch: "", routing_number: "" };
 
