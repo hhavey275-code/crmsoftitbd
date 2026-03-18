@@ -166,10 +166,8 @@ export function AdminDashboard() {
     setMetaLoading(true);
     try {
       const ids = adAccounts.map((a: any) => a.id);
-      const { data, error } = await supabase.functions.invoke("get-account-insights", {
-        body: { ad_account_ids: ids, source: "meta" },
-      });
-      if (error) throw error;
+      const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
+      await chunkedMetaSync(ids);
       await queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["billings-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["billings-insights"] });
