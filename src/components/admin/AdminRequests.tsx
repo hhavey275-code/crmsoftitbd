@@ -163,21 +163,8 @@ export function AdminRequests() {
   const handleApproveBmRequest = async (req: any) => {
     setBmApproveLoading(req.id);
     try {
-      // Call edge function to add partner access
-      const { data, error } = await supabase.functions.invoke("manage-ad-account-partners", {
-        body: {
-          action: "add_partner",
-          ad_account_id: req.ad_account_id,
-          partner_bm_id: req.bm_id,
-        },
-      });
-
-      if (error || data?.error) {
-        toast.error(data?.error || "Failed to add partner access via Meta API");
-        setBmApproveLoading(null);
-        return;
-      }
-
+      // No Meta API call — admin manually shares BM partner in Meta Business Manager
+      // Just update database status and notify client
       await (supabase as any)
         .from("bm_access_requests")
         .update({ status: "approved", reviewed_by: user!.id, updated_at: new Date().toISOString() })
@@ -187,11 +174,11 @@ export function AdminRequests() {
         user_id: req.user_id,
         type: "bm_access_request",
         title: "BM Access Request Approved",
-        message: `Your BM partner access request for "${req.bm_name}" has been approved.`,
+        message: `Your BM partner access request for "${req.bm_name}" has been approved. Partner access has been granted.`,
         reference_id: req.id,
       });
 
-      toast.success("BM partner access granted");
+      toast.success("BM request approved — make sure you've shared partner access in Meta Business Manager");
       queryClient.invalidateQueries({ queryKey: ["admin-bm-requests"] });
     } catch (err: any) {
       toast.error(err.message || "Failed to approve BM request");
