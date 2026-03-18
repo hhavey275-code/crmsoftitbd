@@ -114,11 +114,20 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Delay between BMs
-      await delay(500);
-    }
+        // Log API calls for this BM
+        if (accounts.length > 0) {
+          await supabase.from("api_call_logs").insert({
+            business_manager_id: bm.id,
+            function_name: "scheduled-sync",
+            call_count: accounts.length + 1, // 1 for listing + 1 per account update
+          });
+        }
 
-    return new Response(
+        // Delay between BMs
+        await delay(500);
+      }
+
+      return new Response(
       JSON.stringify({
         success: true,
         bms_processed: bms?.length ?? 0,

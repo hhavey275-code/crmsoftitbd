@@ -285,7 +285,20 @@ Deno.serve(async (req) => {
     }
 
     // ============================================
-    // STEP 3: Update DB spend cap
+    // STEP 3: Log API calls
+    // ============================================
+    const bmId = bm.bm_id;
+    const bmDbId = (account as any).business_manager_id;
+    if (bmDbId) {
+      await supabase.from("api_call_logs").insert({
+        business_manager_id: bmDbId,
+        function_name: "spend-cap-update",
+        call_count: 2, // 1 POST + 1 GET verify
+      });
+    }
+
+    // ============================================
+    // STEP 4: Update DB spend cap
     // ============================================
     await supabase.from("ad_accounts").update({ spend_cap: newSpendCapDollars }).eq("id", ad_account_id);
 
