@@ -49,6 +49,7 @@ export function ClientAdAccounts() {
   const [cardFilter, setCardFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [lastMetaUpdate, setLastMetaUpdate] = useState<number>(0);
+  const [isAutoSyncing, setIsAutoSyncing] = useState(false);
 
   const isInactive = (profile as any)?.status === "inactive";
   const dueLimit = Number((profile as any)?.due_limit ?? 0);
