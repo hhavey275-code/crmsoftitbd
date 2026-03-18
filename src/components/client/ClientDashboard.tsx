@@ -178,7 +178,7 @@ export function ClientDashboard() {
       )}
 
       {/* Download App Banner */}
-      {!isInstalled && !dismissedInstall && (canInstall || isIOS) && (
+      {!isInstalled && !dismissedInstall && (
         <Card className="border-primary/30 bg-gradient-to-r from-primary/10 to-blue-500/10 relative overflow-hidden">
           <button
             onClick={() => { setDismissedInstall(true); localStorage.setItem("pwa-install-dismissed", "true"); }}
