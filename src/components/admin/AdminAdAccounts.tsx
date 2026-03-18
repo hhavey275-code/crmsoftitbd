@@ -88,30 +88,21 @@ export function AdminAdAccounts() {
   });
 
 
-  const openWithdrawDialog = async (account: any) => {
-    setWithdrawAccount(account);
+  const fetchWithdrawMeta = async (account: any) => {
     setWithdrawAmount("");
     setWithdrawMeta(null);
     setFetchingWithdrawMeta(true);
     try {
-      const { data, error } = await supabase.functions.invoke("spend-cap-withdraw", {
+      const { data } = await supabase.functions.invoke("spend-cap-withdraw", {
         body: { ad_account_id: account.id, amount: 0.001 },
       });
-      // We expect a validation error with meta info
       if (data?.max_withdrawable !== undefined) {
         setWithdrawMeta({
           real_amount_spent: data.real_amount_spent,
           current_spend_cap: data.current_spend_cap,
           max_withdrawable: data.max_withdrawable,
         });
-      } else if (data?.error && data?.max_withdrawable !== undefined) {
-        setWithdrawMeta({
-          real_amount_spent: data.real_amount_spent,
-          current_spend_cap: data.current_spend_cap,
-          max_withdrawable: data.max_withdrawable,
-        });
       } else {
-        // Fallback to local data
         setWithdrawMeta({
           real_amount_spent: Number(account.amount_spent),
           current_spend_cap: Number(account.spend_cap),
@@ -132,7 +123,7 @@ export function AdminAdAccounts() {
     mutationFn: async () => {
       const amt = parseFloat(withdrawAmount);
       const { data, error } = await supabase.functions.invoke("spend-cap-withdraw", {
-        body: { ad_account_id: withdrawAccount.id, amount: amt },
+        body: { ad_account_id: topUpAccount.id, amount: amt },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -140,9 +131,10 @@ export function AdminAdAccounts() {
     },
     onSuccess: (data) => {
       toast.success(`Withdrawn $${parseFloat(withdrawAmount).toLocaleString()} — Cap: $${Number(data.old_spend_cap).toLocaleString()} → $${Number(data.new_spend_cap).toLocaleString()}`);
-      setWithdrawAccount(null);
+      setTopUpAccount(null);
       setWithdrawAmount("");
       setWithdrawMeta(null);
+      setDialogTab("topup");
       queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["admin-all-wallets"] });
     },
