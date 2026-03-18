@@ -166,10 +166,8 @@ export function AdminDashboard() {
     setMetaLoading(true);
     try {
       const ids = adAccounts.map((a: any) => a.id);
-      const { data, error } = await supabase.functions.invoke("get-account-insights", {
-        body: { ad_account_ids: ids, source: "meta" },
-      });
-      if (error) throw error;
+      const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
+      await chunkedMetaSync(ids);
       await queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["billings-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["billings-insights"] });
@@ -186,11 +184,9 @@ export function AdminDashboard() {
     setDailySpendLoading(true);
     try {
       const ids = adAccounts.map((a: any) => a.id);
-      const { data, error } = await supabase.functions.invoke("get-account-insights", {
-        body: { ad_account_ids: ids, source: "meta" },
-      });
-      if (error) throw error;
-      const insights = data?.insights ?? {};
+      const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
+      const result = await chunkedMetaSync(ids);
+      const insights = result.insights ?? {};
       const today = Object.values(insights).reduce((sum: number, ins: any) => sum + (Number(ins?.today_spend) || 0), 0) as number;
       const yesterday = Object.values(insights).reduce((sum: number, ins: any) => sum + (Number(ins?.yesterday_spend) || 0), 0) as number;
       const newSpend = { today, yesterday };
@@ -211,14 +207,12 @@ export function AdminDashboard() {
       const ids = adAccounts.map((a: any) => a.id);
       const fromStr = format(dateRange.from, "yyyy-MM-dd");
       const toStr = format(dateRange.to, "yyyy-MM-dd");
-      const { data, error } = await supabase.functions.invoke("get-account-insights", {
-        body: { ad_account_ids: ids, source: "meta", date_from: fromStr, date_to: toStr },
-      });
-      if (error) throw error;
-      if (data?.rate_limited?.length) {
-        toast.warning(`Rate limited on ${data.rate_limited.length} account(s). Results may be partial.`);
+      const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
+      const result = await chunkedMetaSync(ids, { date_from: fromStr, date_to: toStr });
+      if (result.rate_limited?.length) {
+        toast.warning(`Rate limited on ${result.rate_limited.length} account(s). Results may be partial.`);
       }
-      const insights = data?.insights ?? {};
+      const insights = result.insights ?? {};
       const total = Object.values(insights).reduce((sum: number, ins: any) => {
         // date_spend is the primary field, fallback to today_spend for date range queries
         return sum + (Number(ins?.date_spend) || Number(ins?.today_spend) || 0);
