@@ -55,7 +55,7 @@ export function AdminBanks() {
       const { error } = await (supabase as any).from("bank_accounts").insert(form);
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Bank added!"); queryClient.invalidateQueries({ queryKey: ["admin-banks"] }); setShowAdd(false); setForm(emptyForm); },
+    onSuccess: () => { logSystemAction("Bank Added", `${form.bank_name} — ${form.account_number}`); toast.success("Bank added!"); queryClient.invalidateQueries({ queryKey: ["admin-banks"] }); setShowAdd(false); setForm(emptyForm); },
     onError: (e: any) => toast.error(e.message),
   });
 
