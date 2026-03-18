@@ -349,7 +349,6 @@ export function AdminAdAccounts() {
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          )}
           <Button variant="outline" size="sm" onClick={() => refreshAllMutation.mutate()} disabled={refreshAllMutation.isPending} className="text-xs">
             <RefreshCw className={`h-4 w-4 mr-1 ${refreshAllMutation.isPending ? 'animate-spin' : ''}`} />
             {refreshAllMutation.isPending ? "Updating..." : isMobile ? "Update All" : "Update All from Meta"}
