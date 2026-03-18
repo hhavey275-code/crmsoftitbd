@@ -127,6 +127,16 @@ export function NotificationBell() {
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="end">
+        {/* Push notification prompt */}
+        {isSupported && !isSubscribed && permission !== "denied" && (
+          <div className="flex items-center gap-2 border-b bg-primary/5 px-4 py-2.5">
+            <BellRing className="h-4 w-4 text-primary shrink-0" />
+            <p className="text-xs text-muted-foreground flex-1">Enable push notifications to get alerts on your phone</p>
+            <Button variant="outline" size="sm" className="h-7 text-xs shrink-0" onClick={() => subscribe()}>
+              Enable
+            </Button>
+          </div>
+        )}
         <div className="flex items-center justify-between border-b px-4 py-3">
           <p className="text-sm font-semibold">Notifications</p>
           {unreadCount > 0 && (
