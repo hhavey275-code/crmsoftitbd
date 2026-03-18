@@ -566,6 +566,45 @@ export function ClientDashboard() {
         )}
       </div>
 
+      {/* Ad Account Request Dialog */}
+      <Dialog open={showAdReqForm} onOpenChange={setShowAdReqForm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Request New Ad Account</DialogTitle>
+            <DialogDescription>Fill in the details to request a new ad account.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Account Name *</label>
+              <Input value={adReqForm.account_name} onChange={(e) => setAdReqForm(f => ({ ...f, account_name: e.target.value }))} placeholder="e.g. My Store Ads" />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Email *</label>
+              <Input type="email" value={adReqForm.email} onChange={(e) => setAdReqForm(f => ({ ...f, email: e.target.value }))} placeholder="your@email.com" />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Business Manager ID *</label>
+              <Input value={adReqForm.business_manager_id} onChange={(e) => setAdReqForm(f => ({ ...f, business_manager_id: e.target.value }))} placeholder="e.g. 123456789" />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Monthly Approx Spending</label>
+              <Input value={adReqForm.monthly_spend} onChange={(e) => setAdReqForm(f => ({ ...f, monthly_spend: e.target.value }))} placeholder="e.g. $500" />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">When will you start ads?</label>
+              <Input type="date" value={adReqForm.start_date} onChange={(e) => setAdReqForm(f => ({ ...f, start_date: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAdReqForm(false)}>Cancel</Button>
+            <Button onClick={handleAdReqSubmit} disabled={adReqLoading}>
+              {adReqLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              Submit Request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Spend Cap Increase Dialog */}
       <Dialog open={!!topUpAccount} onOpenChange={(open) => { if (!open) setTopUpAccount(null); }}>
         <DialogContent className="sm:max-w-md">
