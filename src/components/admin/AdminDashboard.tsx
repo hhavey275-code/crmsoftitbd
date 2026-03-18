@@ -212,8 +212,7 @@ export function AdminDashboard() {
       if (result.rate_limited?.length) {
         toast.warning(`Rate limited on ${result.rate_limited.length} account(s). Results may be partial.`);
       }
-      }
-      const insights = data?.insights ?? {};
+      const insights = result.insights ?? {};
       const total = Object.values(insights).reduce((sum: number, ins: any) => {
         // date_spend is the primary field, fallback to today_spend for date range queries
         return sum + (Number(ins?.date_spend) || Number(ins?.today_spend) || 0);
