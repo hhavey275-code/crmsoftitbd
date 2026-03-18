@@ -21,6 +21,7 @@ import { ArrowUpCircle, ExternalLink, Wallet, ArrowUp, ArrowDown, ArrowUpDown, R
 import { CardBrandIcon } from "@/components/CardBrandIcon";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { logSystemAction } from "@/lib/systemLog";
 
 const PAGE_SIZE = 20;
 
