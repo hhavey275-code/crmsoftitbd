@@ -190,9 +190,10 @@ async function processAccount(
     let dailySpendLimit = 0;
     let billingThreshold = 0;
 
-    const fetchOptionalCurrencyField = async (field: "daily_spend_limit" | "min_billing_threshold") => {
+    const fetchOptionalCurrencyField = async (field: string, path = "") => {
       try {
-        const res = await fetch(`https://graph.facebook.com/v24.0/${actId}?fields=${field}&access_token=${accessToken}`);
+        const target = path ? `/${path}` : "";
+        const res = await fetch(`https://graph.facebook.com/v25.0/${actId}${target}?fields=${field}&access_token=${accessToken}`);
         const data = await res.json();
         if (data?.error) return 0;
         const raw = data?.[field];
@@ -206,6 +207,14 @@ async function processAccount(
       fetchOptionalCurrencyField("daily_spend_limit"),
       fetchOptionalCurrencyField("min_billing_threshold"),
     ]);
+
+    // Fallbacks for accounts where primary fields are unavailable
+    if (!dailySpendLimit) {
+      dailySpendLimit = await fetchOptionalCurrencyField("adtrust_dsl");
+    }
+    if (!billingThreshold) {
+      billingThreshold = await fetchOptionalCurrencyField("threshold_amount", "adspaymentcycle");
+    }
 
     let adAccountUpdate: any = undefined;
     if (!isSingleDate && !isDateRange && accountData?.amount_spent !== undefined) {
