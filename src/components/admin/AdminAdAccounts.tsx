@@ -65,7 +65,7 @@ export function AdminAdAccounts() {
     },
   });
 
-  const [isAutoSyncing, setIsAutoSyncing] = useState(false);
+  
 
   const { data: insights = {}, refetch: refetchInsights } = useQuery({
     queryKey: ["admin-insights-cache"],
