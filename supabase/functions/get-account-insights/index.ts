@@ -186,17 +186,26 @@ async function processAccount(
 
     const balance = accountData?.balance ? parseFloat(accountData.balance) / 100 : 0;
 
-    // Fetch daily_spend_limit and min_billing_threshold separately as they may not exist on all accounts
+    // Fetch optional fields independently so one invalid field doesn't break the other
     let dailySpendLimit = 0;
     let billingThreshold = 0;
-    try {
-      const extraRes = await fetch(`https://graph.facebook.com/v24.0/${actId}?fields=daily_spend_limit,min_billing_threshold&access_token=${accessToken}`);
-      const extraData = await extraRes.json();
-      if (!extraData?.error) {
-        dailySpendLimit = extraData?.daily_spend_limit ? parseFloat(extraData.daily_spend_limit) / 100 : 0;
-        billingThreshold = extraData?.min_billing_threshold ? parseFloat(extraData.min_billing_threshold) / 100 : 0;
+
+    const fetchOptionalCurrencyField = async (field: "daily_spend_limit" | "min_billing_threshold") => {
+      try {
+        const res = await fetch(`https://graph.facebook.com/v24.0/${actId}?fields=${field}&access_token=${accessToken}`);
+        const data = await res.json();
+        if (data?.error) return 0;
+        const raw = data?.[field];
+        return raw ? parseFloat(raw) / 100 : 0;
+      } catch {
+        return 0;
       }
-    } catch { /* silently ignore - these fields are optional */ }
+    };
+
+    [dailySpendLimit, billingThreshold] = await Promise.all([
+      fetchOptionalCurrencyField("daily_spend_limit"),
+      fetchOptionalCurrencyField("min_billing_threshold"),
+    ]);
 
     let adAccountUpdate: any = undefined;
     if (!isSingleDate && !isDateRange && accountData?.amount_spent !== undefined) {
