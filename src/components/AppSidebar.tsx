@@ -39,6 +39,7 @@ const adminNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, key: "dashboard" },
   { title: "Ad Accounts", url: "/ad-accounts", icon: MonitorSmartphone, key: "ad-accounts" },
   { title: "Failed Top-Ups", url: "/failed-topups", icon: AlertTriangle, key: "failed-topups" },
+  { title: "Requests", url: "/requests", icon: FileText, key: "requests" },
   { title: "Billings", url: "/billings", icon: Receipt, key: "billings" },
   { title: "Business Managers", url: "/business-managers", icon: Building2, key: "business-managers" },
   { title: "Top-Up Request", url: "/top-up", icon: ArrowUpCircle, key: "top-up" },
@@ -53,6 +54,7 @@ const adminNavItems = [
 const clientNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, key: "dashboard" },
   { title: "Ad Accounts", url: "/ad-accounts", icon: MonitorSmartphone, key: "ad-accounts" },
+  { title: "Requests", url: "/requests", icon: FileText, key: "requests" },
   { title: "Failed Top-Ups", url: "/failed-topups", icon: AlertTriangle, key: "failed-topups" },
   { title: "Top-Up Request", url: "/top-up", icon: ArrowUpCircle, key: "top-up" },
   { title: "Transactions", url: "/transactions", icon: History, key: "transactions" },

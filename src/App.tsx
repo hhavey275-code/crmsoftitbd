@@ -67,6 +67,7 @@ const App = () => (
               <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
               <Route path="/system-logs" element={<ProtectedRoute><SystemLogsPage /></ProtectedRoute>} />
               <Route path="/failed-topups" element={<ProtectedRoute><FailedTopUpsPage /></ProtectedRoute>} />
+              <Route path="/requests" element={<ProtectedRoute><RequestsPage /></ProtectedRoute>} />
               <Route path="/invoice/:requestId" element={<ProtectedRoute><InvoicePage /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
