@@ -42,10 +42,10 @@ export function useSidebarBadges(): Record<string, number> {
 
       setBadges({
         "top-up": topUpRes.count || 0,
-        "chat": chatRes.count || 0,
-        "clients": clientsRes.count || 0,
+        chat: chatRes.count || 0,
+        clients: clientsRes.count || 0,
         "failed-topups": failedRes.count || 0,
-        "requests": (adReqRes.count || 0) + (bmReqRes.count || 0),
+        requests: (adReqRes.count || 0) + (bmReqRes.count || 0),
       });
     } else {
       // Client: show own failed topups count
@@ -65,6 +65,19 @@ export function useSidebarBadges(): Record<string, number> {
     fetchCounts();
   }, [fetchCounts]);
 
+  // Polling fallback (handles missed realtime events without page reload)
+  useEffect(() => {
+    if (!user) return;
+
+    const intervalId = window.setInterval(() => {
+      fetchCounts();
+    }, 5000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [user, fetchCounts]);
+
   // Realtime subscriptions
   useEffect(() => {
     if (!user) return;
@@ -74,12 +87,14 @@ export function useSidebarBadges(): Record<string, number> {
       : ["failed_topups", "notifications"];
 
     let channel = supabase.channel("sidebar-badges");
-    tables.forEach(table => {
+    tables.forEach((table) => {
       channel = channel.on("postgres_changes", { event: "*", schema: "public", table }, () => fetchCounts());
     });
     channel.subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user, isAdminUser, fetchCounts]);
 
   return badges;

@@ -114,6 +114,14 @@ export default function SettingsPage() {
   if (currentBotToken && !botTokenInput && !savingBotToken) setBotTokenInput(currentBotToken);
 
   // Handlers
+  const fileToDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error("Failed to read file"));
+      reader.readAsDataURL(file);
+    });
+
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
@@ -195,16 +203,17 @@ export default function SettingsPage() {
     if (!file) return;
     if (!file.type.startsWith("audio/")) { toast.error("Please upload an audio file"); return; }
     if (file.size > 2 * 1024 * 1024) { toast.error("File must be under 2MB"); return; }
+
     setUploadingSound(true);
-    const ext = file.name.split(".").pop();
-    const filePath = `notification-sound.${ext}`;
-    const { error: uploadError } = await supabase.storage.from("logos").upload(filePath, file, { upsert: true });
-    if (uploadError) { toast.error("Failed to upload sound"); setUploadingSound(false); return; }
-    const { data: urlData } = supabase.storage.from("logos").getPublicUrl(filePath);
-    const publicUrl = urlData.publicUrl + "?t=" + Date.now();
-    localStorage.setItem("notification_sound_url", publicUrl);
-    setUploadingSound(false);
-    toast.success("Notification sound uploaded!");
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      localStorage.setItem("notification_sound_url", dataUrl);
+      toast.success("Notification sound uploaded!");
+    } catch {
+      toast.error("Failed to save custom sound");
+    } finally {
+      setUploadingSound(false);
+    }
   };
 
   const handleTestSound = () => {
