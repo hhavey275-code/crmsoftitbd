@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { friendlyEdgeError } from "@/lib/utils";
 import { FailedTopUps } from "@/components/FailedTopUps";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -81,6 +81,22 @@ export function ClientAdAccounts() {
     },
     enabled: !!user && !!accounts && accounts.length > 0,
   });
+
+  // Auto-refresh from Meta on mount (once per page load)
+  const hasAutoRefreshed = useRef(false);
+  useEffect(() => {
+    if (!accounts || accounts.length === 0 || hasAutoRefreshed.current) return;
+    hasAutoRefreshed.current = true;
+    const ids = accounts.map((a: any) => a.id);
+    supabase.functions.invoke("get-account-insights", {
+      body: { ad_account_ids: ids, source: "meta" },
+    }).then(({ data }) => {
+      if (data?.insights) {
+        queryClient.setQueryData(["client-insights-cache", user?.id], data.insights);
+        queryClient.invalidateQueries({ queryKey: ["client-ad-accounts"] });
+      }
+    }).catch(() => {});
+  }, [accounts]);
 
   const { data: wallet } = useQuery({
     queryKey: ["client-wallet", user?.id],
@@ -276,8 +292,6 @@ export function ClientAdAccounts() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      {/* Failed Top-Ups */}
-      <FailedTopUps />
       {/* Today's Performance Summary */}
       <div className="grid gap-3 grid-cols-2">
         <MetricCard
@@ -611,6 +625,9 @@ export function ClientAdAccounts() {
           </div>
         </div>
       )}
+
+      {/* Failed Top-Ups */}
+      <FailedTopUps />
 
       {/* Top Up Dialog */}
       <Dialog open={!!topUpAccount} onOpenChange={(open) => !open && setTopUpAccount(null)}>

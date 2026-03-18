@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { FailedTopUps } from "@/components/FailedTopUps";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -77,6 +77,22 @@ export function AdminAdAccounts() {
     },
     enabled: !!accounts && accounts.length > 0,
   });
+
+  // Auto-refresh from Meta on mount (once per page load)
+  const hasAutoRefreshed = useRef(false);
+  useEffect(() => {
+    if (!accounts || accounts.length === 0 || hasAutoRefreshed.current) return;
+    hasAutoRefreshed.current = true;
+    const ids = accounts.map((a: any) => a.id);
+    supabase.functions.invoke("get-account-insights", {
+      body: { ad_account_ids: ids, source: "meta" },
+    }).then(({ data }) => {
+      if (data?.insights) {
+        queryClient.setQueryData(["admin-insights-cache"], data.insights);
+        queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
+      }
+    }).catch(() => {});
+  }, [accounts]);
 
   const { data: assignments } = useQuery({
     queryKey: ["admin-user-ad-accounts"],
@@ -309,8 +325,6 @@ export function AdminAdAccounts() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      {/* Failed Top-Ups */}
-      <FailedTopUps />
       {/* Header */}
       <div className={cn("flex gap-2", isMobile ? "flex-col" : "items-center justify-between")}>
         <h1 className="text-xl md:text-2xl font-bold">All Ad Accounts</h1>
@@ -658,6 +672,9 @@ export function AdminAdAccounts() {
           </div>
         </div>
       )}
+
+      {/* Failed Top-Ups */}
+      <FailedTopUps />
 
       {/* Top Up Dialog */}
       <Dialog open={!!topUpAccount} onOpenChange={(open) => !open && setTopUpAccount(null)}>
