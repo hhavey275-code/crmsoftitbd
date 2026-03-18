@@ -194,13 +194,14 @@ export default function AdAccountDetailPage() {
         </div>
 
         {/* Performance Metric Cards */}
-        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-2 grid-cols-2 lg:grid-cols-4">
           <MetricCard
             title="Running Campaigns"
             value={insights?.active_campaigns ?? 0}
             icon={Megaphone}
             iconBg="bg-blue-500/10"
             iconColor="text-blue-500"
+            size={isMobile ? "xs" : "default"}
           />
           <MetricCard
             title="Today's Spend"
@@ -209,6 +210,7 @@ export default function AdAccountDetailPage() {
             icon={DollarSign}
             iconBg="bg-green-500/10"
             iconColor="text-green-500"
+            size={isMobile ? "xs" : "default"}
           />
           <MetricCard
             title="Today's Orders"
@@ -217,6 +219,7 @@ export default function AdAccountDetailPage() {
             icon={ShoppingCart}
             iconBg="bg-orange-500/10"
             iconColor="text-orange-500"
+            size={isMobile ? "xs" : "default"}
           />
           <MetricCard
             title="Today's Messages"
@@ -225,6 +228,7 @@ export default function AdAccountDetailPage() {
             icon={MessageSquare}
             iconBg="bg-purple-500/10"
             iconColor="text-purple-500"
+            size={isMobile ? "xs" : "default"}
           />
         </div>
 
