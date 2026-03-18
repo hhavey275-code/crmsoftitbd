@@ -23,6 +23,7 @@ import { CardBrandIcon } from "@/components/CardBrandIcon";
 import { friendlyEdgeError } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { logSystemAction } from "@/lib/systemLog";
 
 const PAGE_SIZE = 20;
 
