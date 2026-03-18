@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { friendlyEdgeError } from "@/lib/utils";
+import { FailedTopUps } from "@/components/FailedTopUps";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -275,6 +276,8 @@ export function ClientAdAccounts() {
 
   return (
     <div className="space-y-4 md:space-y-6">
+      {/* Failed Top-Ups */}
+      <FailedTopUps />
       {/* Today's Performance Summary */}
       <div className="grid gap-3 grid-cols-2">
         <MetricCard

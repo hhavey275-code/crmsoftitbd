@@ -46,12 +46,10 @@ function getRetryDelayMs(attempt: number, retryAfterHeader: string | null): numb
   if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
     return Math.min(retryAfterSeconds * 1000, 120000);
   }
-
   const backoffMs = [5000, 15000, 30000, 60000];
   return backoffMs[Math.min(attempt, backoffMs.length - 1)];
 }
 
-// Retry a fetch with slower backoff on Meta rate limit
 async function metaFetchWithRetry(
   url: string,
   options: RequestInit,
@@ -134,20 +132,52 @@ Deno.serve(async (req) => {
 
     if (accErr || !account) return json({ error: "Ad account not found" }, 404);
 
-    // --- Pre-check wallet balance ---
-    const shouldDeductWallet = !!deduct_wallet && !!target_user_id;
+    // --- Get user name for logging ---
+    const { data: userProfile } = await supabase.from("profiles").select("full_name").eq("user_id", userId).single();
+    const userName = userProfile?.full_name || "Unknown";
+
+    // --- Determine wallet user ---
+    const shouldDeductWallet = !!deduct_wallet;
     const walletUserId = target_user_id || userId;
 
-    if (shouldDeductWallet && !isAdmin) {
-      const { data: wallet } = await supabase.from("wallets").select("id, balance").eq("user_id", walletUserId).single();
-      if (!wallet) return json({ error: "Wallet not found for user" }, 404);
+    // ============================================
+    // STEP 1: Deduct wallet FIRST (before Meta API)
+    // ============================================
+    let newBalance: number | null = null;
+    let walletId: string | null = null;
+
+    if (shouldDeductWallet) {
+      const { data: wallet, error: walletErr } = await supabase
+        .from("wallets").select("id, balance").eq("user_id", walletUserId).single();
+
+      if (walletErr || !wallet) return json({ error: "Wallet not found for user" }, 404);
 
       const { data: prof } = await supabase.from("profiles").select("due_limit").eq("user_id", walletUserId).single();
       const dueLimit = Number(prof?.due_limit ?? 0);
       if (Number(wallet.balance) + dueLimit < amount) return json({ error: "Insufficient wallet balance" }, 400);
+
+      newBalance = Number(wallet.balance) - amount;
+      walletId = wallet.id;
+
+      // Deduct wallet
+      await supabase.from("wallets").update({ balance: newBalance }).eq("id", wallet.id);
+
+      // Create transaction record
+      const cleanAccountId = account.account_id.replace(/^act_/, '');
+      await supabase.from("transactions").insert({
+        user_id: walletUserId,
+        amount: -amount,
+        balance_after: newBalance,
+        type: "ad_topup",
+        description: `${account.account_name}\n${cleanAccountId}`,
+        reference_id: ad_account_id,
+        processed_by: isAdmin ? `admin:${userId}` : `client:${walletUserId}`,
+      });
     }
 
-    // --- Prepare Meta call ---
+    // ============================================
+    // STEP 2: Call Meta API
+    // ============================================
     const bm = (account as any).business_managers;
     const bmToken = await decryptToken(bm.access_token, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const oldSpendCapDollars = Number(account.spend_cap);
@@ -156,12 +186,9 @@ Deno.serve(async (req) => {
 
     console.log("Spend cap update attempt", {
       actId, bmId: bm.bm_id, oldSpendCapDollars, amountDollars: amount,
-      newSpendCapDollars, sentToMetaPost: newSpendCapDollars,
+      newSpendCapDollars, walletDeducted: shouldDeductWallet,
     });
 
-    // ============================================
-    // STEP 1: Meta API call with retry on rate limit
-    // ============================================
     try {
       const { res: metaRes, data: metaData } = await metaFetchWithRetry(
         `https://graph.facebook.com/v24.0/${actId}`,
@@ -180,27 +207,36 @@ Deno.serve(async (req) => {
         const rateLimited = isMetaRateLimited(metaRes.status, metaData);
         console.warn("Meta POST failed", { actId, status: metaRes.status, message: metaErrorMsg });
 
-        if (rateLimited) {
-          return json({
-            error: "Meta API is busy (rate limit reached). Please try again in 2-3 minutes.",
-            code: "META_RATE_LIMIT",
-            ad_account_id: actId,
-            business_manager_id: bm?.bm_id ?? null,
-            wallet_charged: false,
-            retry_after_seconds: 180,
-          }, 429);
-        }
+        // Insert into failed_topups
+        const { data: failedRecord } = await supabase.from("failed_topups").insert({
+          user_id: walletUserId,
+          ad_account_id: ad_account_id,
+          amount: amount,
+          old_spend_cap: oldSpendCapDollars,
+          error_message: metaErrorMsg,
+          status: "pending",
+        }).select("id").single();
 
+        // Log to system_logs
+        await supabase.from("system_logs").insert({
+          user_id: userId,
+          user_name: userName,
+          action: "Top-Up Failed",
+          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${metaErrorMsg}`,
+        });
+
+        const errorCode = rateLimited ? "META_RATE_LIMIT" : "META_API_ERROR";
         return json({
-          error: `Meta API error: ${metaErrorMsg}`,
-          ad_account_id: actId,
-          business_manager_id: bm?.bm_id ?? null,
-          wallet_charged: false,
-          hint: "Grant this token owner ad account admin/manage permission for the target ad account.",
-        }, 400);
+          error: rateLimited
+            ? "Meta API is busy (rate limit reached). Amount deducted from wallet. You can retry from Failed Top-Ups."
+            : `Meta API error: ${metaErrorMsg}. Amount deducted from wallet. You can retry from Failed Top-Ups.`,
+          code: errorCode,
+          failed_topup_id: failedRecord?.id,
+          wallet_charged: shouldDeductWallet,
+        }, rateLimited ? 429 : 400);
       }
 
-      // Verify with GET (also with retry)
+      // Verify with GET
       const { res: verifyRes, data: verifyData } = await metaFetchWithRetry(
         `https://graph.facebook.com/v24.0/${actId}?fields=spend_cap&access_token=${encodeURIComponent(bmToken)}`,
         { method: "GET" },
@@ -208,21 +244,30 @@ Deno.serve(async (req) => {
 
       if (!verifyRes.ok || verifyData?.error) {
         const verifyErrorMsg = verifyData?.error?.message || `Meta verify HTTP ${verifyRes.status}`;
-        const verifyRateLimited = isMetaRateLimited(verifyRes.status, verifyData);
-        console.warn("Meta verification failed", { actId, status: verifyRes.status, message: verifyErrorMsg });
+        console.warn("Meta verification failed", { actId, message: verifyErrorMsg });
 
-        if (verifyRateLimited) {
-          return json({
-            error: "Meta verification is temporarily rate limited. Please retry in 2-3 minutes.",
-            code: "META_RATE_LIMIT",
-            ad_account_id: actId,
-            business_manager_id: bm?.bm_id ?? null,
-            wallet_charged: false,
-            retry_after_seconds: 180,
-          }, 429);
-        }
+        // Insert into failed_topups
+        const { data: failedRecord } = await supabase.from("failed_topups").insert({
+          user_id: walletUserId,
+          ad_account_id: ad_account_id,
+          amount: amount,
+          old_spend_cap: oldSpendCapDollars,
+          error_message: `Verification failed: ${verifyErrorMsg}`,
+          status: "pending",
+        }).select("id").single();
 
-        return json({ error: `Meta verification error: ${verifyErrorMsg}`, wallet_charged: false }, 400);
+        await supabase.from("system_logs").insert({
+          user_id: userId,
+          user_name: userName,
+          action: "Top-Up Failed",
+          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — Verification failed: ${verifyErrorMsg}`,
+        });
+
+        return json({
+          error: `Meta verification failed. Amount deducted from wallet. You can retry from Failed Top-Ups.`,
+          failed_topup_id: failedRecord?.id,
+          wallet_charged: shouldDeductWallet,
+        }, 400);
       }
 
       if (verifyData?.spend_cap !== undefined) {
@@ -230,62 +275,87 @@ Deno.serve(async (req) => {
         if (Math.abs(verifiedDollars - newSpendCapDollars) < 0.02) {
           console.log(`Meta verified: $${verifiedDollars} (expected $${newSpendCapDollars})`);
         } else {
-          const metaErrorMsg = `Verification mismatch: expected $${newSpendCapDollars}, got $${verifiedDollars} (raw=${verifyData.spend_cap})`;
-          console.warn(metaErrorMsg);
-          return json({ error: metaErrorMsg, wallet_charged: false }, 400);
+          const mismatchMsg = `Verification mismatch: expected $${newSpendCapDollars}, got $${verifiedDollars}`;
+          console.warn(mismatchMsg);
+
+          const { data: failedRecord } = await supabase.from("failed_topups").insert({
+            user_id: walletUserId,
+            ad_account_id: ad_account_id,
+            amount: amount,
+            old_spend_cap: oldSpendCapDollars,
+            error_message: mismatchMsg,
+            status: "pending",
+          }).select("id").single();
+
+          await supabase.from("system_logs").insert({
+            user_id: userId,
+            user_name: userName,
+            action: "Top-Up Failed",
+            details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${mismatchMsg}`,
+          });
+
+          return json({
+            error: `${mismatchMsg}. Amount deducted from wallet. You can retry from Failed Top-Ups.`,
+            failed_topup_id: failedRecord?.id,
+            wallet_charged: shouldDeductWallet,
+          }, 400);
         }
       } else {
-        const metaErrorMsg = "Verification GET failed";
-        console.warn(metaErrorMsg, verifyData);
-        return json({ error: metaErrorMsg, wallet_charged: false }, 400);
+        const failMsg = "Verification GET returned no spend_cap";
+        console.warn(failMsg, verifyData);
+
+        const { data: failedRecord } = await supabase.from("failed_topups").insert({
+          user_id: walletUserId,
+          ad_account_id: ad_account_id,
+          amount: amount,
+          old_spend_cap: oldSpendCapDollars,
+          error_message: failMsg,
+          status: "pending",
+        }).select("id").single();
+
+        await supabase.from("system_logs").insert({
+          user_id: userId,
+          user_name: userName,
+          action: "Top-Up Failed",
+          details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${failMsg}`,
+        });
+
+        return json({
+          error: `${failMsg}. Amount deducted from wallet. You can retry from Failed Top-Ups.`,
+          failed_topup_id: failedRecord?.id,
+          wallet_charged: shouldDeductWallet,
+        }, 400);
       }
     } catch (err) {
       const metaErrorMsg = err instanceof Error ? err.message : "Network error";
       console.warn("Meta network error", metaErrorMsg);
 
-      if (metaErrorMsg === "META_RATE_LIMIT_RETRY_EXHAUSTED") {
-        return json({
-          error: "Meta API rate limit is still active. Please retry in 2-3 minutes.",
-          code: "META_RATE_LIMIT",
-          wallet_charged: false,
-          retry_after_seconds: 180,
-        }, 429);
-      }
-
-      return json({ error: `Meta API error: ${metaErrorMsg}`, wallet_charged: false }, 500);
-    }
-
-    // ============================================
-    // STEP 2: Meta succeeded — deduct wallet
-    // ============================================
-    let newBalance: number | null = null;
-
-    if (shouldDeductWallet) {
-      const { data: wallet, error: walletErr } = await supabase
-        .from("wallets").select("id, balance").eq("user_id", walletUserId).single();
-
-      if (walletErr || !wallet) {
-        console.error("CRITICAL: Meta updated but wallet not found!", { actId, walletUserId });
-        return json({ error: "Wallet not found. Meta spend cap was updated but wallet deduction failed. Contact admin." }, 500);
-      }
-
-      newBalance = Number(wallet.balance) - amount;
-      await supabase.from("wallets").update({ balance: newBalance }).eq("id", wallet.id);
-
-      const cleanAccountId = account.account_id.replace(/^act_/, '');
-      await supabase.from("transactions").insert({
+      // Insert into failed_topups
+      const { data: failedRecord } = await supabase.from("failed_topups").insert({
         user_id: walletUserId,
-        amount: -amount,
-        balance_after: newBalance,
-        type: "ad_topup",
-        description: `${account.account_name}\n${cleanAccountId}`,
-        reference_id: ad_account_id,
-        processed_by: isAdmin ? `admin:${userId}` : `client:${walletUserId}`,
+        ad_account_id: ad_account_id,
+        amount: amount,
+        old_spend_cap: oldSpendCapDollars,
+        error_message: metaErrorMsg,
+        status: "pending",
+      }).select("id").single();
+
+      await supabase.from("system_logs").insert({
+        user_id: userId,
+        user_name: userName,
+        action: "Top-Up Failed",
+        details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${amount} — ${metaErrorMsg}`,
       });
+
+      return json({
+        error: `Meta API error: ${metaErrorMsg}. Amount deducted from wallet. You can retry from Failed Top-Ups.`,
+        failed_topup_id: failedRecord?.id,
+        wallet_charged: shouldDeductWallet,
+      }, 500);
     }
 
     // ============================================
-    // STEP 3: Log API calls
+    // STEP 3: Meta succeeded — log API calls
     // ============================================
     const bmId = bm.bm_id;
     const bmDbId = (account as any).business_manager_id;
@@ -293,7 +363,7 @@ Deno.serve(async (req) => {
       await supabase.from("api_call_logs").insert({
         business_manager_id: bmDbId,
         function_name: "spend-cap-update",
-        call_count: 2, // 1 POST + 1 GET verify
+        call_count: 2,
       });
     }
 
@@ -301,6 +371,14 @@ Deno.serve(async (req) => {
     // STEP 4: Update DB spend cap
     // ============================================
     await supabase.from("ad_accounts").update({ spend_cap: newSpendCapDollars }).eq("id", ad_account_id);
+
+    // Log success
+    await supabase.from("system_logs").insert({
+      user_id: userId,
+      user_name: userName,
+      action: "Spend Cap Updated",
+      details: `${account.account_name} (${actId.replace(/^act_/, '')}) — $${oldSpendCapDollars} → $${newSpendCapDollars}`,
+    });
 
     console.log("Spend cap update SUCCESS", { actId, oldSpendCapDollars, newSpendCapDollars });
 
