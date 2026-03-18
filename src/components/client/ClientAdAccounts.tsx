@@ -637,16 +637,30 @@ export function ClientAdAccounts() {
                       </TableCell>
                       <TableCell><StatusBadge status={a.status} /></TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          size="sm"
-                          variant="default"
-                          className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                          disabled={isInactive}
-                          onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
-                        >
-                          <ArrowUpCircle className="h-4 w-4" />
-                          Top Up
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                            disabled={isInactive}
+                            onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
+                          >
+                            <ArrowUpCircle className="h-4 w-4" />
+                            Top Up
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => { setBmReqAccount(a); setBmReqForm({ bm_name: "", bm_id: "" }); }}>
+                                Request BM Access
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
