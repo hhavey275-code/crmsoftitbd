@@ -693,6 +693,17 @@ export function AdminBusinessManagers() {
                         <p className="text-xs text-muted-foreground">
                           {accounts.length} account{accounts.length !== 1 ? "s" : ""}
                         </p>
+                        {/* API Usage indicator */}
+                        {apiUsage?.[bm.id] && (
+                          <div className={cn(
+                            "flex items-center gap-1 text-xs px-2 py-0.5 rounded-full",
+                            (apiUsage[bm.id].lastHour >= 160) ? "bg-destructive/10 text-destructive font-semibold" :
+                            (apiUsage[bm.id].lastHour >= 100) ? "bg-amber-500/10 text-amber-600" : "bg-muted text-muted-foreground"
+                          )}>
+                            <Activity className="h-3 w-3" />
+                            {apiUsage[bm.id].lastHour} calls/hr · {apiUsage[bm.id].last24h}/24h
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
