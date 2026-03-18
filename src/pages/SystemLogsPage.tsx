@@ -1,0 +1,150 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { DashboardLayout } from "@/components/DashboardLayout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { ScrollText, Search, Filter } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { format } from "date-fns";
+
+const ACTION_COLORS: Record<string, string> = {
+  "Top-Up Approved": "bg-green-500/10 text-green-700 border-green-200",
+  "Top-Up Rejected": "bg-red-500/10 text-red-700 border-red-200",
+  "Spend Cap Updated": "bg-blue-500/10 text-blue-700 border-blue-200",
+  "Ad Account Assigned": "bg-purple-500/10 text-purple-700 border-purple-200",
+  "Ad Account Unassigned": "bg-orange-500/10 text-orange-700 border-orange-200",
+  "Client Status Changed": "bg-yellow-500/10 text-yellow-700 border-yellow-200",
+  "Bank Added": "bg-teal-500/10 text-teal-700 border-teal-200",
+  "Bank Updated": "bg-indigo-500/10 text-indigo-700 border-indigo-200",
+};
+
+export default function SystemLogsPage() {
+  const isMobile = useIsMobile();
+  const [search, setSearch] = useState("");
+  const [actionFilter, setActionFilter] = useState<string>("all");
+
+  const { data: logs, isLoading } = useQuery({
+    queryKey: ["system-logs"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("system_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return (data as any[]) ?? [];
+    },
+  });
+
+  const uniqueActions = [...new Set(logs?.map((l: any) => l.action) ?? [])];
+
+  const filtered = logs?.filter((log: any) => {
+    const matchSearch =
+      !search ||
+      log.user_name?.toLowerCase().includes(search.toLowerCase()) ||
+      log.action?.toLowerCase().includes(search.toLowerCase()) ||
+      log.details?.toLowerCase().includes(search.toLowerCase());
+    const matchAction = actionFilter === "all" || log.action === actionFilter;
+    return matchSearch && matchAction;
+  }) ?? [];
+
+  return (
+    <DashboardLayout>
+      <div className="space-y-4 md:space-y-6">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+            <ScrollText className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold">System Log</h1>
+            <p className="text-xs md:text-sm text-muted-foreground">All CRM activity logs</p>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, action, details..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Select value={actionFilter} onValueChange={setActionFilter}>
+            <SelectTrigger className="w-full sm:w-[200px]">
+              <Filter className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Filter by action" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Actions</SelectItem>
+              {uniqueActions.map((action: string) => (
+                <SelectItem key={action} value={action}>{action}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20 text-muted-foreground">Loading...</div>
+        ) : filtered.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <ScrollText className="h-10 w-10 mb-3 opacity-40" />
+              <p className="text-sm">No logs found</p>
+            </CardContent>
+          </Card>
+        ) : isMobile ? (
+          <div className="space-y-3">
+            {filtered.map((log: any) => (
+              <Card key={log.id}>
+                <CardContent className="p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Badge variant="outline" className={ACTION_COLORS[log.action] || ""}>{log.action}</Badge>
+                    <span className="text-[10px] text-muted-foreground">
+                      {format(new Date(log.created_at), "dd MMM yyyy, hh:mm a")}
+                    </span>
+                  </div>
+                  <p className="text-sm font-medium">{log.user_name || "System"}</p>
+                  {log.details && <p className="text-xs text-muted-foreground">{log.details}</p>}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <Card>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Time</TableHead>
+                  <TableHead>User</TableHead>
+                  <TableHead>Action</TableHead>
+                  <TableHead>Details</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((log: any) => (
+                  <TableRow key={log.id}>
+                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                      {format(new Date(log.created_at), "dd MMM yyyy, hh:mm a")}
+                    </TableCell>
+                    <TableCell className="font-medium">{log.user_name || "System"}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={ACTION_COLORS[log.action] || ""}>{log.action}</Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground max-w-[300px] truncate">{log.details || "—"}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        )}
+      </div>
+    </DashboardLayout>
+  );
+}
