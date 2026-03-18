@@ -507,14 +507,23 @@ export function AdminAdAccounts() {
                       <span>Spent: <span className="font-medium text-foreground">${Number(a.amount_spent).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
                       <span>Limit: <span className="font-medium text-foreground">${Number(a.spend_cap).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
                     </div>
-                    <div onClick={(e) => e.stopPropagation()}>
+                    <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-1">
                       <Button
                         size="sm"
-                        className="gap-1 bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs h-8"
+                        className="gap-1 bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-3 font-semibold text-xs h-8"
                         onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}
                       >
                         <ArrowUpCircle className="h-3.5 w-3.5" />
                         Top Up
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1 rounded-full px-3 font-semibold text-xs h-8"
+                        onClick={() => openWithdrawDialog(a)}
+                      >
+                        <ArrowDownCircle className="h-3.5 w-3.5" />
+                        Withdraw
                       </Button>
                     </div>
                   </div>
