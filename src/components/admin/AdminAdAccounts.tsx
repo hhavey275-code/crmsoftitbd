@@ -54,7 +54,11 @@ export function AdminAdAccounts() {
   const [assignClientId, setAssignClientId] = useState("");
   const [clientSearch, setClientSearch] = useState("");
   const [showUnassignConfirm, setShowUnassignConfirm] = useState(false);
-
+  const [withdrawAccount, setWithdrawAccount] = useState<any>(null);
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [withdrawMeta, setWithdrawMeta] = useState<{ real_amount_spent: number; current_spend_cap: number; max_withdrawable: number } | null>(null);
+  const [fetchingWithdrawMeta, setFetchingWithdrawMeta] = useState(false);
   const { data: accounts } = useQuery({
     queryKey: ["admin-ad-accounts"],
     queryFn: async () => {
