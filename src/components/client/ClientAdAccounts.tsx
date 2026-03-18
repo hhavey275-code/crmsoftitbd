@@ -81,6 +81,8 @@ export function ClientAdAccounts() {
       return (data?.insights as Record<string, InsightsData>) ?? {};
     },
     enabled: !!user && !!accounts && accounts.length > 0,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   // Auto-refresh from Meta on mount (once per page load)
