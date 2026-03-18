@@ -14,12 +14,24 @@ import { format } from "date-fns";
 const ACTION_COLORS: Record<string, string> = {
   "Top-Up Approved": "bg-green-500/10 text-green-700 border-green-200",
   "Top-Up Rejected": "bg-red-500/10 text-red-700 border-red-200",
+  "Top-Up On Hold": "bg-amber-500/10 text-amber-700 border-amber-200",
+  "Top-Up Submitted": "bg-cyan-500/10 text-cyan-700 border-cyan-200",
   "Spend Cap Updated": "bg-blue-500/10 text-blue-700 border-blue-200",
   "Ad Account Assigned": "bg-purple-500/10 text-purple-700 border-purple-200",
   "Ad Account Unassigned": "bg-orange-500/10 text-orange-700 border-orange-200",
+  "Ad Account Deleted": "bg-red-500/10 text-red-700 border-red-200",
+  "Ad Account Requested": "bg-sky-500/10 text-sky-700 border-sky-200",
+  "Ad Account Request Approved": "bg-emerald-500/10 text-emerald-700 border-emerald-200",
+  "Ad Account Request Rejected": "bg-rose-500/10 text-rose-700 border-rose-200",
+  "BM Access Requested": "bg-violet-500/10 text-violet-700 border-violet-200",
+  "BM Access Approved": "bg-emerald-500/10 text-emerald-700 border-emerald-200",
+  "BM Access Rejected": "bg-rose-500/10 text-rose-700 border-rose-200",
   "Client Status Changed": "bg-yellow-500/10 text-yellow-700 border-yellow-200",
   "Bank Added": "bg-teal-500/10 text-teal-700 border-teal-200",
   "Bank Updated": "bg-indigo-500/10 text-indigo-700 border-indigo-200",
+  "Failed Top-Up Retry": "bg-orange-500/10 text-orange-700 border-orange-200",
+  "Failed Top-Up Refund": "bg-pink-500/10 text-pink-700 border-pink-200",
+  "Meta Update": "bg-blue-500/10 text-blue-700 border-blue-200",
 };
 
 export default function SystemLogsPage() {
