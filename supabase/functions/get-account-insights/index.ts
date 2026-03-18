@@ -149,7 +149,7 @@ async function processAccount(
 
     const fetchPromises: Promise<Response>[] = [
       fetch(todayUrl),
-      fetch(`https://graph.facebook.com/v24.0/${actId}?fields=balance,amount_spent,spend_cap,funding_source_details,daily_spend_limit,min_billing_threshold&access_token=${accessToken}`),
+      fetch(`https://graph.facebook.com/v24.0/${actId}?fields=balance,amount_spent,spend_cap,funding_source_details&access_token=${accessToken}`),
       fetchActiveCampaignCount(actId, accessToken).then(c => ({ json: async () => c } as any)),
     ];
     if (yesterdayUrl) {
