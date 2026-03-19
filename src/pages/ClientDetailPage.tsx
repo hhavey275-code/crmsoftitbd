@@ -35,6 +35,7 @@ export default function ClientDetailPage() {
   const { user: currentUser, isSuperAdmin } = useAuth();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
 
   const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfMonth(new Date()));
   const [dateTo, setDateTo] = useState<Date | undefined>(endOfMonth(new Date()));
