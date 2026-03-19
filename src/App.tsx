@@ -46,6 +46,7 @@ const PageLoader = () => (
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
     <AuthProvider>
       <TooltipProvider>
         <Toaster />
