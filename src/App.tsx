@@ -28,6 +28,8 @@ const FailedTopUpsPage = lazy(() => import("./pages/FailedTopUpsPage"));
 const RequestsPage = lazy(() => import("./pages/RequestsPage"));
 const SellersPage = lazy(() => import("./pages/SellersPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const TermsPage = lazy(() => import("./pages/TermsPage"));
+const PrivacyPage = lazy(() => import("./pages/PrivacyPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
