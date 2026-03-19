@@ -97,6 +97,8 @@ export function AppSidebar() {
     } else {
       navItems = adminNavItems;
     }
+  } else if (isSeller) {
+    navItems = sellerNavItems;
   } else {
     navItems = clientNavItems;
   }
