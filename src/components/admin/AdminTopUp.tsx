@@ -236,7 +236,6 @@ export function AdminTopUp() {
         if (reqData2?.proof_url) {
           try {
             const { data: botToken } = await supabase.from("site_settings").select("value").eq("key", "telegram_bot_token").single();
-            // Get per-bank telegram_group_id, fallback to global setting
             let targetGroupId = "";
             if (reqData2.bank_account_id) {
               const { data: bankData } = await (supabase as any).from("bank_accounts").select("telegram_group_id").eq("id", reqData2.bank_account_id).single();
@@ -256,6 +255,28 @@ export function AdminTopUp() {
             }
           } catch (e) {
             console.error("Telegram forward failed:", e);
+          }
+        }
+
+        // Auto-sync to seller ledger if bank has a seller assigned
+        if (reqData2?.bank_account_id) {
+          try {
+            const { data: bankForSeller } = await (supabase as any).from("bank_accounts").select("seller_id").eq("id", reqData2.bank_account_id).single();
+            if (bankForSeller?.seller_id) {
+              await (supabase as any).from("seller_transactions").insert({
+                seller_id: bankForSeller.seller_id,
+                type: "client_topup",
+                bdt_amount: Number(reqData2.bdt_amount || 0),
+                usdt_amount: 0,
+                rate: 0,
+                description: `Client top-up approved — $${amount}`,
+                bank_account_id: reqData2.bank_account_id,
+                top_up_request_id: id,
+                proof_url: reqData2.proof_url || null,
+              });
+            }
+          } catch (e) {
+            console.error("Seller ledger sync failed:", e);
           }
         }
       }
