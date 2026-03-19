@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { DollarSign, Banknote, ImageIcon, UserCog, ArrowLeftRight, Landmark, X } from "lucide-react";
+import { DollarSign, Banknote, ImageIcon, UserCog, ArrowLeftRight, Landmark, X, ScanLine, Loader2, Upload } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -29,6 +29,107 @@ export function AdminSellers() {
   const [proofUrl, setProofUrl] = useState<string | null>(null);
   const [showAssignBank, setShowAssignBank] = useState(false);
   const [selectedBankId, setSelectedBankId] = useState("");
+
+  // OCR states
+  const [showOcrDialog, setShowOcrDialog] = useState(false);
+  const [ocrUploading, setOcrUploading] = useState(false);
+  const [ocrProcessing, setOcrProcessing] = useState(false);
+  const [ocrImageUrl, setOcrImageUrl] = useState<string | null>(null);
+  const [ocrPreviewUrl, setOcrPreviewUrl] = useState<string | null>(null);
+  const [ocrResult, setOcrResult] = useState<{ bdt_amount: string; date: string; reference: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const resetOcr = () => {
+    setOcrUploading(false);
+    setOcrProcessing(false);
+    setOcrImageUrl(null);
+    setOcrPreviewUrl(null);
+    setOcrResult(null);
+  };
+
+  const uploadOcrImage = useCallback(async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload an image file");
+      return;
+    }
+    setOcrUploading(true);
+    try {
+      const ext = file.name.split(".").pop() || "png";
+      const path = `ocr-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("payment-proofs").upload(path, file);
+      if (upErr) throw upErr;
+      const { data: urlData } = supabase.storage.from("payment-proofs").getPublicUrl(path);
+      const publicUrl = urlData.publicUrl;
+      setOcrImageUrl(publicUrl);
+      setOcrPreviewUrl(URL.createObjectURL(file));
+
+      // Now call OCR
+      setOcrUploading(false);
+      setOcrProcessing(true);
+      const { data, error } = await supabase.functions.invoke("ocr-seller-payment", {
+        body: { image_url: publicUrl },
+      });
+      if (error) throw error;
+      setOcrResult({
+        bdt_amount: data.bdt_amount?.toString() || "",
+        date: data.date || "",
+        reference: data.reference || "",
+      });
+    } catch (e: any) {
+      toast.error(e.message || "Upload/OCR failed");
+      resetOcr();
+    } finally {
+      setOcrUploading(false);
+      setOcrProcessing(false);
+    }
+  }, []);
+
+  // Handle Ctrl+V paste
+  useEffect(() => {
+    if (!showOcrDialog) return;
+    const handler = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (file) uploadOcrImage(file);
+          break;
+        }
+      }
+    };
+    document.addEventListener("paste", handler);
+    return () => document.removeEventListener("paste", handler);
+  }, [showOcrDialog, uploadOcrImage]);
+
+  // Save OCR result as seller transaction
+  const saveOcrMutation = useMutation({
+    mutationFn: async () => {
+      if (!ocrResult || !selectedSeller || !ocrImageUrl) throw new Error("Missing data");
+      const bdtAmount = Number(ocrResult.bdt_amount);
+      if (!bdtAmount || bdtAmount <= 0) throw new Error("Enter a valid BDT amount");
+      const entry: any = {
+        seller_id: selectedSeller.user_id,
+        type: "bdt_payment",
+        bdt_amount: bdtAmount,
+        usdt_amount: 0,
+        rate: 0,
+        description: ocrResult.reference ? `TrxID: ${ocrResult.reference}` : undefined,
+        proof_url: ocrImageUrl,
+      };
+      if (ocrResult.date) entry.created_at = new Date(ocrResult.date).toISOString();
+      const { error } = await (supabase as any).from("seller_transactions").insert(entry);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("BDT Payment recorded from screenshot!");
+      logSystemAction("OCR BDT Payment", `Seller: ${selectedSeller.full_name || selectedSeller.email}, Amount: ৳${ocrResult?.bdt_amount}`, user?.id, user?.email);
+      queryClient.invalidateQueries({ queryKey: ["admin-seller-txns", selectedSeller.user_id] });
+      setShowOcrDialog(false);
+      resetOcr();
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
 
   // Fetch all sellers (users with seller role)
   const { data: sellers } = useQuery({
