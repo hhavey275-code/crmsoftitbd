@@ -8,49 +8,83 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatusBadge } from "@/components/StatusBadge";
 import { toast } from "sonner";
-import { Plus, Trash2, UserPlus, Pencil, Building2, BarChart3, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Trash2, UserPlus, Pencil, Building2, BarChart3, RotateCcw, MinusCircle } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { logSystemAction } from "@/lib/systemLog";
 import { format } from "date-fns";
 
-const emptyForm = { bank_name: "", account_name: "", account_number: "", branch: "", routing_number: "" };
+const emptyForm = { bank_name: "", account_name: "", account_number: "", branch: "", routing_number: "", telegram_group_id: "" };
 
 function BankStatsDialog({ bankId, bankName, open, onClose }: { bankId: string; bankName: string; open: boolean; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [withdrawNote, setWithdrawNote] = useState("");
+  const [showWithdrawForm, setShowWithdrawForm] = useState(false);
+
   const { data: stats, isLoading } = useQuery({
     queryKey: ["bank-stats", bankId],
     enabled: open && !!bankId,
     queryFn: async () => {
-      // Get all approved top-ups for this bank
-      const { data: topups } = await supabase
-        .from("top_up_requests")
-        .select("bdt_amount, amount, created_at")
-        .eq("bank_account_id", bankId)
-        .eq("status", "approved")
-        .order("created_at", { ascending: false });
+      const [{ data: topups }, { data: withdrawals }] = await Promise.all([
+        supabase.from("top_up_requests").select("bdt_amount, amount, created_at").eq("bank_account_id", bankId).eq("status", "approved").order("created_at", { ascending: false }),
+        (supabase as any).from("transactions").select("amount, created_at, description").eq("bank_account_id", bankId).eq("type", "withdraw").order("created_at", { ascending: false }),
+      ]);
 
-      const rows = topups ?? [];
-      const totalBdt = rows.reduce((s, r: any) => s + Number(r.bdt_amount || 0), 0);
-      const totalUsd = rows.reduce((s, r: any) => s + Number(r.amount || 0), 0);
+      const topupRows = topups ?? [];
+      const withdrawRows = (withdrawals as any[]) ?? [];
+      const totalBdt = topupRows.reduce((s, r: any) => s + Number(r.bdt_amount || 0), 0);
+      const totalUsd = topupRows.reduce((s, r: any) => s + Number(r.amount || 0), 0);
+      const totalWithdrawn = withdrawRows.reduce((s, r: any) => s + Number(r.amount || 0), 0);
 
-      // Group by day
-      const dayMap: Record<string, { bdt: number; usd: number; count: number }> = {};
-      for (const r of rows) {
+      // Group by day (topups)
+      const dayMap: Record<string, { bdt: number; usd: number; count: number; withdrawn: number }> = {};
+      for (const r of topupRows) {
         const day = format(new Date((r as any).created_at), "yyyy-MM-dd");
-        if (!dayMap[day]) dayMap[day] = { bdt: 0, usd: 0, count: 0 };
+        if (!dayMap[day]) dayMap[day] = { bdt: 0, usd: 0, count: 0, withdrawn: 0 };
         dayMap[day].bdt += Number((r as any).bdt_amount || 0);
         dayMap[day].usd += Number((r as any).amount || 0);
         dayMap[day].count += 1;
+      }
+      for (const w of withdrawRows) {
+        const day = format(new Date(w.created_at), "yyyy-MM-dd");
+        if (!dayMap[day]) dayMap[day] = { bdt: 0, usd: 0, count: 0, withdrawn: 0 };
+        dayMap[day].withdrawn += Number(w.amount || 0);
       }
 
       const daily = Object.entries(dayMap)
         .sort(([a], [b]) => b.localeCompare(a))
         .map(([date, v]) => ({ date, ...v }));
 
-      return { totalBdt, totalUsd, totalCount: rows.length, daily };
+      return { totalBdt, totalUsd, totalCount: topupRows.length, totalWithdrawn, netBdt: totalBdt - totalWithdrawn, daily, withdrawals: withdrawRows };
     },
+  });
+
+  const withdrawMutation = useMutation({
+    mutationFn: async () => {
+      const amt = Number(withdrawAmount);
+      if (!amt || amt <= 0) throw new Error("Enter a valid amount");
+      const { error } = await (supabase as any).from("transactions").insert({
+        user_id: "00000000-0000-0000-0000-000000000000",
+        type: "withdraw",
+        amount: amt,
+        bank_account_id: bankId,
+        description: withdrawNote || `Bank withdraw from ${bankName}`,
+        processed_by: "admin",
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Withdraw recorded!");
+      queryClient.invalidateQueries({ queryKey: ["bank-stats", bankId] });
+      setWithdrawAmount("");
+      setWithdrawNote("");
+      setShowWithdrawForm(false);
+    },
+    onError: (e: any) => toast.error(e.message),
   });
 
   return (
@@ -68,25 +102,52 @@ function BankStatsDialog({ bankId, bankName, open, onClose }: { bankId: string; 
         ) : (
           <div className="space-y-4">
             {/* Summary */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <Card className="border">
                 <CardContent className="p-3 text-center">
-                  <p className="text-xs text-muted-foreground">Total BDT</p>
+                  <p className="text-xs text-muted-foreground">Total Received (BDT)</p>
                   <p className="text-lg font-bold text-primary">৳{stats?.totalBdt?.toLocaleString() ?? 0}</p>
                 </CardContent>
               </Card>
               <Card className="border">
                 <CardContent className="p-3 text-center">
-                  <p className="text-xs text-muted-foreground">Total USD</p>
-                  <p className="text-lg font-bold text-green-600">${stats?.totalUsd?.toLocaleString() ?? 0}</p>
+                  <p className="text-xs text-muted-foreground">Total Withdrawn</p>
+                  <p className="text-lg font-bold text-red-500">৳{stats?.totalWithdrawn?.toLocaleString() ?? 0}</p>
                 </CardContent>
               </Card>
               <Card className="border">
                 <CardContent className="p-3 text-center">
-                  <p className="text-xs text-muted-foreground">Transactions</p>
-                  <p className="text-lg font-bold">{stats?.totalCount ?? 0}</p>
+                  <p className="text-xs text-muted-foreground">Net Balance (BDT)</p>
+                  <p className="text-lg font-bold text-green-600">৳{stats?.netBdt?.toLocaleString() ?? 0}</p>
                 </CardContent>
               </Card>
+              <Card className="border">
+                <CardContent className="p-3 text-center">
+                  <p className="text-xs text-muted-foreground">Total USD / Txns</p>
+                  <p className="text-lg font-bold">${stats?.totalUsd?.toLocaleString() ?? 0} <span className="text-xs text-muted-foreground">({stats?.totalCount ?? 0})</span></p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Record Withdraw */}
+            <div>
+              {!showWithdrawForm ? (
+                <Button size="sm" variant="outline" className="w-full gap-1.5" onClick={() => setShowWithdrawForm(true)}>
+                  <MinusCircle className="h-4 w-4" /> Record Withdraw
+                </Button>
+              ) : (
+                <div className="space-y-2 p-3 border rounded-md bg-muted/30">
+                  <Label className="text-xs">Withdraw Amount (BDT)</Label>
+                  <Input type="number" placeholder="Amount" value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)} />
+                  <Input placeholder="Note (optional)" value={withdrawNote} onChange={e => setWithdrawNote(e.target.value)} />
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setShowWithdrawForm(false)}>Cancel</Button>
+                    <Button size="sm" onClick={() => withdrawMutation.mutate()} disabled={withdrawMutation.isPending}>
+                      {withdrawMutation.isPending ? "Saving..." : "Save Withdraw"}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Day-by-day */}
@@ -97,8 +158,8 @@ function BankStatsDialog({ bankId, bankName, open, onClose }: { bankId: string; 
                   <TableHeader>
                     <TableRow>
                       <TableHead className="text-xs">Date</TableHead>
-                      <TableHead className="text-xs text-right">BDT</TableHead>
-                      <TableHead className="text-xs text-right">USD</TableHead>
+                      <TableHead className="text-xs text-right">Received</TableHead>
+                      <TableHead className="text-xs text-right">Withdrawn</TableHead>
                       <TableHead className="text-xs text-right">#</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -107,7 +168,7 @@ function BankStatsDialog({ bankId, bankName, open, onClose }: { bankId: string; 
                       <TableRow key={d.date}>
                         <TableCell className="text-xs">{format(new Date(d.date), "MMM d, yyyy")}</TableCell>
                         <TableCell className="text-xs text-right font-mono">৳{d.bdt.toLocaleString()}</TableCell>
-                        <TableCell className="text-xs text-right font-mono">${d.usd.toLocaleString()}</TableCell>
+                        <TableCell className="text-xs text-right font-mono text-red-500">{d.withdrawn > 0 ? `৳${d.withdrawn.toLocaleString()}` : "—"}</TableCell>
                         <TableCell className="text-xs text-right">{d.count}</TableCell>
                       </TableRow>
                     ))}
@@ -133,11 +194,12 @@ export function AdminBanks() {
   const [form, setForm] = useState(emptyForm);
   const [selectedClient, setSelectedClient] = useState("");
   const [statsBank, setStatsBank] = useState<{ id: string; name: string } | null>(null);
+  const [bankTab, setBankTab] = useState("active");
 
   const { data: banks } = useQuery({
-    queryKey: ["admin-banks"],
+    queryKey: ["admin-banks", bankTab],
     queryFn: async () => {
-      const { data } = await (supabase as any).from("bank_accounts").select("*").eq("status", "active").order("created_at", { ascending: false });
+      const { data } = await (supabase as any).from("bank_accounts").select("*").eq("status", bankTab).order("created_at", { ascending: false });
       return (data as any[]) ?? [];
     },
   });
@@ -160,7 +222,9 @@ export function AdminBanks() {
 
   const addMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await (supabase as any).from("bank_accounts").insert(form);
+      const insertData: any = { bank_name: form.bank_name, account_name: form.account_name, account_number: form.account_number, branch: form.branch, routing_number: form.routing_number };
+      if (form.telegram_group_id) insertData.telegram_group_id = form.telegram_group_id;
+      const { error } = await (supabase as any).from("bank_accounts").insert(insertData);
       if (error) throw error;
     },
     onSuccess: () => { logSystemAction("Bank Added", `${form.bank_name} — ${form.account_number}`); toast.success("Bank added!"); queryClient.invalidateQueries({ queryKey: ["admin-banks"] }); setShowAdd(false); setForm(emptyForm); },
@@ -169,9 +233,11 @@ export function AdminBanks() {
 
   const editMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await (supabase as any).from("bank_accounts").update({
+      const updateData: any = {
         bank_name: form.bank_name, account_name: form.account_name, account_number: form.account_number, branch: form.branch, routing_number: form.routing_number,
-      }).eq("id", editingBank.id);
+        telegram_group_id: form.telegram_group_id || null,
+      };
+      const { error } = await (supabase as any).from("bank_accounts").update(updateData).eq("id", editingBank.id);
       if (error) throw error;
     },
     onSuccess: () => { logSystemAction("Bank Updated", `${form.bank_name} — ${form.account_number}`); toast.success("Bank updated!"); queryClient.invalidateQueries({ queryKey: ["admin-banks"] }); setEditingBank(null); setForm(emptyForm); },
@@ -180,11 +246,19 @@ export function AdminBanks() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      // Soft delete: set status to inactive
       const { error } = await (supabase as any).from("bank_accounts").update({ status: "inactive" }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => { logSystemAction("Bank Deactivated", "Bank set to inactive"); toast.success("Bank deactivated"); queryClient.invalidateQueries({ queryKey: ["admin-banks"] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const reactivateMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase as any).from("bank_accounts").update({ status: "active" }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { logSystemAction("Bank Reactivated", "Bank set to active"); toast.success("Bank reactivated!"); queryClient.invalidateQueries({ queryKey: ["admin-banks"] }); },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -206,6 +280,8 @@ export function AdminBanks() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const isActive = bankTab === "active";
+
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex items-center justify-between">
@@ -214,6 +290,14 @@ export function AdminBanks() {
           <Plus className="mr-1.5 h-4 w-4" /> Add Bank
         </Button>
       </div>
+
+      {/* Active / Inactive Toggle */}
+      <Tabs value={bankTab} onValueChange={setBankTab}>
+        <TabsList>
+          <TabsTrigger value="active">Active</TabsTrigger>
+          <TabsTrigger value="inactive">Inactive</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       {/* All Banks */}
       {isMobile ? (
@@ -237,18 +321,26 @@ export function AdminBanks() {
                       <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setStatsBank({ id: b.id, name: b.bank_name })}>
                         <BarChart3 className="h-3.5 w-3.5" />
                       </Button>
-                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => {
-                        setEditingBank(b);
-                        setForm({ bank_name: b.bank_name, account_name: b.account_name, account_number: b.account_number, branch: b.branch || "", routing_number: b.routing_number || "" });
-                      }}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setShowAssign(b.id)}>
-                        <UserPlus className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 hover:text-destructive" onClick={() => deleteMutation.mutate(b.id)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      {isActive ? (
+                        <>
+                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => {
+                            setEditingBank(b);
+                            setForm({ bank_name: b.bank_name, account_name: b.account_name, account_number: b.account_number, branch: b.branch || "", routing_number: b.routing_number || "", telegram_group_id: b.telegram_group_id || "" });
+                          }}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setShowAssign(b.id)}>
+                            <UserPlus className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 hover:text-destructive" onClick={() => deleteMutation.mutate(b.id)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </>
+                      ) : (
+                        <Button size="sm" variant="ghost" className="h-7 gap-1 text-green-600" onClick={() => reactivateMutation.mutate(b.id)}>
+                          <RotateCcw className="h-3.5 w-3.5" /> Reactivate
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -256,12 +348,12 @@ export function AdminBanks() {
             </Card>
           ))}
           {(!banks || banks.length === 0) && (
-            <p className="text-center text-muted-foreground py-8 text-sm">No banks added yet</p>
+            <p className="text-center text-muted-foreground py-8 text-sm">{isActive ? "No active banks" : "No inactive banks"}</p>
           )}
         </div>
       ) : (
         <Card>
-          <CardHeader><CardTitle className="text-lg">All Banks</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-lg">{isActive ? "Active" : "Inactive"} Banks</CardTitle></CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
@@ -287,18 +379,26 @@ export function AdminBanks() {
                         <Button size="sm" variant="ghost" onClick={() => setStatsBank({ id: b.id, name: b.bank_name })} title="View Stats">
                           <BarChart3 className="h-4 w-4" />
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => {
-                          setEditingBank(b);
-                          setForm({ bank_name: b.bank_name, account_name: b.account_name, account_number: b.account_number, branch: b.branch || "", routing_number: b.routing_number || "" });
-                        }}><Pencil className="h-4 w-4" /></Button>
-                        <Button size="sm" variant="ghost" onClick={() => setShowAssign(b.id)}><UserPlus className="h-4 w-4" /></Button>
-                        <Button size="sm" variant="ghost" className="hover:text-destructive" onClick={() => deleteMutation.mutate(b.id)}><Trash2 className="h-4 w-4" /></Button>
+                        {isActive ? (
+                          <>
+                            <Button size="sm" variant="ghost" onClick={() => {
+                              setEditingBank(b);
+                              setForm({ bank_name: b.bank_name, account_name: b.account_name, account_number: b.account_number, branch: b.branch || "", routing_number: b.routing_number || "", telegram_group_id: b.telegram_group_id || "" });
+                            }}><Pencil className="h-4 w-4" /></Button>
+                            <Button size="sm" variant="ghost" onClick={() => setShowAssign(b.id)}><UserPlus className="h-4 w-4" /></Button>
+                            <Button size="sm" variant="ghost" className="hover:text-destructive" onClick={() => deleteMutation.mutate(b.id)}><Trash2 className="h-4 w-4" /></Button>
+                          </>
+                        ) : (
+                          <Button size="sm" variant="ghost" className="text-green-600 gap-1" onClick={() => reactivateMutation.mutate(b.id)}>
+                            <RotateCcw className="h-4 w-4" /> Reactivate
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
                 ))}
                 {(!banks || banks.length === 0) && (
-                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No banks added yet</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">{isActive ? "No active banks" : "No inactive banks"}</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
@@ -364,12 +464,7 @@ export function AdminBanks() {
 
       {/* Bank Stats Dialog */}
       {statsBank && (
-        <BankStatsDialog
-          bankId={statsBank.id}
-          bankName={statsBank.name}
-          open={!!statsBank}
-          onClose={() => setStatsBank(null)}
-        />
+        <BankStatsDialog bankId={statsBank.id} bankName={statsBank.name} open={!!statsBank} onClose={() => setStatsBank(null)} />
       )}
 
       {/* Add Bank Dialog */}
@@ -382,6 +477,7 @@ export function AdminBanks() {
             <div><Label>Account Number</Label><Input value={form.account_number} onChange={e => setForm(f => ({ ...f, account_number: e.target.value }))} /></div>
             <div><Label>Branch</Label><Input value={form.branch} onChange={e => setForm(f => ({ ...f, branch: e.target.value }))} /></div>
             <div><Label>Routing Number</Label><Input value={form.routing_number} onChange={e => setForm(f => ({ ...f, routing_number: e.target.value }))} /></div>
+            <div><Label>Telegram Group ID <span className="text-xs text-muted-foreground">(for proof forwarding)</span></Label><Input placeholder="-100xxxxxxxxxx" value={form.telegram_group_id} onChange={e => setForm(f => ({ ...f, telegram_group_id: e.target.value }))} /></div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAdd(false)}>Cancel</Button>
@@ -426,6 +522,7 @@ export function AdminBanks() {
             <div><Label>Account Number</Label><Input value={form.account_number} onChange={e => setForm(f => ({ ...f, account_number: e.target.value }))} /></div>
             <div><Label>Branch</Label><Input value={form.branch} onChange={e => setForm(f => ({ ...f, branch: e.target.value }))} /></div>
             <div><Label>Routing Number</Label><Input value={form.routing_number} onChange={e => setForm(f => ({ ...f, routing_number: e.target.value }))} /></div>
+            <div><Label>Telegram Group ID <span className="text-xs text-muted-foreground">(for proof forwarding)</span></Label><Input placeholder="-100xxxxxxxxxx" value={form.telegram_group_id} onChange={e => setForm(f => ({ ...f, telegram_group_id: e.target.value }))} /></div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setEditingBank(null); setForm(emptyForm); }}>Cancel</Button>

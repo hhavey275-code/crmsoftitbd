@@ -11,7 +11,7 @@ function amountMatches(a: number, b: number): boolean {
   return Math.abs(a - b) <= BDT_TOLERANCE;
 }
 
-async function forwardProofToTelegram(supabase: any, proofUrl: string, caption: string) {
+async function forwardProofToTelegram(supabase: any, proofUrl: string, caption: string, bankAccountId: string | null) {
   try {
     const { data: botTokenSetting } = await supabase
       .from('site_settings')
@@ -19,14 +19,32 @@ async function forwardProofToTelegram(supabase: any, proofUrl: string, caption: 
       .eq('key', 'telegram_bot_token')
       .single();
 
-    const { data: groupIdSetting } = await supabase
-      .from('site_settings')
-      .select('value')
-      .eq('key', 'telegram_forward_group_id')
-      .single();
+    if (!botTokenSetting?.value) {
+      console.log('Telegram forward skipped: bot token not configured');
+      return;
+    }
 
-    if (!botTokenSetting?.value || !groupIdSetting?.value) {
-      console.log('Telegram forward skipped: bot token or group ID not configured');
+    // Get per-bank telegram_group_id, fallback to global setting
+    let targetGroupId = '';
+    if (bankAccountId) {
+      const { data: bankData } = await supabase
+        .from('bank_accounts')
+        .select('telegram_group_id')
+        .eq('id', bankAccountId)
+        .single();
+      if (bankData?.telegram_group_id) targetGroupId = bankData.telegram_group_id;
+    }
+    if (!targetGroupId) {
+      const { data: groupIdSetting } = await supabase
+        .from('site_settings')
+        .select('value')
+        .eq('key', 'telegram_forward_group_id')
+        .single();
+      targetGroupId = groupIdSetting?.value || '';
+    }
+
+    if (!targetGroupId) {
+      console.log('Telegram forward skipped: no group ID configured for this bank');
       return;
     }
 
@@ -34,7 +52,7 @@ async function forwardProofToTelegram(supabase: any, proofUrl: string, caption: 
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        chat_id: groupIdSetting.value,
+        chat_id: targetGroupId,
         photo: proofUrl,
         caption: caption,
         parse_mode: 'HTML',
@@ -296,7 +314,7 @@ Deno.serve(async (req) => {
       const { data: clientProfile } = await supabase.from('profiles').select('full_name, email').eq('user_id', user_id).single();
       const clientName = clientProfile?.full_name || clientProfile?.email || 'Unknown';
       const caption = `✅ <b>Auto-Approved Top-Up</b>\n👤 ${clientName}\n💰 $${amount} (৳${bdtNum.toLocaleString()})\n🔖 Ref: ${payment_reference || 'N/A'}`;
-      await forwardProofToTelegram(supabase, proof_url, caption);
+      await forwardProofToTelegram(supabase, proof_url, caption, bank_account_id);
     }
 
     return new Response(JSON.stringify({ ok: true, auto_approved: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });

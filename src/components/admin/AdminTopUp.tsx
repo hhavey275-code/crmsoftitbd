@@ -230,19 +230,28 @@ export function AdminTopUp() {
       const clientName = clientProfile?.full_name || clientProfile?.email || userId.slice(0, 8);
       await logSystemAction(actionLabel, `$${amount} for ${clientName}${adminNote ? ` — ${adminNote}` : ""}`, user!.id, user!.email);
 
-      // Forward proof image to Telegram group on approval
+      // Forward proof image to per-bank Telegram group on approval
       if (action === "approved") {
         const reqData2 = requests?.find((r: any) => r.id === id);
         if (reqData2?.proof_url) {
           try {
             const { data: botToken } = await supabase.from("site_settings").select("value").eq("key", "telegram_bot_token").single();
-            const { data: groupId } = await supabase.from("site_settings").select("value").eq("key", "telegram_forward_group_id").single();
-            if (botToken?.value && groupId?.value) {
+            // Get per-bank telegram_group_id, fallback to global setting
+            let targetGroupId = "";
+            if (reqData2.bank_account_id) {
+              const { data: bankData } = await (supabase as any).from("bank_accounts").select("telegram_group_id").eq("id", reqData2.bank_account_id).single();
+              if (bankData?.telegram_group_id) targetGroupId = bankData.telegram_group_id;
+            }
+            if (!targetGroupId) {
+              const { data: globalGroup } = await supabase.from("site_settings").select("value").eq("key", "telegram_forward_group_id").single();
+              targetGroupId = globalGroup?.value || "";
+            }
+            if (botToken?.value && targetGroupId) {
               const caption = `✅ <b>Approved Top-Up</b>\n👤 ${clientName}\n💰 $${amount} (৳${reqData2.bdt_amount ? Number(reqData2.bdt_amount).toLocaleString() : 'N/A'})\n🔖 Ref: ${reqData2.payment_reference || 'N/A'}`;
               await fetch(`https://api.telegram.org/bot${botToken.value}/sendPhoto`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ chat_id: groupId.value, photo: reqData2.proof_url, caption, parse_mode: "HTML" }),
+                body: JSON.stringify({ chat_id: targetGroupId, photo: reqData2.proof_url, caption, parse_mode: "HTML" }),
               });
             }
           } catch (e) {
