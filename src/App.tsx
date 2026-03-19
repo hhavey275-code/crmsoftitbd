@@ -28,6 +28,8 @@ const FailedTopUpsPage = lazy(() => import("./pages/FailedTopUpsPage"));
 const RequestsPage = lazy(() => import("./pages/RequestsPage"));
 const SellersPage = lazy(() => import("./pages/SellersPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const TermsPage = lazy(() => import("./pages/TermsPage"));
+const PrivacyPage = lazy(() => import("./pages/PrivacyPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -73,6 +75,8 @@ const App = () => (
               <Route path="/requests" element={<ProtectedRoute><RequestsPage /></ProtectedRoute>} />
               <Route path="/invoice/:requestId" element={<ProtectedRoute><InvoicePage /></ProtectedRoute>} />
               <Route path="/sellers" element={<ProtectedRoute><SellersPage /></ProtectedRoute>} />
+              <Route path="/terms" element={<TermsPage />} />
+              <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
