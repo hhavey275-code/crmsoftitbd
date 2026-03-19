@@ -10,12 +10,119 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { StatusBadge } from "@/components/StatusBadge";
 import { toast } from "sonner";
-import { Plus, Trash2, UserPlus, Pencil, Building2 } from "lucide-react";
+import { Plus, Trash2, UserPlus, Pencil, Building2, BarChart3, ChevronDown, ChevronUp } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { logSystemAction } from "@/lib/systemLog";
+import { format } from "date-fns";
 
 const emptyForm = { bank_name: "", account_name: "", account_number: "", branch: "", routing_number: "" };
+
+function BankStatsDialog({ bankId, bankName, open, onClose }: { bankId: string; bankName: string; open: boolean; onClose: () => void }) {
+  const { data: stats, isLoading } = useQuery({
+    queryKey: ["bank-stats", bankId],
+    enabled: open && !!bankId,
+    queryFn: async () => {
+      // Get all approved top-ups for this bank
+      const { data: topups } = await supabase
+        .from("top_up_requests")
+        .select("bdt_amount, amount, created_at")
+        .eq("bank_account_id", bankId)
+        .eq("status", "approved")
+        .order("created_at", { ascending: false });
+
+      const rows = topups ?? [];
+      const totalBdt = rows.reduce((s, r: any) => s + Number(r.bdt_amount || 0), 0);
+      const totalUsd = rows.reduce((s, r: any) => s + Number(r.amount || 0), 0);
+
+      // Group by day
+      const dayMap: Record<string, { bdt: number; usd: number; count: number }> = {};
+      for (const r of rows) {
+        const day = format(new Date((r as any).created_at), "yyyy-MM-dd");
+        if (!dayMap[day]) dayMap[day] = { bdt: 0, usd: 0, count: 0 };
+        dayMap[day].bdt += Number((r as any).bdt_amount || 0);
+        dayMap[day].usd += Number((r as any).amount || 0);
+        dayMap[day].count += 1;
+      }
+
+      const daily = Object.entries(dayMap)
+        .sort(([a], [b]) => b.localeCompare(a))
+        .map(([date, v]) => ({ date, ...v }));
+
+      return { totalBdt, totalUsd, totalCount: rows.length, daily };
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-primary" />
+            {bankName} — Stats
+          </DialogTitle>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="py-8 text-center text-muted-foreground animate-pulse">Loading stats...</div>
+        ) : (
+          <div className="space-y-4">
+            {/* Summary */}
+            <div className="grid grid-cols-3 gap-3">
+              <Card className="border">
+                <CardContent className="p-3 text-center">
+                  <p className="text-xs text-muted-foreground">Total BDT</p>
+                  <p className="text-lg font-bold text-primary">৳{stats?.totalBdt?.toLocaleString() ?? 0}</p>
+                </CardContent>
+              </Card>
+              <Card className="border">
+                <CardContent className="p-3 text-center">
+                  <p className="text-xs text-muted-foreground">Total USD</p>
+                  <p className="text-lg font-bold text-green-600">${stats?.totalUsd?.toLocaleString() ?? 0}</p>
+                </CardContent>
+              </Card>
+              <Card className="border">
+                <CardContent className="p-3 text-center">
+                  <p className="text-xs text-muted-foreground">Transactions</p>
+                  <p className="text-lg font-bold">{stats?.totalCount ?? 0}</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Day-by-day */}
+            <div>
+              <h3 className="text-sm font-semibold mb-2">Day-by-Day Breakdown</h3>
+              {stats?.daily && stats.daily.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs">Date</TableHead>
+                      <TableHead className="text-xs text-right">BDT</TableHead>
+                      <TableHead className="text-xs text-right">USD</TableHead>
+                      <TableHead className="text-xs text-right">#</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {stats.daily.map((d) => (
+                      <TableRow key={d.date}>
+                        <TableCell className="text-xs">{format(new Date(d.date), "MMM d, yyyy")}</TableCell>
+                        <TableCell className="text-xs text-right font-mono">৳{d.bdt.toLocaleString()}</TableCell>
+                        <TableCell className="text-xs text-right font-mono">${d.usd.toLocaleString()}</TableCell>
+                        <TableCell className="text-xs text-right">{d.count}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">No transactions yet</p>
+              )}
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export function AdminBanks() {
   const queryClient = useQueryClient();
@@ -25,11 +132,12 @@ export function AdminBanks() {
   const [editingBank, setEditingBank] = useState<any>(null);
   const [form, setForm] = useState(emptyForm);
   const [selectedClient, setSelectedClient] = useState("");
+  const [statsBank, setStatsBank] = useState<{ id: string; name: string } | null>(null);
 
   const { data: banks } = useQuery({
     queryKey: ["admin-banks"],
     queryFn: async () => {
-      const { data } = await (supabase as any).from("bank_accounts").select("*").order("created_at", { ascending: false });
+      const { data } = await (supabase as any).from("bank_accounts").select("*").eq("status", "active").order("created_at", { ascending: false });
       return (data as any[]) ?? [];
     },
   });
@@ -72,10 +180,11 @@ export function AdminBanks() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase as any).from("bank_accounts").delete().eq("id", id);
+      // Soft delete: set status to inactive
+      const { error } = await (supabase as any).from("bank_accounts").update({ status: "inactive" }).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Bank deleted"); queryClient.invalidateQueries({ queryKey: ["admin-banks"] }); },
+    onSuccess: () => { logSystemAction("Bank Deactivated", "Bank set to inactive"); toast.success("Bank deactivated"); queryClient.invalidateQueries({ queryKey: ["admin-banks"] }); },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -125,6 +234,9 @@ export function AdminBanks() {
                     <p className="text-xs font-mono text-muted-foreground">{b.account_number}</p>
                     {b.branch && <p className="text-[11px] text-muted-foreground">Branch: {b.branch}</p>}
                     <div className="flex items-center gap-1.5 mt-2">
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setStatsBank({ id: b.id, name: b.bank_name })}>
+                        <BarChart3 className="h-3.5 w-3.5" />
+                      </Button>
                       <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => {
                         setEditingBank(b);
                         setForm({ bank_name: b.bank_name, account_name: b.account_name, account_number: b.account_number, branch: b.branch || "", routing_number: b.routing_number || "" });
@@ -172,6 +284,9 @@ export function AdminBanks() {
                     <TableCell><StatusBadge status={b.status} /></TableCell>
                     <TableCell>
                       <div className="flex gap-1">
+                        <Button size="sm" variant="ghost" onClick={() => setStatsBank({ id: b.id, name: b.bank_name })} title="View Stats">
+                          <BarChart3 className="h-4 w-4" />
+                        </Button>
                         <Button size="sm" variant="ghost" onClick={() => {
                           setEditingBank(b);
                           setForm({ bank_name: b.bank_name, account_name: b.account_name, account_number: b.account_number, branch: b.branch || "", routing_number: b.routing_number || "" });
@@ -245,6 +360,16 @@ export function AdminBanks() {
             </Table>
           </CardContent>
         </Card>
+      )}
+
+      {/* Bank Stats Dialog */}
+      {statsBank && (
+        <BankStatsDialog
+          bankId={statsBank.id}
+          bankName={statsBank.name}
+          open={!!statsBank}
+          onClose={() => setStatsBank(null)}
+        />
       )}
 
       {/* Add Bank Dialog */}

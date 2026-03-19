@@ -36,6 +36,37 @@ const ANNOUNCEMENT_SIZES = [
   { label: "Extra Large", value: "text-lg" },
 ];
 
+function TelegramForwardGroupSetting() {
+  const { data: currentVal, refetch } = useQuery({
+    queryKey: ["telegram-forward-group-id"],
+    queryFn: async () => {
+      const { data } = await supabase.from("site_settings").select("value").eq("key", "telegram_forward_group_id").single();
+      return data?.value ?? "";
+    },
+  });
+  const [input, setInput] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  if (currentVal && !input && !saving) setInput(currentVal);
+
+  const handleSave = async () => {
+    if (!input.trim()) return;
+    setSaving(true);
+    const { error } = await supabase.from("site_settings").upsert({ key: "telegram_forward_group_id", value: input.trim() }, { onConflict: "key" });
+    setSaving(false);
+    error ? toast.error("Failed to save") : (toast.success("Telegram forward group updated!"), refetch());
+  };
+
+  return (
+    <div className="flex items-center gap-3">
+      <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="-1001234567890" className="flex-1" />
+      <Button onClick={handleSave} disabled={saving} size="sm">
+        {saving ? "Saving..." : "Save"}
+      </Button>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const { profile, user, isAdmin } = useAuth();
   const {
@@ -431,6 +462,20 @@ export default function SettingsPage() {
                     {savingBotToken ? "Saving..." : "Save"}
                   </Button>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Telegram Forward Group ID */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Bot className="h-4 w-4 text-green-500" />
+                  Telegram Forward Group
+                </CardTitle>
+                <CardDescription>Top-up proof images will be forwarded to this Telegram group/channel on approval</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <TelegramForwardGroupSetting />
               </CardContent>
             </Card>
           </div>
