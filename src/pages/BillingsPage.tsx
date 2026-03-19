@@ -267,14 +267,6 @@ export default function BillingsPage() {
                         <span className="text-muted-foreground">Balance: </span>
                         <span className="font-semibold text-foreground">${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
-                      <div className="text-xs">
-                        <span className="text-muted-foreground">Threshold: </span>
-                        <span className="font-semibold text-foreground">
-                          {Number((ins as InsightsData)?.billing_threshold ?? 0) > 0
-                            ? `$${Number((ins as InsightsData).billing_threshold).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                            : "—"}
-                        </span>
-                      </div>
                       {ins?.cards?.[0] && (
                         <div className="flex items-center gap-1">
                           <CardBrandIcon displayString={ins.cards[0].display_string} size="xs" />
