@@ -224,6 +224,7 @@ export function AdminBanks() {
     mutationFn: async () => {
       const insertData: any = { bank_name: form.bank_name, account_name: form.account_name, account_number: form.account_number, branch: form.branch, routing_number: form.routing_number };
       if (form.telegram_group_id) insertData.telegram_group_id = form.telegram_group_id;
+      if (form.seller_id) insertData.seller_id = form.seller_id;
       const { error } = await (supabase as any).from("bank_accounts").insert(insertData);
       if (error) throw error;
     },
