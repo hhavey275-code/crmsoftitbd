@@ -49,6 +49,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               ) : null}
             </div>
             <div className="flex items-center gap-2">
+              <ThemeToggle />
               <NotificationBell />
             </div>
           </header>
