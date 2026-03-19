@@ -411,14 +411,28 @@ export default function ClientDetailPage() {
                   <span>Limit: <span className="font-medium text-foreground">${Number(acc.spend_cap).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
                 </div>
                 <div onClick={(e) => e.stopPropagation()}>
-                  <Button
-                    size="sm"
-                    className="gap-1 bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs h-8"
-                    onClick={() => { setSelectedAccountId(acc.id); setTopUpDialogOpen(true); setTopUpAmount(""); }}
-                  >
-                    <ArrowUpCircle className="h-3.5 w-3.5" />
-                    Top Up
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        size="sm"
+                        className="gap-1 bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs h-8"
+                      >
+                        <DollarSign className="h-3.5 w-3.5" />
+                        Actions
+                        <ChevronDown className="h-3 w-3" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => { setSelectedAccountId(acc.id); setTopUpDialogOpen(true); setTopUpAmount(""); }}>
+                        <ArrowUpCircle className="h-4 w-4 mr-2 text-primary" />
+                        Top Up
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => openWithdrawDialog(acc.id)}>
+                        <ArrowDownCircle className="h-4 w-4 mr-2 text-orange-500" />
+                        Withdraw
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
 
