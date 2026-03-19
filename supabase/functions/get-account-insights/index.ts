@@ -264,14 +264,23 @@ async function processAccount(
 
     const balance = accountData?.balance ? parseFloat(accountData.balance) / 100 : 0;
 
+    // Log raw accountData to debug available fields
+    console.log(`RAW accountData for ${actId}: ${JSON.stringify(accountData)}`);
+
     // Daily Spending Limit: use adtrust_dsl (Ad Trust Daily Spend Limit) from Meta
-    // This is the daily spending limit Meta assigns based on account trust level
-    // It returns value in cents (minor units), so divide by 100
+    // Returns value in cents (minor units), divide by 100
     let dailySpendLimit = 0;
     if (accountData?.adtrust_dsl !== undefined && accountData.adtrust_dsl !== null) {
       const raw = parseFloat(String(accountData.adtrust_dsl));
       if (Number.isFinite(raw) && raw > 0) {
         dailySpendLimit = raw / 100;
+      }
+    }
+    // Fallback: use spend_cap as daily_spend_limit if adtrust_dsl not available
+    if (!dailySpendLimit && accountData?.spend_cap) {
+      const sc = parseFloat(String(accountData.spend_cap));
+      if (Number.isFinite(sc) && sc > 0) {
+        dailySpendLimit = sc / 100;
       }
     }
 
@@ -290,8 +299,6 @@ async function processAccount(
         }
       }
     }
-
-    console.log(`Account ${actId}: adtrust_dsl=${accountData?.adtrust_dsl}, dailySpendLimit=$${dailySpendLimit}, billingThreshold=$${billingThreshold}, fsd_keys=${fsdForThreshold ? Object.keys(fsdForThreshold).join(',') : 'none'}`);
 
     let adAccountUpdate: any = undefined;
     if (!isSingleDate && !isDateRange && accountData?.amount_spent !== undefined) {
