@@ -385,6 +385,9 @@ export function AdminSellers() {
               <Button size="sm" variant="outline" onClick={() => { setEntryType("bdt_payment"); setShowEntryDialog(true); }}>
                 <Banknote className="h-4 w-4 mr-1" /> Record BDT Payment
               </Button>
+              <Button size="sm" variant="outline" onClick={() => { setShowOcrDialog(true); resetOcr(); }}>
+                <ScanLine className="h-4 w-4 mr-1" /> OCR BDT Payment
+              </Button>
             </div>
           </div>
 
