@@ -332,11 +332,11 @@ export function AdminSellers() {
   });
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div className="space-y-4 md:space-y-6 relative">
       <div className="flex items-center justify-between">
         <h1 className="text-xl md:text-2xl font-bold">Sellers</h1>
         <Button size={isMobile ? "sm" : "default"} onClick={() => setShowConvert(true)}>
-          <UserCog className="mr-1.5 h-4 w-4" /> Convert Client to Seller
+          <UserCog className="mr-1.5 h-4 w-4" /> {isMobile ? "Convert" : "Convert Client to Seller"}
         </Button>
       </div>
 
@@ -349,7 +349,7 @@ export function AdminSellers() {
             onClick={() => setSelectedSeller(s)}
           >
             <CardContent className="p-4 flex items-center justify-between">
-              <div>
+              <div className="min-w-0">
                 <p className="font-semibold truncate">{s.full_name || s.email}</p>
                 <p className="text-xs text-muted-foreground truncate">{s.email}</p>
               </div>
@@ -373,9 +373,9 @@ export function AdminSellers() {
       {/* Selected Seller Detail */}
       {selectedSeller && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex flex-col gap-2">
             <h2 className="text-lg font-semibold">{selectedSeller.full_name || selectedSeller.email} — Ledger</h2>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="outline" onClick={() => { setShowAssignBank(true); setSelectedBankId(""); }}>
                 <Landmark className="h-4 w-4 mr-1" /> Assign Bank
               </Button>
@@ -383,10 +383,7 @@ export function AdminSellers() {
                 <DollarSign className="h-4 w-4 mr-1" /> Record USDT
               </Button>
               <Button size="sm" variant="outline" onClick={() => { setEntryType("bdt_payment"); setShowEntryDialog(true); }}>
-                <Banknote className="h-4 w-4 mr-1" /> Record BDT Payment
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => { setShowOcrDialog(true); resetOcr(); }}>
-                <ScanLine className="h-4 w-4 mr-1" /> OCR BDT Payment
+                <Banknote className="h-4 w-4 mr-1" /> Record BDT
               </Button>
             </div>
           </div>
@@ -403,7 +400,7 @@ export function AdminSellers() {
             </Card>
             <Card className="border">
               <CardContent className="p-3 text-center">
-                <p className="text-xs text-muted-foreground">BDT Received (Total)</p>
+                <p className="text-xs text-muted-foreground">BDT Received</p>
                 <p className="text-lg font-bold text-primary">৳{(sellerTotals.totalBdtPaid + sellerTotals.totalClientBdt).toLocaleString()}</p>
               </CardContent>
             </Card>
@@ -437,55 +434,117 @@ export function AdminSellers() {
           )}
 
           {/* Transaction Table — Google Sheets style */}
-          <Card className="overflow-hidden">
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-[13px] font-semibold border-collapse" style={{ fontFamily: "'Google Sans', 'Roboto', 'Arial', sans-serif", fontFeatureSettings: '"tnum", "ss01"', letterSpacing: '0.01em' }}>
-                  <thead>
-                    <tr className="bg-muted/60">
-                      <th className="border border-border px-3 py-2 text-left font-semibold text-muted-foreground whitespace-nowrap">Date</th>
-                      <th className="border border-border px-3 py-2 text-left font-semibold text-muted-foreground whitespace-nowrap">Type</th>
-                      <th className="border border-border px-3 py-2 text-right font-semibold text-muted-foreground whitespace-nowrap">Payment (BDT)</th>
-                      <th className="border border-border px-3 py-2 text-right font-semibold text-muted-foreground whitespace-nowrap">USDT</th>
-                      <th className="border border-border px-3 py-2 text-right font-semibold text-muted-foreground whitespace-nowrap">Rate</th>
-                      <th className="border border-border px-3 py-2 text-right font-semibold text-muted-foreground whitespace-nowrap">Converted BDT</th>
-                      <th className="border border-border px-3 py-2 text-left font-semibold text-muted-foreground whitespace-nowrap">Note</th>
-                      <th className="border border-border px-3 py-2 text-left font-semibold text-muted-foreground whitespace-nowrap">Proof</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sellerTxns?.map((t: any) => {
-                      const convertedBdt = Number(t.usdt_amount || 0) * Number(t.rate || 0);
-                      const typeLabel = t.type === "usdt_received" ? "USDT Received" : t.type === "bdt_payment" ? "BDT Payment" : "Client Top-Up";
-                      const typeColor = t.type === "usdt_received" ? "text-blue-600" : t.type === "bdt_payment" ? "text-green-600" : "text-orange-500";
-                      return (
-                        <tr key={t.id} className="hover:bg-muted/30">
-                          <td className="border border-border px-3 py-1.5 whitespace-nowrap font-medium">{format(new Date(t.created_at), "MMM d, yyyy")}</td>
-                          <td className={cn("border border-border px-3 py-1.5 font-bold", typeColor)}>{typeLabel}</td>
-                          <td className="border border-border px-3 py-1.5 text-right font-semibold">{Number(t.bdt_amount) > 0 ? `৳${Number(t.bdt_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "—"}</td>
-                          <td className="border border-border px-3 py-1.5 text-right font-semibold">{Number(t.usdt_amount) > 0 ? `$${Number(t.usdt_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "—"}</td>
-                          <td className="border border-border px-3 py-1.5 text-right font-semibold">{Number(t.rate) > 0 ? Number(t.rate).toFixed(1) : "—"}</td>
-                          <td className="border border-border px-3 py-1.5 text-right font-semibold">{convertedBdt > 0 ? `৳${convertedBdt.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "—"}</td>
-                          <td className="border border-border px-3 py-1.5 max-w-[140px] truncate font-medium">{t.description || "—"}</td>
-                          <td className="border border-border px-3 py-1.5 font-medium">
-                            {t.proof_url ? (
-                              <button onClick={() => setProofUrl(t.proof_url)} className="text-primary hover:underline flex items-center gap-1">
-                                <ImageIcon className="h-3.5 w-3.5" /> View
-                              </button>
-                            ) : "—"}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    {(!sellerTxns || sellerTxns.length === 0) && (
-                      <tr><td colSpan={8} className="border border-border text-center text-muted-foreground py-8">No transactions</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
+          {isMobile ? (
+            /* Mobile: Card-based layout */
+            <div className="space-y-2 pb-20">
+              {sellerTxns?.map((t: any) => {
+                const convertedBdt = Number(t.usdt_amount || 0) * Number(t.rate || 0);
+                const typeLabel = t.type === "usdt_received" ? "USDT Received" : t.type === "bdt_payment" ? "BDT Payment" : "Client Top-Up";
+                const typeColor = t.type === "usdt_received" ? "text-blue-600" : t.type === "bdt_payment" ? "text-green-600" : "text-orange-500";
+                return (
+                  <Card key={t.id} className="border">
+                    <CardContent className="p-3 space-y-1.5" style={{ fontFamily: "'Google Sans', 'Roboto', 'Arial', sans-serif" }}>
+                      <div className="flex items-center justify-between">
+                        <span className={cn("text-sm font-bold", typeColor)}>{typeLabel}</span>
+                        <span className="text-xs text-muted-foreground font-medium">{format(new Date(t.created_at), "MMM d, yyyy")}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[13px]">
+                        <div className="text-center">
+                          <span className="text-muted-foreground text-xs">BDT</span>
+                          <p className="font-semibold">৳{Number(t.bdt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                        </div>
+                        <div className="text-center">
+                          <span className="text-muted-foreground text-xs">USDT</span>
+                          <p className="font-semibold">${Number(t.usdt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                        </div>
+                        <div className="text-center">
+                          <span className="text-muted-foreground text-xs">Rate</span>
+                          <p className="font-semibold">{Number(t.rate || 0).toFixed(1)}</p>
+                        </div>
+                        <div className="text-center">
+                          <span className="text-muted-foreground text-xs">Conv. BDT</span>
+                          <p className="font-semibold">৳{convertedBdt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between text-xs pt-1 border-t border-border">
+                        <span className="text-muted-foreground truncate max-w-[60%]">{t.description || "—"}</span>
+                        {t.proof_url ? (
+                          <button onClick={() => setProofUrl(t.proof_url)} className="text-primary hover:underline flex items-center gap-1">
+                            <ImageIcon className="h-3 w-3" /> View
+                          </button>
+                        ) : null}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+              {(!sellerTxns || sellerTxns.length === 0) && (
+                <p className="text-muted-foreground text-sm text-center py-8">No transactions</p>
+              )}
+            </div>
+          ) : (
+            /* Desktop: Table layout */
+            <Card className="overflow-hidden">
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[13px] font-semibold border-collapse" style={{ fontFamily: "'Google Sans', 'Roboto', 'Arial', sans-serif", fontFeatureSettings: '"tnum", "ss01"', letterSpacing: '0.01em' }}>
+                    <thead>
+                      <tr className="bg-muted/60">
+                        <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Date</th>
+                        <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Type</th>
+                        <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Payment (BDT)</th>
+                        <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">USDT</th>
+                        <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Rate</th>
+                        <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Converted BDT</th>
+                        <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Note</th>
+                        <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Proof</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sellerTxns?.map((t: any) => {
+                        const convertedBdt = Number(t.usdt_amount || 0) * Number(t.rate || 0);
+                        const typeLabel = t.type === "usdt_received" ? "USDT Received" : t.type === "bdt_payment" ? "BDT Payment" : "Client Top-Up";
+                        const typeColor = t.type === "usdt_received" ? "text-blue-600" : t.type === "bdt_payment" ? "text-green-600" : "text-orange-500";
+                        return (
+                          <tr key={t.id} className="hover:bg-muted/30">
+                            <td className="border border-border px-3 py-1.5 text-center whitespace-nowrap font-medium">{format(new Date(t.created_at), "MMM d, yyyy")}</td>
+                            <td className={cn("border border-border px-3 py-1.5 text-center font-bold", typeColor)}>{typeLabel}</td>
+                            <td className="border border-border px-3 py-1.5 text-center font-semibold">৳{Number(t.bdt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                            <td className="border border-border px-3 py-1.5 text-center font-semibold">${Number(t.usdt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                            <td className="border border-border px-3 py-1.5 text-center font-semibold">{Number(t.rate || 0).toFixed(1)}</td>
+                            <td className="border border-border px-3 py-1.5 text-center font-semibold">৳{convertedBdt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                            <td className="border border-border px-3 py-1.5 text-center max-w-[140px] truncate font-medium">{t.description || "—"}</td>
+                            <td className="border border-border px-3 py-1.5 text-center font-medium">
+                              {t.proof_url ? (
+                                <button onClick={() => setProofUrl(t.proof_url)} className="text-primary hover:underline inline-flex items-center gap-1 mx-auto">
+                                  <ImageIcon className="h-3.5 w-3.5" /> View
+                                </button>
+                              ) : "—"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {(!sellerTxns || sellerTxns.length === 0) && (
+                        <tr><td colSpan={8} className="border border-border text-center text-muted-foreground py-8">No transactions</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
+      )}
+
+      {/* Floating OCR Button — visible when a seller is selected */}
+      {selectedSeller && (
+        <button
+          onClick={() => { setShowOcrDialog(true); resetOcr(); }}
+          className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
+          title="OCR BDT Payment"
+        >
+          <ScanLine className="h-6 w-6" />
+        </button>
       )}
 
       {/* Convert Client to Seller Dialog */}
@@ -554,6 +613,39 @@ export function AdminSellers() {
       <Dialog open={!!proofUrl} onOpenChange={() => setProofUrl(null)}>
         <DialogContent className="max-w-lg">
           {proofUrl && <img src={proofUrl} alt="Proof" className="w-full rounded-md" />}
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign Bank Dialog */}
+      <Dialog open={showAssignBank} onOpenChange={setShowAssignBank}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Assign Bank to {selectedSeller?.full_name || selectedSeller?.email}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Select Bank</Label>
+              <Select value={selectedBankId} onValueChange={setSelectedBankId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a bank..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {unassignedBanks?.map((b: any) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.bank_name} — {b.account_number} ({b.account_name})
+                    </SelectItem>
+                  ))}
+                  {(!unassignedBanks || unassignedBanks.length === 0) && (
+                    <SelectItem value="_none" disabled>No unassigned banks available</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAssignBank(false)}>Cancel</Button>
+            <Button onClick={() => assignBankMutation.mutate()} disabled={!selectedBankId || assignBankMutation.isPending}>
+              {assignBankMutation.isPending ? "Assigning..." : "Assign Bank"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
