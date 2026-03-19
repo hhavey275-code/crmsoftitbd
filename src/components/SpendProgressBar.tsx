@@ -1,9 +1,10 @@
 interface SpendProgressBarProps {
   amountSpent: number;
   spendCap: number;
+  balanceAfterTopup?: number;
 }
 
-export function SpendProgressBar({ amountSpent, spendCap }: SpendProgressBarProps) {
+export function SpendProgressBar({ amountSpent, spendCap, balanceAfterTopup }: SpendProgressBarProps) {
   if (spendCap <= 0) {
     return (
       <div className="w-full">
@@ -12,9 +13,18 @@ export function SpendProgressBar({ amountSpent, spendCap }: SpendProgressBarProp
     );
   }
 
-  const ratio = amountSpent / spendCap;
-  const percentage = Math.min(ratio * 100, 100);
   const remaining = Math.max(spendCap - amountSpent, 0);
+  const percentage = Math.min((amountSpent / spendCap) * 100, 100);
+
+  // Color based on how much of the last top-up balance has been spent
+  let ratio: number;
+  if (balanceAfterTopup && balanceAfterTopup > 0) {
+    const spentSinceTopup = balanceAfterTopup - remaining;
+    ratio = Math.max(spentSinceTopup / balanceAfterTopup, 0);
+  } else {
+    // Fallback to overall ratio if no top-up data
+    ratio = amountSpent / spendCap;
+  }
 
   const barColor =
     ratio >= 0.8
