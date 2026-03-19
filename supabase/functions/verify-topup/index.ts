@@ -5,10 +5,46 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-const BDT_TOLERANCE = 15; // ±15 BDT to account for bank transfer charges (~10 BDT)
+const BDT_TOLERANCE = 15;
 
 function amountMatches(a: number, b: number): boolean {
   return Math.abs(a - b) <= BDT_TOLERANCE;
+}
+
+async function forwardProofToTelegram(supabase: any, proofUrl: string, caption: string) {
+  try {
+    const { data: botTokenSetting } = await supabase
+      .from('site_settings')
+      .select('value')
+      .eq('key', 'telegram_bot_token')
+      .single();
+
+    const { data: groupIdSetting } = await supabase
+      .from('site_settings')
+      .select('value')
+      .eq('key', 'telegram_forward_group_id')
+      .single();
+
+    if (!botTokenSetting?.value || !groupIdSetting?.value) {
+      console.log('Telegram forward skipped: bot token or group ID not configured');
+      return;
+    }
+
+    const resp = await fetch(`https://api.telegram.org/bot${botTokenSetting.value}/sendPhoto`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: groupIdSetting.value,
+        photo: proofUrl,
+        caption: caption,
+        parse_mode: 'HTML',
+      }),
+    });
+    const result = await resp.json();
+    console.log('Telegram forward result:', JSON.stringify(result));
+  } catch (e) {
+    console.error('Telegram forward failed (non-blocking):', e);
+  }
 }
 
 Deno.serve(async (req) => {
@@ -43,7 +79,7 @@ Deno.serve(async (req) => {
     const bdtNum = Number(bdt_amount);
     const verificationLog: string[] = [];
 
-    // 2. Get bank account details (last 4 digits + bank name)
+    // 2. Get bank account details
     let bankLast4 = '';
     let bankName = '';
     if (bank_account_id) {
@@ -52,18 +88,13 @@ Deno.serve(async (req) => {
         .select('account_number, bank_name')
         .eq('id', bank_account_id)
         .single();
-      if (bank?.account_number) {
-        bankLast4 = bank.account_number.slice(-4);
-      }
-      if (bank?.bank_name) {
-        bankName = bank.bank_name.toLowerCase();
-      }
+      if (bank?.account_number) bankLast4 = bank.account_number.slice(-4);
+      if (bank?.bank_name) bankName = bank.bank_name.toLowerCase();
     }
 
-    // Check if this is a bKash/Nagad agent payment
     const isMobileAgent = bankName.includes('bkash') || bankName.includes('nagad');
 
-    // 3. Step 1 & 2: AI OCR — Extract ref and amount from screenshot
+    // 3. AI OCR
     let ocrRef = '';
     let ocrAmount = 0;
     let ocrRefMatch = false;
@@ -79,24 +110,15 @@ Deno.serve(async (req) => {
           },
           body: JSON.stringify({
             model: 'google/gemini-2.5-flash',
-            messages: [
-              {
-                role: 'user',
-                content: [
-                  {
-                    type: 'text',
-                    text: 'Extract the transaction reference number and the BASE payment amount (in BDT) from this payment screenshot. IMPORTANT: If the screenshot shows a breakdown like "৳1,300.00 + ৳16.25" or "amount + charge", extract ONLY the base amount (1300), NOT the total including charges/fees/VAT. The base amount is the actual money sent, excluding any service charge, VAT, or bank fee. For bKash/Nagad screenshots, look for the principal amount before fees. For bank transfer screenshots, extract the transfer amount excluding service charge and VAT. Return ONLY a JSON object like: {"ref": "ABC123", "amount": 1300}. If you cannot find a value, use empty string for ref and 0 for amount. No explanation, just JSON.',
-                  },
-                  {
-                    type: 'image_url',
-                    image_url: { url: proof_url },
-                  },
-                ],
-              },
-            ],
+            messages: [{
+              role: 'user',
+              content: [
+                { type: 'text', text: 'Extract the transaction reference number and the BASE payment amount (in BDT) from this payment screenshot. IMPORTANT: If the screenshot shows a breakdown like "৳1,300.00 + ৳16.25" or "amount + charge", extract ONLY the base amount (1300), NOT the total including charges/fees/VAT. The base amount is the actual money sent, excluding any service charge, VAT, or bank fee. For bKash/Nagad screenshots, look for the principal amount before fees. For bank transfer screenshots, extract the transfer amount excluding service charge and VAT. Return ONLY a JSON object like: {"ref": "ABC123", "amount": 1300}. If you cannot find a value, use empty string for ref and 0 for amount. No explanation, just JSON.' },
+                { type: 'image_url', image_url: { url: proof_url } },
+              ],
+            }],
           }),
         });
-
         if (aiResponse.ok) {
           const aiData = await aiResponse.json();
           const content = aiData.choices?.[0]?.message?.content || '';
@@ -113,41 +135,29 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Step 1: OCR Ref match
+    // OCR Ref match
     if (ocrRef && payment_reference) {
       ocrRefMatch = ocrRef.toLowerCase() === payment_reference.toLowerCase();
-      if (ocrRefMatch) {
-        verificationLog.push(`✅ OCR Ref matched (${ocrRef})`);
-      } else {
-        verificationLog.push(`❌ OCR Ref mismatch (OCR: ${ocrRef} vs Submitted: ${payment_reference})`);
-      }
+      verificationLog.push(ocrRefMatch ? `✅ OCR Ref matched (${ocrRef})` : `❌ OCR Ref mismatch (OCR: ${ocrRef} vs Submitted: ${payment_reference})`);
     } else {
       verificationLog.push(`⚠️ OCR Ref skipped (OCR: "${ocrRef}", Submitted: "${payment_reference || ''}")`);
     }
 
-    // Step 2: OCR Amount match (±15 BDT tolerance)
+    // OCR Amount match
     if (ocrAmount > 0 && bdtNum > 0) {
       ocrAmountMatch = amountMatches(ocrAmount, bdtNum);
-      if (ocrAmountMatch) {
-        verificationLog.push(`✅ OCR Amount matched (OCR: ৳${ocrAmount} vs Submitted: ৳${bdtNum}, diff: ৳${Math.abs(ocrAmount - bdtNum)})`);
-      } else {
-        verificationLog.push(`❌ OCR Amount mismatch (OCR: ৳${ocrAmount} vs Submitted: ৳${bdtNum}, diff: ৳${Math.abs(ocrAmount - bdtNum)})`);
-      }
+      verificationLog.push(ocrAmountMatch ? `✅ OCR Amount matched (OCR: ৳${ocrAmount} vs Submitted: ৳${bdtNum}, diff: ৳${Math.abs(ocrAmount - bdtNum)})` : `❌ OCR Amount mismatch (OCR: ৳${ocrAmount} vs Submitted: ৳${bdtNum}, diff: ৳${Math.abs(ocrAmount - bdtNum)})`);
     } else {
       verificationLog.push(`⚠️ OCR Amount skipped (OCR: ${ocrAmount}, Submitted: ${bdtNum})`);
     }
 
-    // Step 3: Telegram SMS match — wider window for mobile agents (users may submit hours later)
+    // Telegram SMS match
     const requestTime = new Date(request.created_at);
-    const windowHoursBack = isMobileAgent ? 6 : 0.5; // 6 hours for bKash/Nagad, 30min for bank
+    const windowHoursBack = isMobileAgent ? 6 : 0.5;
     const windowStart = new Date(requestTime.getTime() - windowHoursBack * 60 * 60 * 1000).toISOString();
     const windowEnd = new Date(requestTime.getTime() + 10 * 60 * 1000).toISOString();
 
-    console.log(`Telegram search window: ${windowStart} → ${windowEnd}`);
-
-    // Only check messages from monitored groups: -1003856921490 first, then -1003763493818
     const MONITORED_CHAT_IDS = [-1003856921490, -1003763493818];
-
     const { data: telegramMsgs } = await supabase
       .from('telegram_messages')
       .select('text, raw_update, created_at, update_id, chat_id, matched_request_id')
@@ -169,22 +179,17 @@ Deno.serve(async (req) => {
         const text = msg.text || payload.text || payload.caption || '';
 
         if (isMobileAgent && payment_reference) {
-          // For bKash/Nagad: match by transaction ID (trnx id) in SMS
-          const hasTrnxId = text.toLowerCase().includes(payment_reference.toLowerCase());
-          if (hasTrnxId) {
+          if (text.toLowerCase().includes(payment_reference.toLowerCase())) {
             telegramMatch = true;
             matchedMsg = msg;
             telegramMatchDetail = `trnxID: ${payment_reference} found in SMS`;
-            console.log(`Telegram trnx ID match found: ${telegramMatchDetail}, text snippet: ${text.substring(0, 100)}`);
             break;
           }
         } else {
-          // For bank transfer: match by last4 + amount
           const hasLast4 = bankLast4 && text.includes(bankLast4);
           const numberMatches = text.match(/[\d,]+/g) || [];
           let hasAmount = false;
           let matchedTelegramAmount = 0;
-
           for (const numStr of numberMatches) {
             const num = Number(numStr.replace(/,/g, ''));
             if (num > 0 && amountMatches(num, bdtNum)) {
@@ -193,12 +198,10 @@ Deno.serve(async (req) => {
               break;
             }
           }
-
           if (hasLast4 && hasAmount) {
             telegramMatch = true;
             matchedMsg = msg;
             telegramMatchDetail = `last4: ${bankLast4}, amount: ৳${matchedTelegramAmount} (submitted: ৳${bdtNum}, diff: ৳${Math.abs(matchedTelegramAmount - bdtNum)})`;
-            console.log(`Telegram match found: ${telegramMatchDetail}, text snippet: ${text.substring(0, 100)}`);
             break;
           }
         }
@@ -208,52 +211,30 @@ Deno.serve(async (req) => {
     if (telegramMatch) {
       verificationLog.push(`✅ Telegram SMS matched (${telegramMatchDetail})`);
     } else {
-      const matchInfo = isMobileAgent 
-        ? `trnxID=${payment_reference}` 
-        : `bankLast4=${bankLast4}, bdt=${bdtNum}`;
+      const matchInfo = isMobileAgent ? `trnxID=${payment_reference}` : `bankLast4=${bankLast4}, bdt=${bdtNum}`;
       verificationLog.push(`❌ Telegram SMS no match (${matchInfo}, messages checked: ${telegramMsgs?.length ?? 0}, window: ${windowStart} → ${windowEnd})`);
     }
 
-    // Decision: All 3 steps must pass (OCR ref, OCR amount, Telegram SMS)
-    // If OCR was skipped (no proof or OCR failed), only require Telegram match
+    // Decision
     const ocrAvailable = ocrRef !== '' || ocrAmount > 0;
-    const allPassed = ocrAvailable 
-      ? (ocrRefMatch && ocrAmountMatch && telegramMatch)
-      : telegramMatch;
-
+    const allPassed = ocrAvailable ? (ocrRefMatch && ocrAmountMatch && telegramMatch) : telegramMatch;
     const logText = `Auto-verification: ${verificationLog.join(' | ')}`;
 
     if (!allPassed) {
-      // Save partial verification log even on failure
-      await supabase
-        .from('top_up_requests')
-        .update({ admin_note: logText })
-        .eq('id', request_id);
-
+      await supabase.from('top_up_requests').update({ admin_note: logText }).eq('id', request_id);
       const failReasons: string[] = [];
       if (ocrAvailable && !ocrRefMatch) failReasons.push('OCR ref mismatch');
       if (ocrAvailable && !ocrAmountMatch) failReasons.push('OCR amount mismatch');
       if (!telegramMatch) failReasons.push('No Telegram SMS match');
-
-      console.log(`Verification failed for ${request_id}: ${failReasons.join(', ')}`);
-      return new Response(JSON.stringify({ 
-        ok: true, 
-        auto_approved: false, 
-        reason: failReasons.join(', '),
-        retry_suggested: !telegramMatch 
-      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ ok: true, auto_approved: false, reason: failReasons.join(', '), retry_suggested: !telegramMatch }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // All checks passed — Auto-approve!
+    // Auto-approve
     console.log(`Auto-approving request ${request_id}: ${logText}`);
 
     const { error: updateErr } = await supabase
       .from('top_up_requests')
-      .update({ 
-        status: 'approved', 
-        admin_note: logText,
-        reviewed_by: null
-      })
+      .update({ status: 'approved', admin_note: logText, reviewed_by: null })
       .eq('id', request_id);
     if (updateErr) throw updateErr;
 
@@ -261,80 +242,61 @@ Deno.serve(async (req) => {
     const { data: wallet } = await supabase.from('wallets').select('balance').eq('user_id', user_id).single();
     const currentBalance = Number(wallet?.balance ?? 0);
     const newBalance = currentBalance + Number(amount);
-
     const { error: walletErr } = await supabase.from('wallets').update({ balance: newBalance }).eq('user_id', user_id);
     if (walletErr) throw walletErr;
 
     // Create transaction
     const { error: txErr } = await supabase.from('transactions').insert({
-      user_id,
-      type: 'top_up',
-      amount: Number(amount),
-      balance_after: newBalance,
-      reference_id: request_id,
-      description: 'Wallet top-up auto-approved',
-      processed_by: 'system',
+      user_id, type: 'top_up', amount: Number(amount), balance_after: newBalance,
+      reference_id: request_id, description: 'Wallet top-up auto-approved', processed_by: 'system',
     });
     if (txErr) throw txErr;
 
     // Create invoice
     const { data: invNum } = await supabase.rpc('generate_invoice_number');
     await supabase.from('invoices').insert({
-      top_up_request_id: request_id,
-      invoice_number: invNum || `INV-${Date.now()}`,
-      user_id,
-      amount: Number(amount),
-      bdt_amount: bdtNum,
-      usd_rate: Number(request.usd_rate || 0),
+      top_up_request_id: request_id, invoice_number: invNum || `INV-${Date.now()}`,
+      user_id, amount: Number(amount), bdt_amount: bdtNum, usd_rate: Number(request.usd_rate || 0),
     });
 
     // Notify client
     await supabase.from('notifications').insert({
-      user_id,
-      type: 'top_up_update',
-      title: 'Top-Up Approved',
-      message: `Your top-up of $${amount} has been auto-approved.`,
-      reference_id: request_id,
+      user_id, type: 'top_up_update', title: 'Top-Up Approved',
+      message: `Your top-up of $${amount} has been auto-approved.`, reference_id: request_id,
     });
 
-    // Mark matched Telegram message so it can't be reused
+    // Mark matched Telegram message
     if (matchedMsg) {
-      await supabase
-        .from('telegram_messages')
-        .update({ matched_request_id: request_id })
-        .eq('update_id', matchedMsg.update_id);
+      await supabase.from('telegram_messages').update({ matched_request_id: request_id }).eq('update_id', matchedMsg.update_id);
 
-      // Send 👍 reaction on matched Telegram message
+      // Send 👍 reaction
       try {
         const raw = matchedMsg.raw_update || {};
         const payload = raw.message || raw.edited_message || raw.channel_post || raw.edited_channel_post || {};
         const messageId = payload.message_id;
         const chatId = matchedMsg.chat_id;
-
         if (messageId && chatId) {
-          const { data: botTokenSetting } = await supabase
-            .from('site_settings')
-            .select('value')
-            .eq('key', 'telegram_bot_token')
-            .single();
-
+          const { data: botTokenSetting } = await supabase.from('site_settings').select('value').eq('key', 'telegram_bot_token').single();
           if (botTokenSetting?.value) {
             const reactionResp = await fetch(`https://api.telegram.org/bot${botTokenSetting.value}/setMessageReaction`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                chat_id: chatId,
-                message_id: messageId,
-                reaction: [{ type: 'emoji', emoji: '👍' }],
-              }),
+              body: JSON.stringify({ chat_id: chatId, message_id: messageId, reaction: [{ type: 'emoji', emoji: '👍' }] }),
             });
-            const reactionData = await reactionResp.json();
-            console.log('Telegram reaction result:', JSON.stringify(reactionData));
+            console.log('Telegram reaction result:', JSON.stringify(await reactionResp.json()));
           }
         }
       } catch (e) {
         console.error('Telegram reaction failed (non-blocking):', e);
       }
+    }
+
+    // Forward proof image to Telegram group
+    if (proof_url) {
+      const { data: clientProfile } = await supabase.from('profiles').select('full_name, email').eq('user_id', user_id).single();
+      const clientName = clientProfile?.full_name || clientProfile?.email || 'Unknown';
+      const caption = `✅ <b>Auto-Approved Top-Up</b>\n👤 ${clientName}\n💰 $${amount} (৳${bdtNum.toLocaleString()})\n🔖 Ref: ${payment_reference || 'N/A'}`;
+      await forwardProofToTelegram(supabase, proof_url, caption);
     }
 
     return new Response(JSON.stringify({ ok: true, auto_approved: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
