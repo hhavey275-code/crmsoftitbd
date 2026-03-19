@@ -14,6 +14,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   isAdmin: boolean;
   isSuperAdmin: boolean;
+  isSeller: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
