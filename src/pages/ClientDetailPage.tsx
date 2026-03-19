@@ -548,13 +548,27 @@ export default function ClientDetailPage() {
                   <LogIn className="h-3 w-3 mr-1" />Login
                 </Button>
               )}
-              <Button
-                size="sm"
-                className="bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs h-8"
-                onClick={() => { setTopUpDialogOpen(true); setSelectedAccountId(""); setTopUpAmount(""); }}
-              >
-                <ArrowUpCircle className="h-3 w-3 mr-1" />Top Up
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    className="bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs h-8"
+                  >
+                    <DollarSign className="h-3 w-3 mr-1" />Actions
+                    <ChevronDown className="h-3 w-3 ml-0.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => { setTopUpDialogOpen(true); setSelectedAccountId(""); setTopUpAmount(""); }}>
+                    <ArrowUpCircle className="h-4 w-4 mr-2 text-primary" />
+                    Top Up
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => { setWithdrawDialogOpen(true); setWithdrawAccountId(""); setWithdrawAmount(""); setWithdrawMaxInfo(null); }}>
+                    <ArrowDownCircle className="h-4 w-4 mr-2 text-orange-500" />
+                    Withdraw
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button
                 size="sm"
                 variant="outline"
