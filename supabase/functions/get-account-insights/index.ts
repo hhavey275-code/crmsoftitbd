@@ -96,6 +96,84 @@ function checkRateLimit(data: any): number | null {
   return null;
 }
 
+function extractNumericValue(input: any): number | null {
+  if (input === null || input === undefined) return null;
+
+  if (typeof input === "number") {
+    return Number.isFinite(input) ? input : null;
+  }
+
+  if (typeof input === "string") {
+    const n = Number(input);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  if (Array.isArray(input)) {
+    for (const item of input) {
+      const n = extractNumericValue(item);
+      if (n !== null) return n;
+    }
+    return null;
+  }
+
+  if (typeof input === "object") {
+    const preferredKeys = [
+      "amount",
+      "value",
+      "threshold_amount",
+      "daily_spend_limit",
+      "adtrust_dsl",
+      "min_billing_threshold",
+    ];
+
+    for (const key of preferredKeys) {
+      if (key in input) {
+        const n = extractNumericValue(input[key]);
+        if (n !== null) return n;
+      }
+    }
+
+    if ("data" in input) {
+      const n = extractNumericValue(input.data);
+      if (n !== null) return n;
+    }
+
+    for (const val of Object.values(input)) {
+      const n = extractNumericValue(val);
+      if (n !== null) return n;
+    }
+  }
+
+  return null;
+}
+
+function normalizeCurrency(raw: number | null): number {
+  if (raw === null || !Number.isFinite(raw) || raw <= 0) return 0;
+
+  // Meta may return either minor units (e.g. "2500") or major units (e.g. "25.00")
+  if (Number.isInteger(raw) && raw >= 100) return raw / 100;
+  return raw;
+}
+
+function extractCurrencyFromPayload(payload: any, field: string): number {
+  if (!payload || payload.error) return 0;
+
+  const direct = extractNumericValue(payload?.[field]);
+  if (direct !== null) return normalizeCurrency(direct);
+
+  if (Array.isArray(payload?.data)) {
+    for (const row of payload.data) {
+      const n = extractNumericValue(row?.[field] ?? row);
+      if (n !== null) return normalizeCurrency(n);
+    }
+  } else if (payload?.data) {
+    const n = extractNumericValue(payload.data?.[field] ?? payload.data);
+    if (n !== null) return normalizeCurrency(n);
+  }
+
+  return 0;
+}
+
 // Process a single account's Meta API calls
 async function processAccount(
   account: any,
