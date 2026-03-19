@@ -823,14 +823,14 @@ export default function ClientDetailPage() {
                   ].map((item, i) => {
                     const Icon = item.icon;
                     return (
-                      <div key={i} className={cn("rounded-xl px-3 py-2.5 flex items-center gap-2.5", item.bg)}>
-                        <div className={cn("flex shrink-0 items-center justify-center rounded-lg h-8 w-8", item.accent)}>
-                          <Icon className={cn("h-4 w-4", item.iconColor)} />
+                      <div key={i} className={cn("rounded-xl px-4 py-4 flex items-center gap-3", item.bg)}>
+                        <div className={cn("flex shrink-0 items-center justify-center rounded-lg h-9 w-9", item.accent)}>
+                          <Icon className={cn("h-4.5 w-4.5", item.iconColor)} />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-[10px] font-semibold text-muted-foreground leading-tight">{item.label}</p>
-                          <p className="text-sm font-bold text-foreground leading-tight">{item.value}</p>
-                          <p className="text-[9px] text-muted-foreground leading-none mt-0.5">{item.sub}</p>
+                          <p className="text-[11px] font-semibold text-muted-foreground leading-tight">{item.label}</p>
+                          <p className="text-base font-bold text-foreground leading-tight mt-0.5">{item.value}</p>
+                          <p className="text-[10px] text-muted-foreground leading-none mt-1">{item.sub}</p>
                         </div>
                       </div>
                     );
