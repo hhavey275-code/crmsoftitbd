@@ -315,90 +315,11 @@ async function processAccount(
 
     const balance = accountData?.balance ? parseFloat(accountData.balance) / 100 : 0;
 
-    // ---- DEBUG: Log all raw field values ----
-    let debugInfo: any = { actId };
-
-    // Fetch adtrust_dsl separately
-    let adtrustDsl: any = null;
-    try {
-      const dslRes = await fetch(`https://graph.facebook.com/v24.0/${actId}?fields=adtrust_dsl&access_token=${accessToken}`);
-      const dslData = await dslRes.json();
-      adtrustDsl = dslData;
-      debugInfo.adtrust_dsl_raw = dslData;
-    } catch (e: any) { debugInfo.adtrust_dsl_error = e.message; }
-
-    // Fetch min_campaign_group_spend_cap separately
-    let cgData: any = null;
-    try {
-      const cgRes = await fetch(`https://graph.facebook.com/v24.0/${actId}?fields=min_campaign_group_spend_cap&access_token=${accessToken}`);
-      cgData = await cgRes.json();
-      debugInfo.min_campaign_group_spend_cap_raw = cgData;
-    } catch (e: any) { debugInfo.min_campaign_group_spend_cap_error = e.message; }
-
-    // Fetch min_daily_budget separately
-    let mdbData: any = null;
-    try {
-      const mdbRes = await fetch(`https://graph.facebook.com/v24.0/${actId}?fields=min_daily_budget&access_token=${accessToken}`);
-      mdbData = await mdbRes.json();
-      debugInfo.min_daily_budget_raw = mdbData;
-    } catch (e: any) { debugInfo.min_daily_budget_error = e.message; }
-
-    // Log account data fields
-    debugInfo.account_spend_cap_raw = accountData?.spend_cap;
-    debugInfo.account_balance_raw = accountData?.balance;
-    debugInfo.account_amount_spent_raw = accountData?.amount_spent;
-    debugInfo.funding_source_details_raw = accountData?.funding_source_details;
-
-    console.log(`DEBUG_META_FIELDS[${actId}]:`, JSON.stringify(debugInfo));
-
-    // ---- Daily Spending Limit ----
-    // Priority: 1) Sum of active campaign/adset daily budgets (what Ads Manager shows)
-    //           2) adtrust_dsl (account-level trust limit, often unavailable)
-    //           3) spend_cap as last resort
-    let dailySpendLimit = 0;
-
-    // Priority 1: Sum of all ACTIVE campaign/adset daily budgets
-    dailySpendLimit = await fetchActiveDailyBudget(actId, accessToken);
-
-    // Priority 2: adtrust_dsl
-    if (!dailySpendLimit && adtrustDsl?.adtrust_dsl !== undefined && !adtrustDsl?.error) {
-      const raw = parseFloat(String(adtrustDsl.adtrust_dsl));
-      if (Number.isFinite(raw) && raw > 0) {
-        dailySpendLimit = raw / 100;
-      }
-    }
-
-    // Priority 3: spend_cap (account level)
-    if (!dailySpendLimit && accountData?.spend_cap) {
-      const raw = parseFloat(String(accountData.spend_cap));
-      if (Number.isFinite(raw) && raw > 0) {
-        dailySpendLimit = raw / 100;
-      }
-    }
-
-    console.log(`DEBUG_DSL_FINAL[${actId}]: activeBudget=${dailySpendLimit}`);
-
-    // ---- Billing Threshold ----
-    let billingThreshold = 0;
+    // Daily spend limit and billing threshold removed from UI
+    // as Meta API doesn't reliably provide these fields.
+    const dailySpendLimit = 0;
+    const billingThreshold = 0;
     const fsd = accountData?.funding_source_details;
-    if (fsd) {
-      const thresholdCandidates = [
-        fsd.billing_activity_threshold,
-        fsd.current_balance,
-        fsd.amount,
-      ];
-      for (const candidate of thresholdCandidates) {
-        if (candidate !== undefined && candidate !== null) {
-          const parsed = parseFloat(String(candidate));
-          if (Number.isFinite(parsed) && parsed > 0) {
-            billingThreshold = parsed / 100;
-            break;
-          }
-        }
-      }
-    }
-
-    console.log(`DEBUG_COMPUTED[${actId}]: dailySpendLimit=${dailySpendLimit}, billingThreshold=${billingThreshold}`);
 
     
 
