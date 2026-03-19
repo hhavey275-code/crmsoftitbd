@@ -313,8 +313,6 @@ async function processAccount(
     console.log(`Account ${actId}: DSL=$${dailySpendLimit}, threshold=$${billingThreshold}, spend_cap=${accountData?.spend_cap}, fsd_keys=${fsd ? Object.keys(fsd).join(',') : 'none'}`);
 
     let adAccountUpdate: any = undefined;
-    const isSingleDate = date && !(date_from && date_to);
-    const isDateRange = date_from && date_to;
     if (!isSingleDate && !isDateRange && accountData?.amount_spent !== undefined) {
       const metaAmountSpent = parseFloat(accountData.amount_spent) / 100;
       const rawSpendCap = accountData?.spend_cap;
@@ -332,15 +330,6 @@ async function processAccount(
         display_string: fsd.display_string || `Card ending ${fsd.id?.slice(-4) || '****'}`,
         type: fsd.type,
       });
-    }
-    if (!isSingleDate && !isDateRange && accountData?.amount_spent !== undefined) {
-      const metaAmountSpent = parseFloat(accountData.amount_spent) / 100;
-      const rawSpendCap = accountData?.spend_cap;
-      const metaSpendCap = rawSpendCap ? parseFloat(rawSpendCap) / 100 : 0;
-      adAccountUpdate = { id: account.id, amount_spent: metaAmountSpent };
-      if (metaSpendCap > 0) {
-        adAccountUpdate.spend_cap = metaSpendCap;
-      }
     }
 
 
