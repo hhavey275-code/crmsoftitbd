@@ -225,9 +225,12 @@ async function processAccount(
       yesterdayUrl = `https://graph.facebook.com/v24.0/${actId}/insights?fields=spend,actions&date_preset=yesterday&access_token=${accessToken}`;
     }
 
+    // Main account data fetch (without adtrust_dsl which may not exist)
+    const accountFieldsUrl = `https://graph.facebook.com/v24.0/${actId}?fields=balance,amount_spent,spend_cap,funding_source_details,is_prepay_account&access_token=${accessToken}`;
+    
     const fetchPromises: Promise<Response>[] = [
       fetch(todayUrl),
-      fetch(`https://graph.facebook.com/v24.0/${actId}?fields=balance,amount_spent,spend_cap,funding_source_details,min_daily_budget,min_campaign_group_spend_cap,is_prepay_account&access_token=${accessToken}`),
+      fetch(accountFieldsUrl),
       fetchActiveCampaignCount(actId, accessToken).then(c => ({ json: async () => c } as any)),
     ];
     if (yesterdayUrl) {
@@ -264,13 +267,50 @@ async function processAccount(
 
     const balance = accountData?.balance ? parseFloat(accountData.balance) / 100 : 0;
 
-    // Use currently supported Ad Account fields for limits/threshold-like metrics
-    let dailySpendLimit = normalizeCurrency(extractNumericValue(accountData?.min_daily_budget));
-    if (!dailySpendLimit) {
-      dailySpendLimit = normalizeCurrency(extractNumericValue(accountData?.spend_cap));
+    // ---- Daily Spending Limit ----
+    // Try adtrust_dsl separately (may fail for some accounts)
+    let dailySpendLimit = 0;
+    try {
+      const dslRes = await fetch(`https://graph.facebook.com/v24.0/${actId}?fields=adtrust_dsl&access_token=${accessToken}`);
+      const dslData = await dslRes.json();
+      if (dslData?.adtrust_dsl !== undefined && !dslData?.error) {
+        const raw = parseFloat(String(dslData.adtrust_dsl));
+        if (Number.isFinite(raw) && raw > 0) {
+          dailySpendLimit = raw / 100;
+        }
+      }
+    } catch { /* ignore - field not available */ }
+    
+    // Fallback: use spend_cap
+    if (!dailySpendLimit && accountData?.spend_cap) {
+      const sc = parseFloat(String(accountData.spend_cap));
+      if (Number.isFinite(sc) && sc > 0) {
+        dailySpendLimit = sc / 100;
+      }
     }
 
-    let billingThreshold = normalizeCurrency(extractNumericValue(accountData?.min_campaign_group_spend_cap));
+    // ---- Billing Threshold ----
+    let billingThreshold = 0;
+    const fsd = accountData?.funding_source_details;
+    if (fsd) {
+      // Check all possible threshold-related fields
+      const thresholdCandidates = [
+        fsd.billing_activity_threshold,
+        fsd.current_balance, 
+        fsd.amount,
+      ];
+      for (const candidate of thresholdCandidates) {
+        if (candidate !== undefined && candidate !== null) {
+          const parsed = parseFloat(String(candidate));
+          if (Number.isFinite(parsed) && parsed > 0) {
+            billingThreshold = parsed / 100;
+            break;
+          }
+        }
+      }
+    }
+
+    
 
     let adAccountUpdate: any = undefined;
     if (!isSingleDate && !isDateRange && accountData?.amount_spent !== undefined) {
@@ -284,7 +324,6 @@ async function processAccount(
     }
 
     const cards: any[] = [];
-    const fsd = accountData?.funding_source_details;
     if (fsd) {
       cards.push({
         id: fsd.id,
@@ -292,6 +331,7 @@ async function processAccount(
         type: fsd.type,
       });
     }
+
 
     return {
       id: account.id,
