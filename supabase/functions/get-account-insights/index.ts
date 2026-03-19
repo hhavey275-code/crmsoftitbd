@@ -268,14 +268,21 @@ async function processAccount(
     let dailySpendLimit = 0;
     let billingThreshold = 0;
 
-    const fetchOptionalCurrencyField = async (field: string, path = "") => {
+    const fetchOptionalCurrencyField = async (
+      field: string,
+      options?: { path?: string; fieldsExpr?: string }
+    ) => {
       try {
+        const path = options?.path ?? "";
+        const fieldsExpr = options?.fieldsExpr ?? field;
         const target = path ? `/${path}` : "";
-        const res = await fetch(`https://graph.facebook.com/v24.0/${actId}${target}?fields=${field}&access_token=${accessToken}`);
+        const res = await fetch(
+          `https://graph.facebook.com/v24.0/${actId}${target}?fields=${encodeURIComponent(fieldsExpr)}&access_token=${accessToken}`
+        );
         const data = await res.json();
 
         if (data?.error) {
-          console.log(`[optional-meta-field-error] act=${actId} field=${field} path=${path || "account"} code=${data.error.code ?? ""} subcode=${data.error.error_subcode ?? ""} message=${data.error.message ?? ""}`);
+          console.log(`[optional-meta-field-error] act=${actId} field=${field} expr=${fieldsExpr} path=${path || "account"} code=${data.error.code ?? ""} subcode=${data.error.error_subcode ?? ""} message=${data.error.message ?? ""}`);
           return 0;
         }
 
@@ -295,7 +302,9 @@ async function processAccount(
       dailySpendLimit = await fetchOptionalCurrencyField("adtrust_dsl");
     }
     if (!billingThreshold) {
-      billingThreshold = await fetchOptionalCurrencyField("threshold_amount", "adspaymentcycle");
+      billingThreshold = await fetchOptionalCurrencyField("threshold_amount", {
+        fieldsExpr: "adspaymentcycle{threshold_amount}",
+      });
     }
 
     let adAccountUpdate: any = undefined;
