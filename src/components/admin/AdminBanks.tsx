@@ -237,6 +237,7 @@ export function AdminBanks() {
       const updateData: any = {
         bank_name: form.bank_name, account_name: form.account_name, account_number: form.account_number, branch: form.branch, routing_number: form.routing_number,
         telegram_group_id: form.telegram_group_id || null,
+        seller_id: form.seller_id || null,
       };
       const { error } = await (supabase as any).from("bank_accounts").update(updateData).eq("id", editingBank.id);
       if (error) throw error;
