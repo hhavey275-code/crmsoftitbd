@@ -82,6 +82,58 @@ export function AdminSellers() {
     },
   });
 
+  // Fetch unassigned active banks
+  const { data: unassignedBanks } = useQuery({
+    queryKey: ["unassigned-banks", selectedSeller?.user_id],
+    enabled: !!selectedSeller,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("bank_accounts")
+        .select("id, bank_name, account_number, account_name")
+        .eq("status", "active")
+        .is("seller_id", null);
+      return (data as any[]) ?? [];
+    },
+  });
+
+  // Assign bank to seller
+  const assignBankMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedBankId || !selectedSeller) throw new Error("Select a bank");
+      const { error } = await supabase
+        .from("bank_accounts")
+        .update({ seller_id: selectedSeller.user_id })
+        .eq("id", selectedBankId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Bank assigned to seller!");
+      logSystemAction("Bank Assigned to Seller", `Bank assigned to ${selectedSeller.full_name || selectedSeller.email}`, user?.id, user?.email);
+      queryClient.invalidateQueries({ queryKey: ["admin-seller-banks", selectedSeller.user_id] });
+      queryClient.invalidateQueries({ queryKey: ["unassigned-banks"] });
+      setShowAssignBank(false);
+      setSelectedBankId("");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  // Unassign bank from seller
+  const unassignBankMutation = useMutation({
+    mutationFn: async (bankId: string) => {
+      const { error } = await supabase
+        .from("bank_accounts")
+        .update({ seller_id: null })
+        .eq("id", bankId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Bank unassigned!");
+      queryClient.invalidateQueries({ queryKey: ["admin-seller-banks", selectedSeller.user_id] });
+      queryClient.invalidateQueries({ queryKey: ["unassigned-banks"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   // Calculate totals for selected seller
   const sellerTotals = sellerTxns?.reduce(
     (acc: any, t: any) => {
