@@ -54,15 +54,13 @@ export default function ClientDetailPage() {
   const [walletAmount, setWalletAmount] = useState("");
   const [walletNote, setWalletNote] = useState("");
 
-  // Top-up dialog
+  // Top-up / withdraw tabbed dialog
   const [topUpDialogOpen, setTopUpDialogOpen] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState("");
-  // Withdraw dialog
-  const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
-  const [withdrawAccountId, setWithdrawAccountId] = useState("");
+  const [dialogTab, setDialogTab] = useState<"topup" | "withdraw">("topup");
   const [withdrawAmount, setWithdrawAmount] = useState("");
-  const [withdrawMaxInfo, setWithdrawMaxInfo] = useState<{ max_withdrawable: number; current_spend_cap: number; real_amount_spent: number } | null>(null);
-  const [fetchingWithdrawInfo, setFetchingWithdrawInfo] = useState(false);
+  const [withdrawMeta, setWithdrawMeta] = useState<{ max_withdrawable: number; current_spend_cap: number; real_amount_spent: number } | null>(null);
+  const [fetchingWithdrawMeta, setFetchingWithdrawMeta] = useState(false);
   const [topUpAmount, setTopUpAmount] = useState("");
 
   // Bulk assign/unassign
