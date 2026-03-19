@@ -138,6 +138,7 @@ export type Database = {
           business_name: string | null
           created_at: string
           id: string
+          platform: string
           spend_cap: number
           status: string
           updated_at: string
@@ -151,6 +152,7 @@ export type Database = {
           business_name?: string | null
           created_at?: string
           id?: string
+          platform?: string
           spend_cap?: number
           status?: string
           updated_at?: string
@@ -164,6 +166,7 @@ export type Database = {
           business_name?: string | null
           created_at?: string
           id?: string
+          platform?: string
           spend_cap?: number
           status?: string
           updated_at?: string
@@ -308,6 +311,7 @@ export type Database = {
           id: string
           last_synced_at: string | null
           name: string
+          platform: string
           status: string
           updated_at: string
         }
@@ -318,6 +322,7 @@ export type Database = {
           id?: string
           last_synced_at?: string | null
           name: string
+          platform?: string
           status?: string
           updated_at?: string
         }
@@ -328,6 +333,7 @@ export type Database = {
           id?: string
           last_synced_at?: string | null
           name?: string
+          platform?: string
           status?: string
           updated_at?: string
         }
