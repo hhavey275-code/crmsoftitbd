@@ -1288,21 +1288,19 @@ export default function ClientDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Top Up Dialog */}
-      <Dialog open={topUpDialogOpen} onOpenChange={(open) => !open && setTopUpDialogOpen(false)}>
-        <DialogContent>
+      {/* Top Up / Withdraw Tabbed Dialog */}
+      <Dialog open={topUpDialogOpen} onOpenChange={(open) => { if (!open) { setTopUpDialogOpen(false); setDialogTab("topup"); setWithdrawMeta(null); setWithdrawAmount(""); setTopUpAmount(""); setSelectedAccountId(""); } }}>
+        <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
-            <DialogTitle>Top Up Ad Account</DialogTitle>
-            <DialogDescription>Select an ad account and enter amount. Wallet balance will be deducted.</DialogDescription>
+            <DialogTitle>{selectedAccountId ? adAccounts?.find((a: any) => a.id === selectedAccountId)?.account_name ?? "Ad Account" : "Ad Account Action"}</DialogTitle>
+            <DialogDescription>{selectedAccountId ? adAccounts?.find((a: any) => a.id === selectedAccountId)?.account_id?.replace(/^act_/, '') : "Select an ad account and choose an action"}</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-muted">
-              <span className="flex items-center gap-2"><Wallet className="h-4 w-4" /> Client Wallet</span>
-              <span className={cn("font-semibold", walletBalance < 0 ? "text-destructive" : "")}>${walletBalance.toLocaleString()}</span>
-            </div>
+
+          {/* Account selector - show if no account pre-selected */}
+          {!selectedAccountId && (
             <div className="space-y-2">
               <Label>Ad Account</Label>
-              <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+              <Select value={selectedAccountId} onValueChange={(val) => { setSelectedAccountId(val); }}>
                 <SelectTrigger><SelectValue placeholder="Select ad account" /></SelectTrigger>
                 <SelectContent>
                   {adAccounts?.map((acc: any) => (
@@ -1311,119 +1309,101 @@ export default function ClientDetailPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Amount (USD)</Label>
-              <Input type="number" min="1" step="0.01" value={topUpAmount} onChange={(e) => setTopUpAmount(e.target.value)} placeholder="500.00" />
-            </div>
-            {selectedAccountId && parseFloat(topUpAmount) > 0 && (
-              <div className="text-sm space-y-1">
-                <div className="flex justify-between">
+          )}
+
+          {selectedAccountId && (
+            <Tabs value={dialogTab} onValueChange={(v) => { const tab = v as "topup" | "withdraw"; setDialogTab(tab); if (tab === "withdraw" && !withdrawMeta && !fetchingWithdrawMeta) fetchWithdrawMeta(selectedAccountId); }}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="topup">Increase Limit</TabsTrigger>
+                <TabsTrigger value="withdraw">Withdraw</TabsTrigger>
+              </TabsList>
+              <TabsContent value="topup" className="space-y-4 pt-2">
+                <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-muted">
+                  <span className="flex items-center gap-2"><Wallet className="h-4 w-4" /> Client Wallet</span>
+                  <span className={cn("font-semibold", walletBalance < 0 ? "text-destructive" : "")}>${walletBalance.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Current Spend Cap</span>
                   <span className="font-medium">${Number(adAccounts?.find((a: any) => a.id === selectedAccountId)?.spend_cap ?? 0).toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">New Spend Cap</span>
-                  <span className="font-medium text-primary">${(Number(adAccounts?.find((a: any) => a.id === selectedAccountId)?.spend_cap ?? 0) + parseFloat(topUpAmount)).toLocaleString()}</span>
+                <div className="space-y-2">
+                  <Label>Amount to Add (USD)</Label>
+                  <Input type="number" min="1" step="0.01" value={topUpAmount} onChange={(e) => setTopUpAmount(e.target.value)} placeholder="500.00" />
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Wallet After</span>
-                  <span className={cn("font-medium", (walletBalance - parseFloat(topUpAmount)) < 0 ? "text-destructive" : "")}>
-                    ${(walletBalance - parseFloat(topUpAmount)).toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setTopUpDialogOpen(false)}>Cancel</Button>
-            <Button
-              className="bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground"
-              onClick={() => topUpMutation.mutate()}
-              disabled={!selectedAccountId || !topUpAmount || parseFloat(topUpAmount) <= 0 || topUpMutation.isPending}
-            >
-              {topUpMutation.isPending ? "Processing..." : "Top Up Now"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Withdraw Dialog */}
-      <Dialog open={withdrawDialogOpen} onOpenChange={(open) => !open && setWithdrawDialogOpen(false)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Withdraw from Ad Account</DialogTitle>
-            <DialogDescription>Reduce spend cap and credit the client's wallet.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-muted">
-              <span className="flex items-center gap-2"><Wallet className="h-4 w-4" /> Client Wallet</span>
-              <span className={cn("font-semibold", walletBalance < 0 ? "text-destructive" : "")}>${walletBalance.toLocaleString()}</span>
-            </div>
-            <div className="space-y-2">
-              <Label>Ad Account</Label>
-              <Select value={withdrawAccountId} onValueChange={(val) => { setWithdrawAccountId(val); openWithdrawDialog(val); }}>
-                <SelectTrigger><SelectValue placeholder="Select ad account" /></SelectTrigger>
-                <SelectContent>
-                  {adAccounts?.map((acc: any) => (
-                    <SelectItem key={acc.id} value={acc.id}>{acc.account_name} ({acc.account_id})</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {fetchingWithdrawInfo && (
-              <p className="text-sm text-muted-foreground text-center">Fetching account info...</p>
-            )}
-            {withdrawMaxInfo && (
-              <div className="text-sm space-y-1 bg-muted/50 rounded-lg p-3">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Current Spend Cap</span>
-                  <span className="font-medium">${withdrawMaxInfo.current_spend_cap.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Amount Spent</span>
-                  <span className="font-medium">${withdrawMaxInfo.real_amount_spent.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Max Withdrawable</span>
-                  <span className="font-bold text-orange-500">${withdrawMaxInfo.max_withdrawable.toLocaleString()}</span>
-                </div>
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label>Withdraw Amount (USD)</Label>
-              <Input
-                type="number"
-                min="1"
-                step="0.01"
-                max={withdrawMaxInfo?.max_withdrawable}
-                value={withdrawAmount}
-                onChange={(e) => setWithdrawAmount(e.target.value)}
-                placeholder={withdrawMaxInfo ? `Max: $${withdrawMaxInfo.max_withdrawable.toLocaleString()}` : "0.00"}
-              />
-            </div>
-            {withdrawAccountId && parseFloat(withdrawAmount) > 0 && withdrawMaxInfo && (
-              <div className="text-sm space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">New Spend Cap</span>
-                  <span className="font-medium text-orange-500">${(withdrawMaxInfo.current_spend_cap - parseFloat(withdrawAmount)).toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Wallet After</span>
-                  <span className="font-medium text-primary">${(walletBalance + parseFloat(withdrawAmount)).toLocaleString()}</span>
-                </div>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setWithdrawDialogOpen(false)}>Cancel</Button>
-            <Button
-              variant="destructive"
-              onClick={() => withdrawMutation.mutate()}
-              disabled={!withdrawAccountId || !withdrawAmount || parseFloat(withdrawAmount) <= 0 || (withdrawMaxInfo ? parseFloat(withdrawAmount) > withdrawMaxInfo.max_withdrawable : true) || withdrawMutation.isPending}
-            >
-              {withdrawMutation.isPending ? "Processing..." : "Withdraw Now"}
-            </Button>
-          </DialogFooter>
+                {selectedAccountId && parseFloat(topUpAmount) > 0 && (
+                  <div className="text-sm space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">New Spend Cap</span>
+                      <span className="font-medium text-primary">${(Number(adAccounts?.find((a: any) => a.id === selectedAccountId)?.spend_cap ?? 0) + parseFloat(topUpAmount)).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Wallet After</span>
+                      <span className={cn("font-medium", (walletBalance - parseFloat(topUpAmount)) < 0 ? "text-destructive" : "")}>
+                        ${(walletBalance - parseFloat(topUpAmount)).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setTopUpDialogOpen(false)}>Cancel</Button>
+                  <Button
+                    onClick={() => topUpMutation.mutate()}
+                    disabled={!selectedAccountId || !topUpAmount || parseFloat(topUpAmount) <= 0 || topUpMutation.isPending}
+                  >
+                    {topUpMutation.isPending ? "Processing..." : "Top Up Now"}
+                  </Button>
+                </DialogFooter>
+              </TabsContent>
+              <TabsContent value="withdraw" className="space-y-4 pt-2">
+                {fetchingWithdrawMeta ? (
+                  <div className="flex items-center justify-center py-6 gap-2 text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm">Fetching real-time data from Meta...</span>
+                  </div>
+                ) : withdrawMeta ? (
+                  <>
+                    <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-muted">
+                      <span className="flex items-center gap-2"><Wallet className="h-4 w-4" /> Client Wallet</span>
+                      <span className="font-semibold">${walletBalance.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Current Spend Cap (Meta)</span>
+                      <span className="font-medium">${withdrawMeta.current_spend_cap.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Amount Spent (Real-time)</span>
+                      <span className="font-medium">${withdrawMeta.real_amount_spent.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-semibold">
+                      <span className="text-muted-foreground">Max Withdrawable</span>
+                      <span className="text-primary">${withdrawMeta.max_withdrawable.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Withdraw Amount (USD)</Label>
+                      <Input type="number" min="1" max={withdrawMeta.max_withdrawable} step="0.01" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} placeholder={`Max $${withdrawMeta.max_withdrawable.toFixed(2)}`} />
+                      {parseFloat(withdrawAmount) > withdrawMeta.max_withdrawable && (
+                        <p className="text-sm text-destructive">Amount exceeds maximum withdrawable</p>
+                      )}
+                    </div>
+                    {parseFloat(withdrawAmount) > 0 && parseFloat(withdrawAmount) <= withdrawMeta.max_withdrawable && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">New Spend Cap</span>
+                        <span className="font-medium text-primary">${(withdrawMeta.current_spend_cap - parseFloat(withdrawAmount)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    )}
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setTopUpDialogOpen(false)}>Cancel</Button>
+                      <Button onClick={() => withdrawMutation.mutate()} disabled={!withdrawAmount || parseFloat(withdrawAmount) <= 0 || !withdrawMeta || parseFloat(withdrawAmount) > withdrawMeta.max_withdrawable || withdrawMutation.isPending} variant="destructive">
+                        {withdrawMutation.isPending ? "Processing..." : "Withdraw Now"}
+                      </Button>
+                    </DialogFooter>
+                  </>
+                ) : (
+                  <div className="text-center py-6 text-sm text-muted-foreground">Unable to fetch data. Please try again.</div>
+                )}
+              </TabsContent>
+            </Tabs>
+          )}
         </DialogContent>
       </Dialog>
     </DashboardLayout>
