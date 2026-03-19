@@ -1,30 +1,54 @@
 
 
-## Plan: OCR-based BDT Payment Recording from Screenshot
+## Plan: TikTok Ad Accounts Tab (Postpaid / Spend Cap)
 
-### What it does
-Add a new button "OCR BDT Payment" to the seller detail section. When clicked, admin can upload or paste (Ctrl+V) a payment screenshot. The image is sent to an Edge Function that uses Lovable AI (Gemini Flash) to OCR-extract the BDT amount and transaction date. The extracted data is shown for confirmation, then saved as a `bdt_payment` entry in `seller_transactions` with the screenshot stored as `proof_url`.
+### Overview
+Add a "TikTok Ad Accounts" tab next to "All Ad Accounts" (Meta) on the Ad Accounts page. TikTok accounts are postpaid with spend cap — same model as Meta. Admin can add TikTok Business Centers, sync accounts, and top up. Clients see their assigned TikTok accounts and can top up from wallet.
 
 ### Steps
 
-1. **Create Edge Function `supabase/functions/ocr-seller-payment/index.ts`**
-   - Accepts `{ image_url: string }` (public URL from payment-proofs bucket)
-   - Calls Lovable AI Gateway with the image asking to extract: BDT amount, transaction date, and any reference/TrxID
-   - Returns `{ bdt_amount, date, reference }` as JSON
+**1. Database Migration — Add `platform` column**
+```sql
+ALTER TABLE ad_accounts ADD COLUMN platform TEXT NOT NULL DEFAULT 'meta';
+ALTER TABLE business_managers ADD COLUMN platform TEXT NOT NULL DEFAULT 'meta';
+```
+Existing data stays as `meta`. TikTok records will have `platform = 'tiktok'`.
 
-2. **Update `AdminSellers.tsx`**
-   - Add "OCR BDT Payment" button next to existing "Record BDT Payment"
-   - New dialog with:
-     - Image upload area (file picker + Ctrl+V paste support, uploads to `payment-proofs` bucket)
-     - After upload, calls `ocr-seller-payment` edge function
-     - Shows extracted BDT amount, date, and reference (editable fields for correction)
-     - On confirm, inserts into `seller_transactions` with `type: "bdt_payment"`, the extracted `bdt_amount`, `description` with reference, `proof_url` pointing to the uploaded image, and `created_at` set to the extracted date
+**2. Update `AdAccountsPage.tsx` — Tab wrapper**
+- Two tabs: "Meta Ad Accounts" | "TikTok Ad Accounts"
+- Meta tab renders existing `AdminAdAccounts` / `ClientAdAccounts` (no changes)
+- TikTok tab renders new components
 
-### Technical Details
+**3. Create `AdminTikTokAccounts.tsx`**
+- Add TikTok Business Center (bc_id, name, access_token stored in `business_managers` with `platform: 'tiktok'`)
+- Sync button → calls `tiktok-sync` edge function
+- Table: Account Name, Spend Cap, Amount Spent, Status, Top Up button
+- Top up calls `tiktok-topup` edge function (same wallet-first pattern as Meta)
 
-- Reuses existing `payment-proofs` storage bucket (already public)
-- AI model: `google/gemini-2.5-flash` (same as verify-topup, good for OCR)
-- Edge function uses `LOVABLE_API_KEY` (already configured)
-- The `seller_transactions.created_at` has a default of `now()` — the insert will explicitly pass the OCR-extracted date so ledger reflects actual payment date
-- No database migration needed — existing `seller_transactions` table has all required columns (`bdt_amount`, `proof_url`, `description`, `created_at`)
+**4. Create `ClientTikTokAccounts.tsx`**
+- Shows assigned TikTok accounts (filtered by `platform = 'tiktok'`)
+- Same columns: Account Name, Spend Cap, Amount Spent, Status
+- Top Up button → wallet deduction + TikTok API call
+
+**5. Create Edge Function `tiktok-sync/index.ts`**
+- Fetches TikTok ad accounts via `GET /open_api/v1.3/bc/advertiser/get/`
+- Gets balance/status via `GET /open_api/v1.3/advertiser/balance/get/`
+- Upserts into `ad_accounts` with `platform = 'tiktok'`
+
+**6. Create Edge Function `tiktok-topup/index.ts`**
+- Same wallet-first deduction pattern as `spend-cap-update`
+- Calls TikTok `POST /open_api/v1.3/bc/transfer/` with `transfer_type: "RECHARGE"`
+- On failure → logs to `failed_topups`
+- On success → updates `ad_accounts.spend_cap`
+
+**7. Add `TIKTOK_ACCESS_TOKEN` secret**
+- Will request via `add_secret` tool for TikTok Business API authentication
+
+### Technical Notes
+- TikTok uses `advertiser_id` (numeric, no `act_` prefix)
+- TikTok API uses dollar amounts directly (not cents)
+- Since postpaid with spend cap — same `SpendProgressBar` component works
+- Existing Meta queries will add `platform = 'meta'` filter (or no filter since default is `meta`)
+- `failed_topups` table works as-is — no schema change needed
+- RLS policies unchanged — `platform` is just a column filter
 
