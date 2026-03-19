@@ -47,7 +47,7 @@ export function AdminSellers() {
       const { data: roles } = await (supabase as any).from("user_roles").select("user_id").eq("role", "client");
       if (!roles?.length) return [];
       const clientIds = roles.map((r: any) => r.user_id);
-      const { data: profiles } = await supabase.from("profiles").select("*").in("user_id", clientIds).eq("status", "approved");
+      const { data: profiles } = await supabase.from("profiles").select("*").in("user_id", clientIds);
       return (profiles as any[]) ?? [];
     },
   });
