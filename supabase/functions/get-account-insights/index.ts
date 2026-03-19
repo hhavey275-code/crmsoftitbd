@@ -306,10 +306,20 @@ async function processAccount(
     const balance = accountData?.balance ? parseFloat(accountData.balance) / 100 : 0;
 
     // ---- Daily Spending Limit ----
-    // Prefer active ad-set daily budgets (what users see as daily limit in Ads Manager).
-    let dailySpendLimit = await fetchActiveDailyBudget(actId, accessToken);
+    // Prefer account-level campaign-group spend cap when available.
+    let dailySpendLimit = 0;
+    try {
+      const cgRes = await fetch(`https://graph.facebook.com/v24.0/${actId}?fields=min_campaign_group_spend_cap&access_token=${accessToken}`);
+      const cgData = await cgRes.json();
+      dailySpendLimit = extractCurrencyFromPayload(cgData, "min_campaign_group_spend_cap");
+    } catch { /* ignore */ }
 
-    // Fallback: account spend cap when ad-set budget is not available.
+    // Fallback 1: active campaign/ad-set daily budgets.
+    if (!dailySpendLimit) {
+      dailySpendLimit = await fetchActiveDailyBudget(actId, accessToken);
+    }
+
+    // Fallback 2: account spend cap.
     if (!dailySpendLimit) {
       dailySpendLimit = extractCurrencyFromPayload(accountData, "spend_cap");
     }
