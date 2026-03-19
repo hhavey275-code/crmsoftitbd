@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -24,16 +24,18 @@ import { toast } from "sonner";
 import {
   User, Building2, Phone, CalendarDays, Wallet, MonitorSmartphone,
   CheckCircle, XCircle, TrendingUp, TrendingDown, DollarSign, CalendarIcon, Save,
-  Plus, Minus, ArrowUpCircle, CreditCard, Shield, Receipt, ShoppingCart, RefreshCw, ListChecks, Search, LayoutDashboard, FileText, LogIn
+  Plus, Minus, ArrowUpCircle, CreditCard, Shield, Receipt, ShoppingCart, RefreshCw, ListChecks, Search, LayoutDashboard, FileText, LogIn, AppWindow, ExternalLink
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { CardBrandIcon } from "@/components/CardBrandIcon";
 
 export default function ClientDetailPage() {
   const { userId } = useParams<{ userId: string }>();
   const { user: currentUser, isSuperAdmin } = useAuth();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
 
   const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfMonth(new Date()));
   const [dateTo, setDateTo] = useState<Date | undefined>(endOfMonth(new Date()));
@@ -305,30 +307,36 @@ export default function ClientDetailPage() {
         const ratio = Number(acc.spend_cap) > 0 ? Number(acc.amount_spent) / Number(acc.spend_cap) : 0;
         const percentage = Math.min(ratio * 100, 100);
         const barColor = ratio >= 0.8 ? "bg-destructive" : ratio >= 0.5 ? "bg-yellow-500" : "bg-primary";
+        const ins = insights?.[acc.id];
 
         return (
-          <Card key={acc.id} className="border border-border/60 shadow-sm">
+          <Card key={acc.id} className="border border-border/60 shadow-sm cursor-pointer active:scale-[0.98] transition-transform" onClick={() => navigate(`/ad-accounts/${acc.id}`)}>
             <CardContent className="p-4">
               {/* Header */}
               <div className="flex items-start justify-between mb-1">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    {showUnassignCheckboxes && (
-                      <Checkbox
-                        checked={unassignSelectedIds.has(acc.id)}
-                        onCheckedChange={() => {
-                          setUnassignSelectedIds(prev => {
-                            const next = new Set(prev);
-                            if (next.has(acc.id)) next.delete(acc.id);
-                            else next.add(acc.id);
-                            return next;
-                          });
-                        }}
-                      />
-                    )}
-                    <p className="font-semibold text-sm text-foreground truncate">{acc.account_name}</p>
+                {showUnassignCheckboxes && (
+                  <div className="pt-0.5 mr-2" onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={unassignSelectedIds.has(acc.id)}
+                      onCheckedChange={() => {
+                        setUnassignSelectedIds(prev => {
+                          const next = new Set(prev);
+                          if (next.has(acc.id)) next.delete(acc.id);
+                          else next.add(acc.id);
+                          return next;
+                        });
+                      }}
+                    />
                   </div>
-                  <p className="text-[11px] text-muted-foreground font-mono mt-0.5">{acc.account_id}</p>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-sm text-foreground truncate">{acc.account_name}</p>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <span className="text-[11px] text-muted-foreground font-mono">{acc.account_id.replace(/^act_/, '')}</span>
+                    <a href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${acc.account_id.replace(/^act_/, '')}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary" onClick={(e) => e.stopPropagation()}>
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
                 </div>
                 <StatusBadge status={acc.status} />
               </div>
@@ -349,14 +357,45 @@ export default function ClientDetailPage() {
                   <span>Spent: <span className="font-medium text-foreground">${Number(acc.amount_spent).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
                   <span>Limit: <span className="font-medium text-foreground">${Number(acc.spend_cap).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
                 </div>
-                <Button
-                  size="sm"
-                  className="gap-1 bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs"
-                  onClick={() => { setSelectedAccountId(acc.id); setTopUpDialogOpen(true); setTopUpAmount(""); }}
-                >
-                  Top Up
-                </Button>
+                <div onClick={(e) => e.stopPropagation()}>
+                  <Button
+                    size="sm"
+                    className="gap-1 bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs h-8"
+                    onClick={() => { setSelectedAccountId(acc.id); setTopUpDialogOpen(true); setTopUpAmount(""); }}
+                  >
+                    <ArrowUpCircle className="h-3.5 w-3.5" />
+                    Top Up
+                  </Button>
+                </div>
               </div>
+
+              {/* Insights row */}
+              {ins && (
+                <div className="mt-2.5 grid grid-cols-3 gap-2 text-center">
+                  <div className="bg-muted/50 rounded-md p-1.5">
+                    <p className="text-[10px] text-muted-foreground">Today Spend</p>
+                    <p className="text-xs font-semibold">${Number(ins.today_spend ?? 0).toLocaleString()}</p>
+                  </div>
+                  <div className="bg-muted/50 rounded-md p-1.5">
+                    <p className="text-[10px] text-muted-foreground">Yesterday</p>
+                    <p className="text-xs font-semibold">${Number(ins.yesterday_spend ?? 0).toLocaleString()}</p>
+                  </div>
+                  <div className="bg-muted/50 rounded-md p-1.5">
+                    <p className="text-[10px] text-muted-foreground">Balance</p>
+                    <p className="text-xs font-semibold">${Number(ins.balance ?? 0).toLocaleString()}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Card info */}
+              {ins?.cards?.[0] && (
+                <div className="mt-2 flex items-center justify-end text-xs">
+                  <div className="flex items-center gap-1">
+                    <CardBrandIcon displayString={ins.cards[0].display_string} size="xs" />
+                    <span className="text-muted-foreground">{ins.cards[0].display_string}</span>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         );
@@ -858,17 +897,23 @@ export default function ClientDetailPage() {
                                   />
                                 </TableHead>
                               )}
-                              <TableHead className="w-[35%]">Account</TableHead>
-                              <TableHead className="w-[20%]">Status</TableHead>
-                              <TableHead className="w-[30%]">Spend Progress</TableHead>
-                              <TableHead className="w-[15%] text-right">Action</TableHead>
+                              <TableHead className="w-[200px]"><span className="text-xs font-medium">Ad Account</span></TableHead>
+                              <TableHead className="w-[100px]"><span className="text-xs font-medium">Budget</span></TableHead>
+                              <TableHead className="w-[90px]"><span className="text-xs font-medium">Status</span></TableHead>
+                              <TableHead className="w-[90px]"><span className="text-xs font-medium">Balance</span></TableHead>
+                              <TableHead className="w-[100px]"><span className="text-xs font-medium">Today</span></TableHead>
+                              <TableHead className="w-[100px]"><span className="text-xs font-medium">Yesterday</span></TableHead>
+                              <TableHead className="w-[110px]"><span className="text-xs font-medium">Card</span></TableHead>
+                              <TableHead className="w-[50px]"><span className="text-xs font-medium">Actions</span></TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {adAccounts?.map((acc: any) => (
-                              <TableRow key={acc.id} className="hover:bg-muted/30">
+                            {adAccounts?.map((acc: any) => {
+                              const ins = insights?.[acc.id];
+                              return (
+                              <TableRow key={acc.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/ad-accounts/${acc.id}`)}>
                                 {showUnassignCheckboxes && (
-                                  <TableCell>
+                                  <TableCell onClick={(e) => e.stopPropagation()}>
                                     <Checkbox
                                       checked={unassignSelectedIds.has(acc.id)}
                                       onCheckedChange={() => {
@@ -883,22 +928,60 @@ export default function ClientDetailPage() {
                                   </TableCell>
                                 )}
                                 <TableCell>
-                                  <p className="font-medium text-sm">{acc.account_name}</p>
-                                  <p className="text-xs text-muted-foreground font-mono">{acc.account_id}</p>
+                                  <div className="flex items-center gap-3">
+                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
+                                      <AppWindow className="h-4 w-4 text-muted-foreground" />
+                                    </div>
+                                    <div>
+                                      <div className="text-sm text-primary">{acc.account_name}</div>
+                                      <div className="mt-0.5 flex items-center gap-1.5">
+                                        <span className="text-xs text-muted-foreground font-mono">{acc.account_id.replace(/^act_/, '')}</span>
+                                        <a href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${acc.account_id.replace(/^act_/, '')}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary" onClick={(e) => e.stopPropagation()}>
+                                          <ExternalLink className="h-3 w-3" />
+                                        </a>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                  <SpendProgressBar amountSpent={Number(acc.amount_spent)} spendCap={Number(acc.spend_cap)} />
                                 </TableCell>
                                 <TableCell><StatusBadge status={acc.status} /></TableCell>
-                                <TableCell><SpendProgressBar amountSpent={Number(acc.amount_spent)} spendCap={Number(acc.spend_cap)} /></TableCell>
-                                <TableCell className="text-right">
+                                <TableCell className="whitespace-nowrap">
+                                  <span className="text-sm">${ins?.balance?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</span>
+                                </TableCell>
+                                <TableCell className="whitespace-nowrap">
+                                  <span className="text-sm">${ins?.today_spend?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</span>
+                                </TableCell>
+                                <TableCell className="whitespace-nowrap">
+                                  <span className="text-sm">${ins?.yesterday_spend?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</span>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="text-sm whitespace-nowrap">
+                                    {ins?.cards && ins.cards.length > 0 ? (
+                                      ins.cards.map((card: any, i: number) => (
+                                        <div key={i} className="flex items-center gap-1.5">
+                                          <CardBrandIcon displayString={card.display_string} size="xs" />
+                                          <span>{card.display_string}</span>
+                                        </div>
+                                      ))
+                                    ) : <span className="text-muted-foreground">—</span>}
+                                  </div>
+                                </TableCell>
+                                <TableCell onClick={(e) => e.stopPropagation()}>
                                   <Button
-                                    size="sm"
-                                    className="rounded-full bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-sm px-3 text-xs font-semibold"
+                                    size="icon"
+                                    variant="default"
+                                    className="h-8 w-8"
                                     onClick={() => { setSelectedAccountId(acc.id); setTopUpDialogOpen(true); setTopUpAmount(""); }}
+                                    title="Top Up"
                                   >
-                                    <ArrowUpCircle className="h-3 w-3 mr-1" />Top Up
+                                    <ArrowUpCircle className="h-4 w-4" />
                                   </Button>
                                 </TableCell>
                               </TableRow>
-                            ))}
+                              );
+                            })}
                           </TableBody>
                         </Table>
                       </div>
