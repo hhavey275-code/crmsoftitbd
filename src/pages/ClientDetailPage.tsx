@@ -292,6 +292,52 @@ export default function ClientDetailPage() {
     onError: (err: any) => toast.error(friendlyEdgeError(err)),
   });
 
+  const openWithdrawDialog = async (accountId: string) => {
+    setWithdrawAccountId(accountId);
+    setWithdrawAmount("");
+    setWithdrawMaxInfo(null);
+    setWithdrawDialogOpen(true);
+    setFetchingWithdrawInfo(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("spend-cap-withdraw", {
+        body: { ad_account_id: accountId, amount: 1, dry_run: true },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setWithdrawMaxInfo({
+        max_withdrawable: data.max_withdrawable,
+        current_spend_cap: data.current_spend_cap,
+        real_amount_spent: data.real_amount_spent,
+      });
+    } catch (err: any) {
+      toast.error(friendlyEdgeError(err));
+    } finally {
+      setFetchingWithdrawInfo(false);
+    }
+  };
+
+  const withdrawMutation = useMutation({
+    mutationFn: async () => {
+      const amt = parseFloat(withdrawAmount);
+      if (!amt || amt <= 0) throw new Error("Invalid amount");
+      const { data, error } = await supabase.functions.invoke("spend-cap-withdraw", {
+        body: { ad_account_id: withdrawAccountId, amount: amt },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data) => {
+      toast.success(`Withdrawn! Cap: $${Number(data.old_spend_cap).toLocaleString()} → $${Number(data.new_spend_cap).toLocaleString()}`);
+      setWithdrawDialogOpen(false);
+      setWithdrawAccountId("");
+      setWithdrawAmount("");
+      setWithdrawMaxInfo(null);
+      invalidateAll();
+    },
+    onError: (err: any) => toast.error(friendlyEdgeError(err)),
+  });
+
   const activeAccounts = adAccounts?.filter((a: any) => a.status === "active") ?? [];
   const disabledAccounts = adAccounts?.filter((a: any) => a.status !== "active") ?? [];
   const totalRemaining = adAccounts?.reduce((sum: number, a: any) => sum + (Number(a.spend_cap) - Number(a.amount_spent)), 0) ?? 0;
