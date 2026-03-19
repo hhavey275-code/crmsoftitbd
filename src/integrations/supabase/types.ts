@@ -221,6 +221,7 @@ export type Database = {
           id: string
           routing_number: string | null
           status: string
+          telegram_group_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -232,6 +233,7 @@ export type Database = {
           id?: string
           routing_number?: string | null
           status?: string
+          telegram_group_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -243,6 +245,7 @@ export type Database = {
           id?: string
           routing_number?: string | null
           status?: string
+          telegram_group_id?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -830,6 +833,7 @@ export type Database = {
         Row: {
           amount: number
           balance_after: number | null
+          bank_account_id: string | null
           created_at: string
           description: string | null
           id: string
@@ -841,6 +845,7 @@ export type Database = {
         Insert: {
           amount: number
           balance_after?: number | null
+          bank_account_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -852,6 +857,7 @@ export type Database = {
         Update: {
           amount?: number
           balance_after?: number | null
+          bank_account_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -860,7 +866,15 @@ export type Database = {
           type?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "transactions_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_ad_accounts: {
         Row: {
