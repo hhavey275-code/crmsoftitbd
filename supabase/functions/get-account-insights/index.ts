@@ -90,10 +90,10 @@ async function fetchActiveCampaignCount(actId: string, accessToken: string): Pro
   }
 }
 
-async function fetchActiveDailyBudget(actId: string, accessToken: string): Promise<number> {
+async function fetchBudgetTotalByEdge(actId: string, accessToken: string, edge: "campaigns" | "adsets"): Promise<number> {
   try {
     const filterParam = encodeURIComponent(JSON.stringify([{"field":"effective_status","operator":"IN","value":["ACTIVE"]}]));
-    let url = `https://graph.facebook.com/v24.0/${actId}/adsets?fields=daily_budget&filtering=${filterParam}&limit=200&access_token=${accessToken}`;
+    let url = `https://graph.facebook.com/v24.0/${actId}/${edge}?fields=daily_budget&filtering=${filterParam}&limit=200&access_token=${accessToken}`;
     let total = 0;
     let pageGuard = 0;
 
@@ -117,6 +117,15 @@ async function fetchActiveDailyBudget(actId: string, accessToken: string): Promi
   } catch {
     return 0;
   }
+}
+
+async function fetchActiveDailyBudget(actId: string, accessToken: string): Promise<number> {
+  const [campaignBudgetTotal, adsetBudgetTotal] = await Promise.all([
+    fetchBudgetTotalByEdge(actId, accessToken, "campaigns"),
+    fetchBudgetTotalByEdge(actId, accessToken, "adsets"),
+  ]);
+
+  return Number(Math.max(campaignBudgetTotal, adsetBudgetTotal).toFixed(2));
 }
 
 // Check for Meta API rate limit errors
