@@ -828,9 +828,9 @@ export default function ClientDetailPage() {
                           <Icon className={cn("h-5 w-5", item.iconColor)} />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/80 leading-tight" style={{ fontFeatureSettings: '"ss01", "cv01"' }}>{item.label}</p>
-                          <p className="text-xl font-extrabold tracking-tight text-foreground leading-snug mt-1" style={{ fontFeatureSettings: '"tnum", "ss01"' }}>{item.value}</p>
-                          <p className="text-[11px] font-medium text-muted-foreground/70 leading-none mt-1">{item.sub}</p>
+                          <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/80 leading-tight" style={{ fontFeatureSettings: '"ss01", "cv01"', textShadow: '0 1px 2px rgba(255,255,255,0.7)' }}>{item.label}</p>
+                          <p className="text-xl font-extrabold tracking-tight text-foreground leading-snug mt-1" style={{ fontFeatureSettings: '"tnum", "ss01"', textShadow: '0 1px 3px rgba(255,255,255,0.6)' }}>{item.value}</p>
+                          <p className="text-[11px] font-medium text-muted-foreground/70 leading-none mt-1" style={{ textShadow: '0 1px 2px rgba(255,255,255,0.5)' }}>{item.sub}</p>
                         </div>
                       </div>
                     );
