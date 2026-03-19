@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
     }
 
     // --- Parse body ---
-    const { ad_account_id, amount } = await req.json();
+    const { ad_account_id, amount, dry_run } = await req.json();
     if (!ad_account_id || !amount || amount <= 0) return json({ error: "ad_account_id and positive amount required" }, 400);
 
     // --- Fetch ad account with BM ---
