@@ -96,6 +96,84 @@ function checkRateLimit(data: any): number | null {
   return null;
 }
 
+function extractNumericValue(input: any): number | null {
+  if (input === null || input === undefined) return null;
+
+  if (typeof input === "number") {
+    return Number.isFinite(input) ? input : null;
+  }
+
+  if (typeof input === "string") {
+    const n = Number(input);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  if (Array.isArray(input)) {
+    for (const item of input) {
+      const n = extractNumericValue(item);
+      if (n !== null) return n;
+    }
+    return null;
+  }
+
+  if (typeof input === "object") {
+    const preferredKeys = [
+      "amount",
+      "value",
+      "threshold_amount",
+      "daily_spend_limit",
+      "adtrust_dsl",
+      "min_billing_threshold",
+    ];
+
+    for (const key of preferredKeys) {
+      if (key in input) {
+        const n = extractNumericValue(input[key]);
+        if (n !== null) return n;
+      }
+    }
+
+    if ("data" in input) {
+      const n = extractNumericValue(input.data);
+      if (n !== null) return n;
+    }
+
+    for (const val of Object.values(input)) {
+      const n = extractNumericValue(val);
+      if (n !== null) return n;
+    }
+  }
+
+  return null;
+}
+
+function normalizeCurrency(raw: number | null): number {
+  if (raw === null || !Number.isFinite(raw) || raw <= 0) return 0;
+
+  // Meta may return either minor units (e.g. "2500") or major units (e.g. "25.00")
+  if (Number.isInteger(raw) && raw >= 100) return raw / 100;
+  return raw;
+}
+
+function extractCurrencyFromPayload(payload: any, field: string): number {
+  if (!payload || payload.error) return 0;
+
+  const direct = extractNumericValue(payload?.[field]);
+  if (direct !== null) return normalizeCurrency(direct);
+
+  if (Array.isArray(payload?.data)) {
+    for (const row of payload.data) {
+      const n = extractNumericValue(row?.[field] ?? row);
+      if (n !== null) return normalizeCurrency(n);
+    }
+  } else if (payload?.data) {
+    const n = extractNumericValue(payload.data?.[field] ?? payload.data);
+    if (n !== null) return normalizeCurrency(n);
+  }
+
+  return 0;
+}
+
 // Process a single account's Meta API calls
 async function processAccount(
   account: any,
@@ -149,7 +227,7 @@ async function processAccount(
 
     const fetchPromises: Promise<Response>[] = [
       fetch(todayUrl),
-      fetch(`https://graph.facebook.com/v24.0/${actId}?fields=balance,amount_spent,spend_cap,funding_source_details&access_token=${accessToken}`),
+      fetch(`https://graph.facebook.com/v24.0/${actId}?fields=balance,amount_spent,spend_cap,funding_source_details,min_daily_budget,min_campaign_group_spend_cap,is_prepay_account&access_token=${accessToken}`),
       fetchActiveCampaignCount(actId, accessToken).then(c => ({ json: async () => c } as any)),
     ];
     if (yesterdayUrl) {
@@ -186,35 +264,13 @@ async function processAccount(
 
     const balance = accountData?.balance ? parseFloat(accountData.balance) / 100 : 0;
 
-    // Fetch optional fields independently so one invalid field doesn't break the other
-    let dailySpendLimit = 0;
-    let billingThreshold = 0;
-
-    const fetchOptionalCurrencyField = async (field: string, path = "") => {
-      try {
-        const target = path ? `/${path}` : "";
-        const res = await fetch(`https://graph.facebook.com/v25.0/${actId}${target}?fields=${field}&access_token=${accessToken}`);
-        const data = await res.json();
-        if (data?.error) return 0;
-        const raw = data?.[field];
-        return raw ? parseFloat(raw) / 100 : 0;
-      } catch {
-        return 0;
-      }
-    };
-
-    [dailySpendLimit, billingThreshold] = await Promise.all([
-      fetchOptionalCurrencyField("daily_spend_limit"),
-      fetchOptionalCurrencyField("min_billing_threshold"),
-    ]);
-
-    // Fallbacks for accounts where primary fields are unavailable
+    // Use currently supported Ad Account fields for limits/threshold-like metrics
+    let dailySpendLimit = normalizeCurrency(extractNumericValue(accountData?.min_daily_budget));
     if (!dailySpendLimit) {
-      dailySpendLimit = await fetchOptionalCurrencyField("adtrust_dsl");
+      dailySpendLimit = normalizeCurrency(extractNumericValue(accountData?.spend_cap));
     }
-    if (!billingThreshold) {
-      billingThreshold = await fetchOptionalCurrencyField("threshold_amount", "adspaymentcycle");
-    }
+
+    let billingThreshold = normalizeCurrency(extractNumericValue(accountData?.min_campaign_group_spend_cap));
 
     let adAccountUpdate: any = undefined;
     if (!isSingleDate && !isDateRange && accountData?.amount_spent !== undefined) {
