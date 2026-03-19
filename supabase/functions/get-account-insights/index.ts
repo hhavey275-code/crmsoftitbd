@@ -273,6 +273,12 @@ async function processAccount(
         const target = path ? `/${path}` : "";
         const res = await fetch(`https://graph.facebook.com/v24.0/${actId}${target}?fields=${field}&access_token=${accessToken}`);
         const data = await res.json();
+
+        if (data?.error) {
+          console.log(`[optional-meta-field-error] act=${actId} field=${field} path=${path || "account"} code=${data.error.code ?? ""} subcode=${data.error.error_subcode ?? ""} message=${data.error.message ?? ""}`);
+          return 0;
+        }
+
         return extractCurrencyFromPayload(data, field);
       } catch {
         return 0;
