@@ -310,7 +310,7 @@ async function processAccount(
       }
     }
 
-    console.log(`Account ${actId}: DSL=$${dailySpendLimit}, threshold=$${billingThreshold}, spend_cap=${accountData?.spend_cap}, fsd_keys=${fsd ? Object.keys(fsd).join(',') : 'none'}`);
+    
 
     let adAccountUpdate: any = undefined;
     if (!isSingleDate && !isDateRange && accountData?.amount_spent !== undefined) {
