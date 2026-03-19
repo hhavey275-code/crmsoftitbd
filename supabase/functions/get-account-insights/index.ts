@@ -271,11 +271,9 @@ async function processAccount(
     const fetchOptionalCurrencyField = async (field: string, path = "") => {
       try {
         const target = path ? `/${path}` : "";
-        const res = await fetch(`https://graph.facebook.com/v25.0/${actId}${target}?fields=${field}&access_token=${accessToken}`);
+        const res = await fetch(`https://graph.facebook.com/v24.0/${actId}${target}?fields=${field}&access_token=${accessToken}`);
         const data = await res.json();
-        if (data?.error) return 0;
-        const raw = data?.[field];
-        return raw ? parseFloat(raw) / 100 : 0;
+        return extractCurrencyFromPayload(data, field);
       } catch {
         return 0;
       }
