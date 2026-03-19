@@ -273,6 +273,11 @@ async function processAccount(
     try {
       const dslRes = await fetch(`https://graph.facebook.com/v24.0/${actId}?fields=adtrust_dsl&access_token=${accessToken}`);
       const dslData = await dslRes.json();
+      if (dslData?.error) {
+        console.log(`adtrust_dsl error for ${actId}: ${JSON.stringify(dslData.error)}`);
+      } else if (dslData?.adtrust_dsl !== undefined) {
+        console.log(`adtrust_dsl raw for ${actId}: ${JSON.stringify(dslData.adtrust_dsl)}`);
+      }
       dailySpendLimit = extractCurrencyFromPayload(dslData, "adtrust_dsl");
     } catch { /* ignore - field not available */ }
 
