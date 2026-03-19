@@ -436,52 +436,52 @@ export function AdminSellers() {
             </div>
           )}
 
-          {/* Transaction Table */}
-          <Card>
+          {/* Transaction Table — Google Sheets style */}
+          <Card className="overflow-hidden">
             <CardContent className="p-0">
               <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-xs">Date</TableHead>
-                      <TableHead className="text-xs">Type</TableHead>
-                      <TableHead className="text-xs text-right">Payment (BDT)</TableHead>
-                      <TableHead className="text-xs text-right">USDT</TableHead>
-                      <TableHead className="text-xs text-right">Rate</TableHead>
-                      <TableHead className="text-xs text-right">Converted BDT</TableHead>
-                      <TableHead className="text-xs">Note</TableHead>
-                      <TableHead className="text-xs">Proof</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <table className="w-full text-[13px] font-mono border-collapse" style={{ fontFeatureSettings: '"tnum", "ss01"', letterSpacing: '0.01em' }}>
+                  <thead>
+                    <tr className="bg-muted/60">
+                      <th className="border border-border px-3 py-2 text-left font-semibold text-muted-foreground whitespace-nowrap">Date</th>
+                      <th className="border border-border px-3 py-2 text-left font-semibold text-muted-foreground whitespace-nowrap">Type</th>
+                      <th className="border border-border px-3 py-2 text-right font-semibold text-muted-foreground whitespace-nowrap">Payment (BDT)</th>
+                      <th className="border border-border px-3 py-2 text-right font-semibold text-muted-foreground whitespace-nowrap">USDT</th>
+                      <th className="border border-border px-3 py-2 text-right font-semibold text-muted-foreground whitespace-nowrap">Rate</th>
+                      <th className="border border-border px-3 py-2 text-right font-semibold text-muted-foreground whitespace-nowrap">Converted BDT</th>
+                      <th className="border border-border px-3 py-2 text-left font-semibold text-muted-foreground whitespace-nowrap">Note</th>
+                      <th className="border border-border px-3 py-2 text-left font-semibold text-muted-foreground whitespace-nowrap">Proof</th>
+                    </tr>
+                  </thead>
+                  <tbody>
                     {sellerTxns?.map((t: any) => {
                       const convertedBdt = Number(t.usdt_amount || 0) * Number(t.rate || 0);
                       const typeLabel = t.type === "usdt_received" ? "USDT Received" : t.type === "bdt_payment" ? "BDT Payment" : "Client Top-Up";
                       const typeColor = t.type === "usdt_received" ? "text-blue-600" : t.type === "bdt_payment" ? "text-green-600" : "text-orange-500";
                       return (
-                        <TableRow key={t.id}>
-                          <TableCell className="text-xs whitespace-nowrap">{format(new Date(t.created_at), "MMM d, yyyy")}</TableCell>
-                          <TableCell className={cn("text-xs font-medium", typeColor)}>{typeLabel}</TableCell>
-                          <TableCell className="text-xs text-right font-mono">{Number(t.bdt_amount) > 0 ? `৳${Number(t.bdt_amount).toLocaleString()}` : "—"}</TableCell>
-                          <TableCell className="text-xs text-right font-mono">{Number(t.usdt_amount) > 0 ? `$${Number(t.usdt_amount).toLocaleString()}` : "—"}</TableCell>
-                          <TableCell className="text-xs text-right font-mono">{Number(t.rate) > 0 ? t.rate : "—"}</TableCell>
-                          <TableCell className="text-xs text-right font-mono">{convertedBdt > 0 ? `৳${convertedBdt.toLocaleString()}` : "—"}</TableCell>
-                          <TableCell className="text-xs max-w-[120px] truncate">{t.description || "—"}</TableCell>
-                          <TableCell className="text-xs">
+                        <tr key={t.id} className="hover:bg-muted/30">
+                          <td className="border border-border px-3 py-1.5 whitespace-nowrap">{format(new Date(t.created_at), "MMM d, yyyy")}</td>
+                          <td className={cn("border border-border px-3 py-1.5 font-medium", typeColor)}>{typeLabel}</td>
+                          <td className="border border-border px-3 py-1.5 text-right">{Number(t.bdt_amount) > 0 ? `৳${Number(t.bdt_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "—"}</td>
+                          <td className="border border-border px-3 py-1.5 text-right">{Number(t.usdt_amount) > 0 ? `$${Number(t.usdt_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "—"}</td>
+                          <td className="border border-border px-3 py-1.5 text-right">{Number(t.rate) > 0 ? Number(t.rate).toFixed(1) : "—"}</td>
+                          <td className="border border-border px-3 py-1.5 text-right">{convertedBdt > 0 ? `৳${convertedBdt.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "—"}</td>
+                          <td className="border border-border px-3 py-1.5 max-w-[140px] truncate font-sans">{t.description || "—"}</td>
+                          <td className="border border-border px-3 py-1.5 font-sans">
                             {t.proof_url ? (
                               <button onClick={() => setProofUrl(t.proof_url)} className="text-primary hover:underline flex items-center gap-1">
                                 <ImageIcon className="h-3.5 w-3.5" /> View
                               </button>
                             ) : "—"}
-                          </TableCell>
-                        </TableRow>
+                          </td>
+                        </tr>
                       );
                     })}
                     {(!sellerTxns || sellerTxns.length === 0) && (
-                      <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No transactions</TableCell></TableRow>
+                      <tr><td colSpan={8} className="border border-border text-center text-muted-foreground py-8">No transactions</td></tr>
                     )}
-                  </TableBody>
-                </Table>
+                  </tbody>
+                </table>
               </div>
             </CardContent>
           </Card>
