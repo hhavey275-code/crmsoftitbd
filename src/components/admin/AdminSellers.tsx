@@ -7,11 +7,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, DollarSign, Banknote, Eye, ImageIcon } from "lucide-react";
+import { DollarSign, Banknote, ImageIcon, UserCog, ArrowLeftRight } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -21,8 +20,8 @@ export function AdminSellers() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isMobile = useIsMobile();
-  const [showCreate, setShowCreate] = useState(false);
-  const [createForm, setCreateForm] = useState({ email: "", password: "", full_name: "" });
+  const [showConvert, setShowConvert] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState("");
   const [selectedSeller, setSelectedSeller] = useState<any>(null);
   const [entryType, setEntryType] = useState<"usdt_received" | "bdt_payment">("usdt_received");
   const [entryForm, setEntryForm] = useState({ usdt_amount: "", bdt_amount: "", rate: "", description: "" });
@@ -37,6 +36,18 @@ export function AdminSellers() {
       if (!roles?.length) return [];
       const sellerIds = roles.map((r: any) => r.user_id);
       const { data: profiles } = await supabase.from("profiles").select("*").in("user_id", sellerIds);
+      return (profiles as any[]) ?? [];
+    },
+  });
+
+  // Fetch all clients (for convert dialog)
+  const { data: clients } = useQuery({
+    queryKey: ["admin-clients-for-convert"],
+    queryFn: async () => {
+      const { data: roles } = await (supabase as any).from("user_roles").select("user_id").eq("role", "client");
+      if (!roles?.length) return [];
+      const clientIds = roles.map((r: any) => r.user_id);
+      const { data: profiles } = await supabase.from("profiles").select("*").in("user_id", clientIds).eq("status", "approved");
       return (profiles as any[]) ?? [];
     },
   });
@@ -85,36 +96,45 @@ export function AdminSellers() {
 
   const dueAdvance = sellerTotals.totalBdtPaid + sellerTotals.totalClientBdt - sellerTotals.totalConvertedBdt;
 
-  // Create seller account
-  const createMutation = useMutation({
+  // Convert client to seller
+  const convertMutation = useMutation({
     mutationFn: async () => {
-      // Sign up user via edge function or direct auth
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email: createForm.email,
-        password: createForm.password,
-        options: { data: { full_name: createForm.full_name } },
-      });
-      if (signUpError) throw signUpError;
-      if (!signUpData.user) throw new Error("Failed to create user");
-
-      // Update user_roles from client to seller
-      const { error: roleError } = await (supabase as any)
+      if (!selectedClientId) throw new Error("Select a client");
+      const { error } = await (supabase as any)
         .from("user_roles")
         .update({ role: "seller" })
-        .eq("user_id", signUpData.user.id);
-      if (roleError) throw roleError;
-
-      // Update profile name
-      if (createForm.full_name) {
-        await supabase.from("profiles").update({ full_name: createForm.full_name }).eq("user_id", signUpData.user.id);
-      }
+        .eq("user_id", selectedClientId);
+      if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Seller account created!");
-      logSystemAction("Seller Created", createForm.email, user?.id, user?.email);
+      const client = clients?.find((c: any) => c.user_id === selectedClientId);
+      toast.success(`${client?.full_name || client?.email} converted to seller!`);
+      logSystemAction("Client Converted to Seller", `${client?.full_name || client?.email}`, user?.id, user?.email);
       queryClient.invalidateQueries({ queryKey: ["admin-sellers"] });
-      setShowCreate(false);
-      setCreateForm({ email: "", password: "", full_name: "" });
+      queryClient.invalidateQueries({ queryKey: ["admin-clients-for-convert"] });
+      setShowConvert(false);
+      setSelectedClientId("");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  // Revert seller back to client
+  const revertMutation = useMutation({
+    mutationFn: async (sellerId: string) => {
+      const { error } = await (supabase as any)
+        .from("user_roles")
+        .update({ role: "client" })
+        .eq("user_id", sellerId);
+      if (error) throw error;
+      return sellerId;
+    },
+    onSuccess: (_data, sellerId) => {
+      const seller = sellers?.find((s: any) => s.user_id === sellerId);
+      toast.success(`${seller?.full_name || seller?.email} reverted to client!`);
+      logSystemAction("Seller Reverted to Client", `${seller?.full_name || seller?.email}`, user?.id, user?.email);
+      if (selectedSeller?.user_id === sellerId) setSelectedSeller(null);
+      queryClient.invalidateQueries({ queryKey: ["admin-sellers"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-clients-for-convert"] });
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -156,8 +176,8 @@ export function AdminSellers() {
     <div className="space-y-4 md:space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl md:text-2xl font-bold">Sellers</h1>
-        <Button size={isMobile ? "sm" : "default"} onClick={() => setShowCreate(true)}>
-          <Plus className="mr-1.5 h-4 w-4" /> Add Seller
+        <Button size={isMobile ? "sm" : "default"} onClick={() => setShowConvert(true)}>
+          <UserCog className="mr-1.5 h-4 w-4" /> Convert Client to Seller
         </Button>
       </div>
 
@@ -169,21 +189,32 @@ export function AdminSellers() {
             className={cn("cursor-pointer border transition-all hover:shadow-md", selectedSeller?.user_id === s.user_id && "ring-2 ring-primary")}
             onClick={() => setSelectedSeller(s)}
           >
-            <CardContent className="p-4">
-              <p className="font-semibold truncate">{s.full_name || s.email}</p>
-              <p className="text-xs text-muted-foreground truncate">{s.email}</p>
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="font-semibold truncate">{s.full_name || s.email}</p>
+                <p className="text-xs text-muted-foreground truncate">{s.email}</p>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-muted-foreground hover:text-destructive shrink-0"
+                onClick={(e) => { e.stopPropagation(); revertMutation.mutate(s.user_id); }}
+                title="Revert to Client"
+              >
+                <ArrowLeftRight className="h-4 w-4" />
+              </Button>
             </CardContent>
           </Card>
         ))}
         {(!sellers || sellers.length === 0) && (
-          <p className="text-muted-foreground text-sm col-span-full text-center py-8">No sellers yet. Click "Add Seller" to create one.</p>
+          <p className="text-muted-foreground text-sm col-span-full text-center py-8">No sellers yet. Convert a client to seller to get started.</p>
         )}
       </div>
 
       {/* Selected Seller Detail */}
       {selectedSeller && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <h2 className="text-lg font-semibold">{selectedSeller.full_name || selectedSeller.email} — Ledger</h2>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" onClick={() => { setEntryType("usdt_received"); setShowEntryDialog(true); }}>
@@ -287,19 +318,34 @@ export function AdminSellers() {
         </div>
       )}
 
-      {/* Create Seller Dialog */}
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+      {/* Convert Client to Seller Dialog */}
+      <Dialog open={showConvert} onOpenChange={setShowConvert}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Create Seller Account</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Convert Client to Seller</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><Label>Full Name</Label><Input value={createForm.full_name} onChange={e => setCreateForm(f => ({ ...f, full_name: e.target.value }))} /></div>
-            <div><Label>Email</Label><Input type="email" value={createForm.email} onChange={e => setCreateForm(f => ({ ...f, email: e.target.value }))} /></div>
-            <div><Label>Password</Label><Input type="password" value={createForm.password} onChange={e => setCreateForm(f => ({ ...f, password: e.target.value }))} /></div>
+            <div>
+              <Label>Select Client</Label>
+              <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a client..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients?.map((c: any) => (
+                    <SelectItem key={c.user_id} value={c.user_id}>
+                      {c.full_name || c.email} — {c.email}
+                    </SelectItem>
+                  ))}
+                  {(!clients || clients.length === 0) && (
+                    <SelectItem value="_none" disabled>No approved clients available</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
-            <Button onClick={() => createMutation.mutate()} disabled={!createForm.email || !createForm.password || createMutation.isPending}>
-              {createMutation.isPending ? "Creating..." : "Create Seller"}
+            <Button variant="outline" onClick={() => setShowConvert(false)}>Cancel</Button>
+            <Button onClick={() => convertMutation.mutate()} disabled={!selectedClientId || convertMutation.isPending}>
+              {convertMutation.isPending ? "Converting..." : "Convert to Seller"}
             </Button>
           </DialogFooter>
         </DialogContent>
