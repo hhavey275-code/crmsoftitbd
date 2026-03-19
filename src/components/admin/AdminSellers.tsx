@@ -452,6 +452,39 @@ export function AdminSellers() {
           {proofUrl && <img src={proofUrl} alt="Proof" className="w-full rounded-md" />}
         </DialogContent>
       </Dialog>
+
+      {/* Assign Bank Dialog */}
+      <Dialog open={showAssignBank} onOpenChange={setShowAssignBank}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Assign Bank to {selectedSeller?.full_name || selectedSeller?.email}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Select Bank</Label>
+              <Select value={selectedBankId} onValueChange={setSelectedBankId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose an unassigned bank..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {unassignedBanks?.map((b: any) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.bank_name} — {b.account_name} (****{b.account_number?.slice(-4)})
+                    </SelectItem>
+                  ))}
+                  {(!unassignedBanks || unassignedBanks.length === 0) && (
+                    <SelectItem value="_none" disabled>No unassigned banks available</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAssignBank(false)}>Cancel</Button>
+            <Button onClick={() => assignBankMutation.mutate()} disabled={!selectedBankId || assignBankMutation.isPending}>
+              {assignBankMutation.isPending ? "Assigning..." : "Assign Bank"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
