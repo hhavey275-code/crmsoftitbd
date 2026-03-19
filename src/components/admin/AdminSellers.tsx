@@ -440,7 +440,7 @@ export function AdminSellers() {
           <Card className="overflow-hidden">
             <CardContent className="p-0">
               <div className="overflow-x-auto">
-                <table className="w-full text-[13px] font-mono border-collapse" style={{ fontFeatureSettings: '"tnum", "ss01"', letterSpacing: '0.01em' }}>
+                <table className="w-full text-[13px] font-semibold border-collapse" style={{ fontFamily: "'Google Sans', 'Roboto', 'Arial', sans-serif", fontFeatureSettings: '"tnum", "ss01"', letterSpacing: '0.01em' }}>
                   <thead>
                     <tr className="bg-muted/60">
                       <th className="border border-border px-3 py-2 text-left font-semibold text-muted-foreground whitespace-nowrap">Date</th>
