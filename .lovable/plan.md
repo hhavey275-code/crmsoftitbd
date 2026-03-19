@@ -1,23 +1,30 @@
 
 
-## Plan: Add Dark Mode Toggle
+## Plan: OCR-based BDT Payment Recording from Screenshot
 
-### What
-Add a dark/light mode toggle to the app so users can switch themes. The system already has dark mode CSS variables defined in `index.css` and `next-themes` is installed — it just needs to be wired up.
+### What it does
+Add a new button "OCR BDT Payment" to the seller detail section. When clicked, admin can upload or paste (Ctrl+V) a payment screenshot. The image is sent to an Edge Function that uses Lovable AI (Gemini Flash) to OCR-extract the BDT amount and transaction date. The extracted data is shown for confirmation, then saved as a `bdt_payment` entry in `seller_transactions` with the screenshot stored as `proof_url`.
 
-### Changes
+### Steps
 
-| # | Task | File |
-|---|------|------|
-| 1 | Wrap app with `ThemeProvider` from `next-themes` | `src/App.tsx` |
-| 2 | Create a `ThemeToggle` component with Sun/Moon icon button | `src/components/ThemeToggle.tsx` |
-| 3 | Add `ThemeToggle` to the sidebar footer (above Sign Out) | `src/components/AppSidebar.tsx` |
-| 4 | Also add `ThemeToggle` to the header bar | `src/components/DashboardLayout.tsx` |
+1. **Create Edge Function `supabase/functions/ocr-seller-payment/index.ts`**
+   - Accepts `{ image_url: string }` (public URL from payment-proofs bucket)
+   - Calls Lovable AI Gateway with the image asking to extract: BDT amount, transaction date, and any reference/TrxID
+   - Returns `{ bdt_amount, date, reference }` as JSON
 
-### Details
+2. **Update `AdminSellers.tsx`**
+   - Add "OCR BDT Payment" button next to existing "Record BDT Payment"
+   - New dialog with:
+     - Image upload area (file picker + Ctrl+V paste support, uploads to `payment-proofs` bucket)
+     - After upload, calls `ocr-seller-payment` edge function
+     - Shows extracted BDT amount, date, and reference (editable fields for correction)
+     - On confirm, inserts into `seller_transactions` with `type: "bdt_payment"`, the extracted `bdt_amount`, `description` with reference, `proof_url` pointing to the uploaded image, and `created_at` set to the extracted date
 
-- **ThemeProvider**: Wrap the entire app in `<ThemeProvider attribute="class" defaultTheme="system" enableSystem>` so the `dark` class gets toggled on `<html>`.
-- **ThemeToggle**: A simple button using `useTheme()` from `next-themes` — shows Sun icon in dark mode, Moon icon in light mode. Clicking toggles between `light` and `dark`.
-- **Placement**: In the sidebar footer before the Sign Out button, and in the header next to the notification bell.
-- No database or migration changes needed.
+### Technical Details
+
+- Reuses existing `payment-proofs` storage bucket (already public)
+- AI model: `google/gemini-2.5-flash` (same as verify-topup, good for OCR)
+- Edge function uses `LOVABLE_API_KEY` (already configured)
+- The `seller_transactions.created_at` has a default of `now()` — the insert will explicitly pass the OCR-extracted date so ledger reflects actual payment date
+- No database migration needed — existing `seller_transactions` table has all required columns (`bdt_amount`, `proof_url`, `description`, `created_at`)
 
