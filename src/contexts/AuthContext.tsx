@@ -26,6 +26,7 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
   isAdmin: false,
   isSuperAdmin: false,
+  isSeller: false,
 });
 
 export const useAuth = () => useContext(AuthContext);
