@@ -828,7 +828,7 @@ export default function ClientDetailPage() {
                           <Icon className={cn("h-5 w-5", item.iconColor)} />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs font-semibold tracking-wide text-muted-foreground leading-tight">{item.label}</p>
+                          <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{item.label}</p>
                           <p className="text-lg font-extrabold tracking-tight text-foreground leading-snug mt-0.5">{item.value}</p>
                           <p className="text-[11px] text-muted-foreground leading-none mt-1">{item.sub}</p>
                         </div>
