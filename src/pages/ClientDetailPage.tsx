@@ -810,39 +810,131 @@ export default function ClientDetailPage() {
               </div>
             ) : (
               /* Desktop Metrics */
-              <Card className="bg-card/50 border-border/40 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-                <CardContent className="p-3">
-                  <div className="grid gap-1.5 grid-cols-2 lg:grid-cols-5">
-                    <Card className="bg-card border border-border/60 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_2px_6px_rgba(0,0,0,0.06)] transition-shadow duration-200">
-                      <CardContent className="p-2.5">
-                        <div className="flex items-center gap-2">
-                          <div className="flex shrink-0 items-center justify-center rounded-lg h-7 w-7 bg-green-100 dark:bg-green-900/50">
-                            <Wallet className="h-3 w-3 text-green-600" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-[10px] font-medium text-muted-foreground leading-tight truncate">Wallet Balance</p>
-                            <p className="text-sm font-bold tracking-tight text-foreground leading-tight">${walletBalance.toLocaleString()}</p>
-                          </div>
-                          <div className="flex items-center gap-px shrink-0">
-                            <button className="h-5 w-5 rounded flex items-center justify-center text-green-600 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors" onClick={() => { setWalletDialogType("credit"); setWalletAmount(""); setWalletNote(""); }}><Plus className="h-2.5 w-2.5" /></button>
-                            <button className="h-5 w-5 rounded flex items-center justify-center text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors" onClick={() => { setWalletDialogType("debit"); setWalletAmount(""); setWalletNote(""); }}><Minus className="h-2.5 w-2.5" /></button>
-                          </div>
+              <div className="space-y-2.5">
+                {/* Secondary row — smaller compact cards on top */}
+                <div className="grid gap-2 grid-cols-2 lg:grid-cols-5">
+                  <Card className="bg-card border border-border/40 shadow-sm hover:shadow-md transition-shadow">
+                    <CardContent className="p-2.5 flex items-center gap-2">
+                      <div className="flex shrink-0 items-center justify-center rounded-md h-7 w-7 bg-emerald-100 dark:bg-emerald-900/40">
+                        <DollarSign className="h-3.5 w-3.5 text-emerald-600" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-muted-foreground font-medium leading-none">Today's Spend</p>
+                        <p className="text-xs font-bold text-foreground mt-0.5">${todaySpend.toLocaleString()}</p>
+                        <p className="text-[9px] text-muted-foreground leading-none mt-0.5">Yesterday: ${yesterdaySpend.toLocaleString()}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-card border border-border/40 shadow-sm hover:shadow-md transition-shadow">
+                    <CardContent className="p-2.5 flex items-center gap-2">
+                      <div className="flex shrink-0 items-center justify-center rounded-md h-7 w-7 bg-blue-100 dark:bg-blue-900/40">
+                        <ShoppingCart className="h-3.5 w-3.5 text-blue-600" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-muted-foreground font-medium leading-none">Today's Orders</p>
+                        <p className="text-xs font-bold text-foreground mt-0.5">{todayOrders.toLocaleString()}</p>
+                        <p className="text-[9px] text-muted-foreground leading-none mt-0.5">Yesterday: {yesterdayOrders.toLocaleString()}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-card border border-border/40 shadow-sm hover:shadow-md transition-shadow">
+                    <CardContent className="p-2.5 flex items-center gap-2">
+                      <div className="flex shrink-0 items-center justify-center rounded-md h-7 w-7 bg-orange-100 dark:bg-orange-900/40">
+                        <TrendingUp className="h-3.5 w-3.5 text-orange-600" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-muted-foreground font-medium leading-none">Total Top-Up</p>
+                        <p className="text-xs font-bold text-foreground mt-0.5">${Number(topUpTotal ?? 0).toLocaleString()}</p>
+                        <p className="text-[9px] text-muted-foreground leading-none mt-0.5">{dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-card border border-border/40 shadow-sm hover:shadow-md transition-shadow">
+                    <CardContent className="p-2.5 flex items-center gap-2">
+                      <div className="flex shrink-0 items-center justify-center rounded-md h-7 w-7 bg-purple-100 dark:bg-purple-900/40">
+                        <TrendingDown className="h-3.5 w-3.5 text-purple-600" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-muted-foreground font-medium leading-none">Total Spending</p>
+                        <p className="text-xs font-bold text-foreground mt-0.5">${(totalSpendingFiltered ?? totalSpending).toLocaleString()}</p>
+                        <p className="text-[9px] text-muted-foreground leading-none mt-0.5">{dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-card border border-border/40 shadow-sm hover:shadow-md transition-shadow">
+                    <CardContent className="p-2.5 flex items-center gap-2">
+                      <div className="flex shrink-0 items-center justify-center rounded-md h-7 w-7 bg-indigo-100 dark:bg-indigo-900/40">
+                        <Wallet className="h-3.5 w-3.5 text-indigo-600" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-muted-foreground font-medium leading-none">Remaining Balance</p>
+                        <p className="text-xs font-bold text-foreground mt-0.5">${totalRemaining.toLocaleString()}</p>
+                        <p className="text-[9px] text-muted-foreground leading-none mt-0.5">All ad accounts</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Primary row — larger hero cards */}
+                <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+                  <Card className="bg-gradient-to-br from-card to-muted/30 border border-border/50 shadow-md hover:shadow-lg transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex shrink-0 items-center justify-center rounded-xl h-10 w-10 bg-green-100 dark:bg-green-900/50">
+                          <Wallet className="h-5 w-5 text-green-600" />
                         </div>
-                      </CardContent>
-                    </Card>
-                    <MetricCard title="Total Ad Accounts" value={adAccounts?.length ?? 0} icon={MonitorSmartphone} iconBg="bg-blue-100 dark:bg-blue-900/50" iconColor="text-blue-600" size="sm" className="!shadow-[0_1px_2px_rgba(0,0,0,0.04)]" />
-                    <MetricCard title="Active Accounts" value={activeAccounts.length} icon={CheckCircle} iconBg="bg-emerald-100 dark:bg-emerald-900/50" iconColor="text-emerald-600" size="sm" className="!shadow-[0_1px_2px_rgba(0,0,0,0.04)]" />
-                    <MetricCard title="Disabled Accounts" value={disabledAccounts.length} icon={XCircle} iconBg="bg-red-100 dark:bg-red-900/50" iconColor="text-red-600" size="sm" className="!shadow-[0_1px_2px_rgba(0,0,0,0.04)]" />
-                    <MetricCard title="Remaining Balance" value={`$${totalRemaining.toLocaleString()}`} subtitle="All ad accounts" icon={Wallet} iconBg="bg-indigo-100 dark:bg-indigo-900/50" iconColor="text-indigo-600" size="sm" className="!shadow-[0_1px_2px_rgba(0,0,0,0.04)]" />
-                  </div>
-                  <div className="grid gap-1.5 grid-cols-2 lg:grid-cols-4 mt-1.5">
-                    <MetricCard title="Today's Spend" value={`$${todaySpend.toLocaleString()}`} subtitle={`Yesterday: $${yesterdaySpend.toLocaleString()}`} icon={DollarSign} iconBg="bg-emerald-100 dark:bg-emerald-900/50" iconColor="text-emerald-600" size="sm" className="!shadow-[0_1px_2px_rgba(0,0,0,0.04)]" />
-                    <MetricCard title="Today's Orders" value={todayOrders.toLocaleString()} subtitle={`Yesterday: ${yesterdayOrders.toLocaleString()}`} icon={ShoppingCart} iconBg="bg-blue-100 dark:bg-blue-900/50" iconColor="text-blue-600" size="sm" className="!shadow-[0_1px_2px_rgba(0,0,0,0.04)]" />
-                    <MetricCard title="Total Top-Up" value={`$${Number(topUpTotal ?? 0).toLocaleString()}`} subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"} icon={TrendingUp} iconBg="bg-orange-100 dark:bg-orange-900/50" iconColor="text-orange-600" size="sm" className="!shadow-[0_1px_2px_rgba(0,0,0,0.04)]" />
-                    <MetricCard title="Total Spending" value={`$${(totalSpendingFiltered ?? totalSpending).toLocaleString()}`} subtitle={dateFrom && dateTo ? `${format(dateFrom, "MMM d")} - ${format(dateTo, "MMM d, yyyy")}` : "All time"} icon={TrendingDown} iconBg="bg-purple-100 dark:bg-purple-900/50" iconColor="text-purple-600" size="sm" className="!shadow-[0_1px_2px_rgba(0,0,0,0.04)]" />
-                  </div>
-                </CardContent>
-              </Card>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-muted-foreground">Wallet Balance</p>
+                          <p className="text-xl font-bold tracking-tight text-foreground">${walletBalance.toLocaleString()}</p>
+                        </div>
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <button className="h-7 w-7 rounded-lg flex items-center justify-center text-green-600 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors" onClick={() => { setWalletDialogType("credit"); setWalletAmount(""); setWalletNote(""); }}><Plus className="h-3.5 w-3.5" /></button>
+                          <button className="h-7 w-7 rounded-lg flex items-center justify-center text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors" onClick={() => { setWalletDialogType("debit"); setWalletAmount(""); setWalletNote(""); }}><Minus className="h-3.5 w-3.5" /></button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-gradient-to-br from-card to-muted/30 border border-border/50 shadow-md hover:shadow-lg transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex shrink-0 items-center justify-center rounded-xl h-10 w-10 bg-blue-100 dark:bg-blue-900/50">
+                          <MonitorSmartphone className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-muted-foreground">Total Ad Accounts</p>
+                          <p className="text-xl font-bold tracking-tight text-foreground">{adAccounts?.length ?? 0}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-gradient-to-br from-card to-muted/30 border border-border/50 shadow-md hover:shadow-lg transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex shrink-0 items-center justify-center rounded-xl h-10 w-10 bg-emerald-100 dark:bg-emerald-900/50">
+                          <CheckCircle className="h-5 w-5 text-emerald-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-muted-foreground">Active Accounts</p>
+                          <p className="text-xl font-bold tracking-tight text-foreground">{activeAccounts.length}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-gradient-to-br from-card to-muted/30 border border-border/50 shadow-md hover:shadow-lg transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex shrink-0 items-center justify-center rounded-xl h-10 w-10 bg-red-100 dark:bg-red-900/50">
+                          <XCircle className="h-5 w-5 text-red-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-muted-foreground">Disabled Accounts</p>
+                          <p className="text-xl font-bold tracking-tight text-foreground">{disabledAccounts.length}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
             )}
 
             {/* Ad Accounts */}
