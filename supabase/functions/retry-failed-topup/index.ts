@@ -146,7 +146,9 @@ Deno.serve(async (req) => {
     }
 
     // SUCCESS — update spend cap in DB, remove failed topup
-    await supabase.from("ad_accounts").update({ spend_cap: newSpendCapDollars }).eq("id", failedTopup.ad_account_id);
+    const currentAmountSpent = Number(account.amount_spent);
+    const remainingAfterTopup = newSpendCapDollars - currentAmountSpent;
+    await supabase.from("ad_accounts").update({ spend_cap: newSpendCapDollars, balance_after_topup: remainingAfterTopup }).eq("id", failedTopup.ad_account_id);
     await supabase.from("failed_topups").delete().eq("id", failed_topup_id);
 
     // Log API calls
