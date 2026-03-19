@@ -229,6 +229,27 @@ export function AdminTopUp() {
       const clientProfile = requests?.find((r: any) => r.id === id)?.profile;
       const clientName = clientProfile?.full_name || clientProfile?.email || userId.slice(0, 8);
       await logSystemAction(actionLabel, `$${amount} for ${clientName}${adminNote ? ` — ${adminNote}` : ""}`, user!.id, user!.email);
+
+      // Forward proof image to Telegram group on approval
+      if (action === "approved") {
+        const reqData2 = requests?.find((r: any) => r.id === id);
+        if (reqData2?.proof_url) {
+          try {
+            const { data: botToken } = await supabase.from("site_settings").select("value").eq("key", "telegram_bot_token").single();
+            const { data: groupId } = await supabase.from("site_settings").select("value").eq("key", "telegram_forward_group_id").single();
+            if (botToken?.value && groupId?.value) {
+              const caption = `✅ <b>Approved Top-Up</b>\n👤 ${clientName}\n💰 $${amount} (৳${reqData2.bdt_amount ? Number(reqData2.bdt_amount).toLocaleString() : 'N/A'})\n🔖 Ref: ${reqData2.payment_reference || 'N/A'}`;
+              await fetch(`https://api.telegram.org/bot${botToken.value}/sendPhoto`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ chat_id: groupId.value, photo: reqData2.proof_url, caption, parse_mode: "HTML" }),
+              });
+            }
+          } catch (e) {
+            console.error("Telegram forward failed:", e);
+          }
+        }
+      }
     },
     onSuccess: (_, { action }) => {
       toast.success(`Request ${action === "hold" ? "put on hold" : action}`);

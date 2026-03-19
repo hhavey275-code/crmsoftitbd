@@ -433,6 +433,20 @@ export default function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Telegram Forward Group ID */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Bot className="h-4 w-4 text-green-500" />
+                  Telegram Forward Group
+                </CardTitle>
+                <CardDescription>Top-up proof images will be forwarded to this Telegram group/channel on approval</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <TelegramForwardGroupSetting />
+              </CardContent>
+            </Card>
           </div>
         )}
 
