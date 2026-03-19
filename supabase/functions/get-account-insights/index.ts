@@ -271,7 +271,7 @@ async function processAccount(
     // Meta may return adtrust_dsl as number/string/object. Parse defensively.
     let dailySpendLimit = 0;
     try {
-      const dslRes = await fetch(`https://graph.facebook.com/v24.0/${actId}?fields=adtrust_dsl&access_token=${accessToken}`);
+      const dslRes = await fetch(`https://graph.facebook.com/v25.0/${actId}?fields=adtrust_dsl&access_token=${accessToken}`);
       const dslData = await dslRes.json();
       if (dslData?.error) {
         console.log(`adtrust_dsl error for ${actId}: ${JSON.stringify(dslData.error)}`);
