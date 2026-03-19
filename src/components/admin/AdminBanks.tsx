@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { logSystemAction } from "@/lib/systemLog";
 import { format } from "date-fns";
 
-const emptyForm = { bank_name: "", account_name: "", account_number: "", branch: "", routing_number: "", telegram_group_id: "" };
+const emptyForm = { bank_name: "", account_name: "", account_number: "", branch: "", routing_number: "", telegram_group_id: "", seller_id: "" };
 
 function BankStatsDialog({ bankId, bankName, open, onClose }: { bankId: string; bankName: string; open: boolean; onClose: () => void }) {
   const queryClient = useQueryClient();
@@ -212,6 +212,18 @@ export function AdminBanks() {
     },
   });
 
+  // Fetch sellers for bank assignment
+  const { data: sellers } = useQuery({
+    queryKey: ["admin-sellers-list"],
+    queryFn: async () => {
+      const { data: roles } = await (supabase as any).from("user_roles").select("user_id").eq("role", "seller");
+      if (!roles?.length) return [];
+      const sellerIds = roles.map((r: any) => r.user_id);
+      const { data: profs } = await supabase.from("profiles").select("user_id, full_name, email").in("user_id", sellerIds);
+      return (profs as any[]) ?? [];
+    },
+  });
+
   const { data: clientBanks } = useQuery({
     queryKey: ["admin-client-banks"],
     queryFn: async () => {
@@ -224,6 +236,7 @@ export function AdminBanks() {
     mutationFn: async () => {
       const insertData: any = { bank_name: form.bank_name, account_name: form.account_name, account_number: form.account_number, branch: form.branch, routing_number: form.routing_number };
       if (form.telegram_group_id) insertData.telegram_group_id = form.telegram_group_id;
+      if (form.seller_id) insertData.seller_id = form.seller_id;
       const { error } = await (supabase as any).from("bank_accounts").insert(insertData);
       if (error) throw error;
     },
@@ -236,6 +249,7 @@ export function AdminBanks() {
       const updateData: any = {
         bank_name: form.bank_name, account_name: form.account_name, account_number: form.account_number, branch: form.branch, routing_number: form.routing_number,
         telegram_group_id: form.telegram_group_id || null,
+        seller_id: form.seller_id || null,
       };
       const { error } = await (supabase as any).from("bank_accounts").update(updateData).eq("id", editingBank.id);
       if (error) throw error;
@@ -325,7 +339,7 @@ export function AdminBanks() {
                         <>
                           <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => {
                             setEditingBank(b);
-                            setForm({ bank_name: b.bank_name, account_name: b.account_name, account_number: b.account_number, branch: b.branch || "", routing_number: b.routing_number || "", telegram_group_id: b.telegram_group_id || "" });
+                            setForm({ bank_name: b.bank_name, account_name: b.account_name, account_number: b.account_number, branch: b.branch || "", routing_number: b.routing_number || "", telegram_group_id: b.telegram_group_id || "", seller_id: b.seller_id || "" });
                           }}>
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
@@ -383,7 +397,7 @@ export function AdminBanks() {
                           <>
                             <Button size="sm" variant="ghost" onClick={() => {
                               setEditingBank(b);
-                              setForm({ bank_name: b.bank_name, account_name: b.account_name, account_number: b.account_number, branch: b.branch || "", routing_number: b.routing_number || "", telegram_group_id: b.telegram_group_id || "" });
+                              setForm({ bank_name: b.bank_name, account_name: b.account_name, account_number: b.account_number, branch: b.branch || "", routing_number: b.routing_number || "", telegram_group_id: b.telegram_group_id || "", seller_id: b.seller_id || "" });
                             }}><Pencil className="h-4 w-4" /></Button>
                             <Button size="sm" variant="ghost" onClick={() => setShowAssign(b.id)}><UserPlus className="h-4 w-4" /></Button>
                             <Button size="sm" variant="ghost" className="hover:text-destructive" onClick={() => deleteMutation.mutate(b.id)}><Trash2 className="h-4 w-4" /></Button>
@@ -478,6 +492,18 @@ export function AdminBanks() {
             <div><Label>Branch</Label><Input value={form.branch} onChange={e => setForm(f => ({ ...f, branch: e.target.value }))} /></div>
             <div><Label>Routing Number</Label><Input value={form.routing_number} onChange={e => setForm(f => ({ ...f, routing_number: e.target.value }))} /></div>
             <div><Label>Telegram Group ID <span className="text-xs text-muted-foreground">(for proof forwarding)</span></Label><Input placeholder="-100xxxxxxxxxx" value={form.telegram_group_id} onChange={e => setForm(f => ({ ...f, telegram_group_id: e.target.value }))} /></div>
+            <div>
+              <Label>Assign to Seller <span className="text-xs text-muted-foreground">(optional)</span></Label>
+              <Select value={form.seller_id} onValueChange={v => setForm(f => ({ ...f, seller_id: v === "none" ? "" : v }))}>
+                <SelectTrigger><SelectValue placeholder="No seller" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No seller</SelectItem>
+                  {sellers?.map((s: any) => (
+                    <SelectItem key={s.user_id} value={s.user_id}>{s.full_name || s.email}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAdd(false)}>Cancel</Button>
@@ -523,6 +549,18 @@ export function AdminBanks() {
             <div><Label>Branch</Label><Input value={form.branch} onChange={e => setForm(f => ({ ...f, branch: e.target.value }))} /></div>
             <div><Label>Routing Number</Label><Input value={form.routing_number} onChange={e => setForm(f => ({ ...f, routing_number: e.target.value }))} /></div>
             <div><Label>Telegram Group ID <span className="text-xs text-muted-foreground">(for proof forwarding)</span></Label><Input placeholder="-100xxxxxxxxxx" value={form.telegram_group_id} onChange={e => setForm(f => ({ ...f, telegram_group_id: e.target.value }))} /></div>
+            <div>
+              <Label>Assign to Seller <span className="text-xs text-muted-foreground">(optional)</span></Label>
+              <Select value={form.seller_id} onValueChange={v => setForm(f => ({ ...f, seller_id: v === "none" ? "" : v }))}>
+                <SelectTrigger><SelectValue placeholder="No seller" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No seller</SelectItem>
+                  {sellers?.map((s: any) => (
+                    <SelectItem key={s.user_id} value={s.user_id}>{s.full_name || s.email}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setEditingBank(null); setForm(emptyForm); }}>Cancel</Button>

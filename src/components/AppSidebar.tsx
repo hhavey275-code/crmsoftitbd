@@ -14,6 +14,7 @@ import {
   ScrollText,
   AlertTriangle,
   FileText,
+  Store,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -47,6 +48,7 @@ const adminNavItems = [
   { title: "Transactions", url: "/transactions", icon: History, key: "transactions" },
   { title: "Banks", url: "/banks", icon: Landmark, key: "banks" },
   { title: "Chat Support", url: "/chat", icon: MessageCircle, key: "chat" },
+  { title: "Sellers", url: "/sellers", icon: Store, key: "sellers" },
   { title: "System Log", url: "/system-logs", icon: ScrollText, key: "system-logs" },
   { title: "Settings", url: "/settings", icon: Settings, key: "settings" },
 ];
@@ -60,10 +62,15 @@ const clientNavItems = [
   { title: "Settings", url: "/settings", icon: Settings, key: "settings" },
 ];
 
+const sellerNavItems = [
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, key: "dashboard" },
+  { title: "Settings", url: "/settings", icon: Settings, key: "settings" },
+];
+
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const { signOut, profile, role, isAdmin, isSuperAdmin, user } = useAuth();
+  const { signOut, profile, role, isAdmin, isSuperAdmin, isSeller, user } = useAuth();
   const { logoUrl, siteName } = useSiteSettings();
   const badges = useSidebarBadges();
 
@@ -90,6 +97,8 @@ export function AppSidebar() {
     } else {
       navItems = adminNavItems;
     }
+  } else if (isSeller) {
+    navItems = sellerNavItems;
   } else {
     navItems = clientNavItems;
   }

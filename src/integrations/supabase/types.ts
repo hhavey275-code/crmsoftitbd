@@ -220,6 +220,7 @@ export type Database = {
           created_at: string | null
           id: string
           routing_number: string | null
+          seller_id: string | null
           status: string
           telegram_group_id: string | null
           updated_at: string | null
@@ -232,6 +233,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           routing_number?: string | null
+          seller_id?: string | null
           status?: string
           telegram_group_id?: string | null
           updated_at?: string | null
@@ -244,6 +246,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           routing_number?: string | null
+          seller_id?: string | null
           status?: string
           telegram_group_id?: string | null
           updated_at?: string | null
@@ -629,6 +632,63 @@ export type Database = {
         }
         Relationships: []
       }
+      seller_transactions: {
+        Row: {
+          bank_account_id: string | null
+          bdt_amount: number
+          created_at: string
+          description: string | null
+          id: string
+          proof_url: string | null
+          rate: number
+          seller_id: string
+          top_up_request_id: string | null
+          type: string
+          usdt_amount: number
+        }
+        Insert: {
+          bank_account_id?: string | null
+          bdt_amount?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          proof_url?: string | null
+          rate?: number
+          seller_id: string
+          top_up_request_id?: string | null
+          type: string
+          usdt_amount?: number
+        }
+        Update: {
+          bank_account_id?: string | null
+          bdt_amount?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          proof_url?: string | null
+          rate?: number
+          seller_id?: string
+          top_up_request_id?: string | null
+          type?: string
+          usdt_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seller_transactions_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seller_transactions_top_up_request_id_fkey"
+            columns: ["top_up_request_id"]
+            isOneToOne: false
+            referencedRelation: "top_up_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       site_settings: {
         Row: {
           id: string
@@ -965,7 +1025,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "client" | "superadmin"
+      app_role: "admin" | "client" | "superadmin" | "seller"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1093,7 +1153,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "client", "superadmin"],
+      app_role: ["admin", "client", "superadmin", "seller"],
     },
   },
 } as const
