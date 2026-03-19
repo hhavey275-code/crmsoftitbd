@@ -93,19 +93,28 @@ async function fetchActiveCampaignCount(actId: string, accessToken: string): Pro
 async function fetchBudgetTotalByEdge(actId: string, accessToken: string, edge: "campaigns" | "adsets"): Promise<number> {
   try {
     const filterParam = encodeURIComponent(JSON.stringify([{"field":"effective_status","operator":"IN","value":["ACTIVE"]}]));
-    let url = `https://graph.facebook.com/v24.0/${actId}/${edge}?fields=daily_budget&filtering=${filterParam}&limit=200&access_token=${accessToken}`;
+    let url = `https://graph.facebook.com/v24.0/${actId}/${edge}?fields=daily_budget,name&filtering=${filterParam}&limit=200&access_token=${accessToken}`;
     let total = 0;
     let pageGuard = 0;
+    const debugItems: any[] = [];
 
     while (url && pageGuard < 5) {
       const res = await fetch(url);
       const data = await res.json();
-      if (data?.error) return 0;
+      if (data?.error) {
+        console.log(`DEBUG_BUDGET_ERROR[${actId}/${edge}]:`, JSON.stringify(data.error));
+        return 0;
+      }
 
       for (const row of data?.data ?? []) {
-        const raw = extractNumericValue(row?.daily_budget);
-        if (raw !== null && raw > 0) {
-          total += normalizeCurrency(raw);
+        const rawVal = row?.daily_budget;
+        debugItems.push({ name: row?.name, daily_budget_raw: rawVal, id: row?.id });
+        if (rawVal !== undefined && rawVal !== null) {
+          const parsed = parseFloat(String(rawVal));
+          if (Number.isFinite(parsed) && parsed > 0) {
+            // Meta returns daily_budget in cents (minor units)
+            total += parsed / 100;
+          }
         }
       }
 
@@ -113,6 +122,7 @@ async function fetchBudgetTotalByEdge(actId: string, accessToken: string, edge: 
       pageGuard += 1;
     }
 
+    console.log(`DEBUG_BUDGET[${actId}/${edge}]: items=${JSON.stringify(debugItems)}, total=${total}`);
     return Number(total.toFixed(2));
   } catch {
     return 0;
