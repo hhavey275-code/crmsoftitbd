@@ -322,7 +322,12 @@ export function AdminSellers() {
             <div className="flex flex-wrap gap-2">
               <span className="text-xs text-muted-foreground self-center">Assigned Banks:</span>
               {sellerBanks.map((b: any) => (
-                <span key={b.id} className="text-xs bg-muted px-2 py-1 rounded-md">{b.bank_name} ****{b.account_number?.slice(-4)}</span>
+                <span key={b.id} className="text-xs bg-muted px-2 py-1 rounded-md inline-flex items-center gap-1">
+                  {b.bank_name} ****{b.account_number?.slice(-4)}
+                  <button onClick={() => unassignBankMutation.mutate(b.id)} className="hover:text-destructive ml-0.5" title="Unassign">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
               ))}
             </div>
           )}
