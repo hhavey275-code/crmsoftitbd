@@ -1,40 +1,65 @@
 
 
-## Plan: Bank Delete Fix + Bank Stats + Telegram Image Forward
+## Plan: Bank Reactivation + Withdraw in Stats + Per-Bank Telegram Forward
 
-### 1. Fix Bank Delete
+### 1. Reactivate Deactivated Banks
 
-The delete button exists in the UI but likely fails due to foreign key constraints — `client_banks` and `top_up_requests` reference `bank_account_id`. Two options:
-- **Soft delete**: Change status to `inactive` instead of hard delete (safer, preserves history)
-- **Hard delete with cascade**: Delete related `client_banks` first, then the bank
+Currently the bank list only shows `status = 'active'` banks, with no way to view or reactivate inactive ones.
 
-Will implement **soft delete** — the delete button will set `status = 'inactive'` and hide inactive banks from the list. This preserves transaction history.
+**Changes in `AdminBanks.tsx`:**
+- Add a toggle/tab to switch between "Active" and "Inactive" banks
+- Show inactive banks with a "Reactivate" button that sets `status = 'active'`
+- The deactivate (trash) button stays on active banks
 
-### 2. Per-Bank Total Stats (Received + Day-by-Day + Withdraw)
+### 2. Withdraw Option in Bank Stats
 
-When admin selects a bank, show:
-- **Total BDT received** (sum of approved top-up `bdt_amount` for that bank)
-- **Day-by-day breakdown** table showing date, total received, number of transactions
-- **Withdrawals** reduce the running total
+The current `BankStatsDialog` only shows approved top-up totals. There's no withdraw tracking per bank because the `transactions` table doesn't have a `bank_account_id` column — withdrawals aren't linked to specific banks.
 
-This will query `top_up_requests` (approved, grouped by bank_account_id and date) and `transactions` (type = 'withdraw') to compute net totals. Add a new dialog/expandable section in AdminBanks that shows this data when a bank is clicked.
+**Two approaches:**
+- **Option A**: Add a "Record Withdraw" button in the bank stats dialog that creates a transaction of type `withdraw` linked to the bank. This requires adding a `bank_account_id` column to the `transactions` table.
+- **Option B**: Add a manual "withdraw" entry system directly on the bank stats, storing withdraw records in a new simple table or using a convention in existing tables.
 
-### 3. Forward Proof Image to Telegram Group on Top-Up Approval
+Will go with **Option A** — add `bank_account_id` column to `transactions` table, add a "Record Withdraw" button in bank stats, and subtract withdrawals from the net total.
 
-When a top-up request is approved (manually or auto), forward the `proof_url` image to a Telegram group. This will be added to the `verify-topup` edge function (for auto-approvals) and the admin approval flow.
+**Database migration:**
+```sql
+ALTER TABLE public.transactions ADD COLUMN bank_account_id uuid;
+```
 
-- Use the existing Telegram bot token from `site_settings`
-- Call Telegram `sendPhoto` API with the proof image URL and caption (client name, amount, ref)
-- Target group will be configurable via `site_settings` key `telegram_forward_group_id`
+**Changes in `AdminBanks.tsx` (BankStatsDialog):**
+- Query withdrawals from `transactions` where `bank_account_id = bankId` and `type = 'withdraw'`
+- Show net balance (total received - total withdrawn)
+- Add "Record Withdraw" button with amount input
+- Include withdrawals in day-by-day breakdown
+
+### 3. Per-Bank Telegram Forward (Different Groups per Bank)
+
+Instead of one global `telegram_forward_group_id`, each bank account will have its own Telegram group ID. When a top-up is approved (manual or auto), the proof image forwards to the Telegram group configured for that specific bank.
+
+**Database migration:**
+```sql
+ALTER TABLE public.bank_accounts ADD COLUMN telegram_group_id text;
+```
+
+**Changes in `AdminBanks.tsx`:**
+- Add "Telegram Group ID" field in the Add/Edit bank dialogs
+
+**Changes in `verify-topup/index.ts` (auto-approve):**
+- Instead of reading `telegram_forward_group_id` from `site_settings`, read `telegram_group_id` from the bank account used in the top-up request
+
+**Changes in `AdminTopUp.tsx` (manual approve):**
+- Same: read `telegram_group_id` from the request's bank account instead of global setting
+
+**Note:** The global `telegram_forward_group_id` setting can be kept as a fallback if a bank doesn't have its own group configured.
 
 ### Technical Steps
 
 | # | Task | Files |
 |---|------|-------|
-| 1 | Change bank delete to soft-delete (set status = inactive), filter list to show only active | `AdminBanks.tsx` |
-| 2 | Add bank detail dialog with total received stats and day-by-day breakdown | `AdminBanks.tsx` |
-| 3 | Query approved top_up_requests grouped by bank_account_id + date for stats | `AdminBanks.tsx` |
-| 4 | Add Telegram image forward logic to `verify-topup` (auto-approve flow) | `verify-topup/index.ts` |
-| 5 | Add Telegram forward to manual admin approval flow | `AdminTopUp.tsx` + possibly new edge function |
-| 6 | Add `telegram_forward_group_id` setting to admin settings | `SettingsPage.tsx` |
+| 1 | Add `bank_account_id` to `transactions` and `telegram_group_id` to `bank_accounts` | DB migration |
+| 2 | Add Active/Inactive toggle + Reactivate button | `AdminBanks.tsx` |
+| 3 | Add withdraw tracking + Record Withdraw in bank stats | `AdminBanks.tsx` |
+| 4 | Add Telegram Group ID field to bank Add/Edit forms | `AdminBanks.tsx` |
+| 5 | Update auto-approve to use per-bank Telegram group | `verify-topup/index.ts` |
+| 6 | Update manual approve to use per-bank Telegram group | `AdminTopUp.tsx` |
 
