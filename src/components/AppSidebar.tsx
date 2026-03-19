@@ -48,6 +48,7 @@ const adminNavItems = [
   { title: "Transactions", url: "/transactions", icon: History, key: "transactions" },
   { title: "Banks", url: "/banks", icon: Landmark, key: "banks" },
   { title: "Chat Support", url: "/chat", icon: MessageCircle, key: "chat" },
+  { title: "Sellers", url: "/sellers", icon: Store, key: "sellers" },
   { title: "System Log", url: "/system-logs", icon: ScrollText, key: "system-logs" },
   { title: "Settings", url: "/settings", icon: Settings, key: "settings" },
 ];
