@@ -268,25 +268,17 @@ async function processAccount(
     const balance = accountData?.balance ? parseFloat(accountData.balance) / 100 : 0;
 
     // ---- Daily Spending Limit ----
-    // Try adtrust_dsl separately (may fail for some accounts)
+    // Meta may return adtrust_dsl as number/string/object. Parse defensively.
     let dailySpendLimit = 0;
     try {
       const dslRes = await fetch(`https://graph.facebook.com/v24.0/${actId}?fields=adtrust_dsl&access_token=${accessToken}`);
       const dslData = await dslRes.json();
-      if (dslData?.adtrust_dsl !== undefined && !dslData?.error) {
-        const raw = parseFloat(String(dslData.adtrust_dsl));
-        if (Number.isFinite(raw) && raw > 0) {
-          dailySpendLimit = raw / 100;
-        }
-      }
+      dailySpendLimit = extractCurrencyFromPayload(dslData, "adtrust_dsl");
     } catch { /* ignore - field not available */ }
-    
-    // Fallback: use spend_cap
-    if (!dailySpendLimit && accountData?.spend_cap) {
-      const sc = parseFloat(String(accountData.spend_cap));
-      if (Number.isFinite(sc) && sc > 0) {
-        dailySpendLimit = sc / 100;
-      }
+
+    // Fallback: use spend_cap when DSL is unavailable
+    if (!dailySpendLimit) {
+      dailySpendLimit = extractCurrencyFromPayload(accountData, "spend_cap");
     }
 
     // ---- Billing Threshold ----
