@@ -897,17 +897,23 @@ export default function ClientDetailPage() {
                                   />
                                 </TableHead>
                               )}
-                              <TableHead className="w-[35%]">Account</TableHead>
-                              <TableHead className="w-[20%]">Status</TableHead>
-                              <TableHead className="w-[30%]">Spend Progress</TableHead>
-                              <TableHead className="w-[15%] text-right">Action</TableHead>
+                              <TableHead className="w-[200px]"><span className="text-xs font-medium">Ad Account</span></TableHead>
+                              <TableHead className="w-[100px]"><span className="text-xs font-medium">Budget</span></TableHead>
+                              <TableHead className="w-[90px]"><span className="text-xs font-medium">Status</span></TableHead>
+                              <TableHead className="w-[90px]"><span className="text-xs font-medium">Balance</span></TableHead>
+                              <TableHead className="w-[100px]"><span className="text-xs font-medium">Today</span></TableHead>
+                              <TableHead className="w-[100px]"><span className="text-xs font-medium">Yesterday</span></TableHead>
+                              <TableHead className="w-[110px]"><span className="text-xs font-medium">Card</span></TableHead>
+                              <TableHead className="w-[50px]"><span className="text-xs font-medium">Actions</span></TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {adAccounts?.map((acc: any) => (
-                              <TableRow key={acc.id} className="hover:bg-muted/30">
+                            {adAccounts?.map((acc: any) => {
+                              const ins = insights?.[acc.id];
+                              return (
+                              <TableRow key={acc.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/ad-accounts/${acc.id}`)}>
                                 {showUnassignCheckboxes && (
-                                  <TableCell>
+                                  <TableCell onClick={(e) => e.stopPropagation()}>
                                     <Checkbox
                                       checked={unassignSelectedIds.has(acc.id)}
                                       onCheckedChange={() => {
@@ -922,22 +928,60 @@ export default function ClientDetailPage() {
                                   </TableCell>
                                 )}
                                 <TableCell>
-                                  <p className="font-medium text-sm">{acc.account_name}</p>
-                                  <p className="text-xs text-muted-foreground font-mono">{acc.account_id}</p>
+                                  <div className="flex items-center gap-3">
+                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
+                                      <AppWindow className="h-4 w-4 text-muted-foreground" />
+                                    </div>
+                                    <div>
+                                      <div className="text-sm text-primary">{acc.account_name}</div>
+                                      <div className="mt-0.5 flex items-center gap-1.5">
+                                        <span className="text-xs text-muted-foreground font-mono">{acc.account_id.replace(/^act_/, '')}</span>
+                                        <a href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${acc.account_id.replace(/^act_/, '')}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary" onClick={(e) => e.stopPropagation()}>
+                                          <ExternalLink className="h-3 w-3" />
+                                        </a>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                  <SpendProgressBar amountSpent={Number(acc.amount_spent)} spendCap={Number(acc.spend_cap)} />
                                 </TableCell>
                                 <TableCell><StatusBadge status={acc.status} /></TableCell>
-                                <TableCell><SpendProgressBar amountSpent={Number(acc.amount_spent)} spendCap={Number(acc.spend_cap)} /></TableCell>
-                                <TableCell className="text-right">
+                                <TableCell className="whitespace-nowrap">
+                                  <span className="text-sm">${ins?.balance?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</span>
+                                </TableCell>
+                                <TableCell className="whitespace-nowrap">
+                                  <span className="text-sm">${ins?.today_spend?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</span>
+                                </TableCell>
+                                <TableCell className="whitespace-nowrap">
+                                  <span className="text-sm">${ins?.yesterday_spend?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</span>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="text-sm whitespace-nowrap">
+                                    {ins?.cards && ins.cards.length > 0 ? (
+                                      ins.cards.map((card: any, i: number) => (
+                                        <div key={i} className="flex items-center gap-1.5">
+                                          <CardBrandIcon displayString={card.display_string} size="xs" />
+                                          <span>{card.display_string}</span>
+                                        </div>
+                                      ))
+                                    ) : <span className="text-muted-foreground">—</span>}
+                                  </div>
+                                </TableCell>
+                                <TableCell onClick={(e) => e.stopPropagation()}>
                                   <Button
-                                    size="sm"
-                                    className="rounded-full bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-sm px-3 text-xs font-semibold"
+                                    size="icon"
+                                    variant="default"
+                                    className="h-8 w-8"
                                     onClick={() => { setSelectedAccountId(acc.id); setTopUpDialogOpen(true); setTopUpAmount(""); }}
+                                    title="Top Up"
                                   >
-                                    <ArrowUpCircle className="h-3 w-3 mr-1" />Top Up
+                                    <ArrowUpCircle className="h-4 w-4" />
                                   </Button>
                                 </TableCell>
                               </TableRow>
-                            ))}
+                              );
+                            })}
                           </TableBody>
                         </Table>
                       </div>
