@@ -17,6 +17,7 @@ import {
   Store,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useSidebarBadges } from "@/hooks/useSidebarBadges";
