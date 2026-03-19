@@ -343,15 +343,6 @@ async function processAccount(
       }
     }
 
-    const cards: any[] = [];
-    const fsd = accountData?.funding_source_details;
-    if (fsd) {
-      cards.push({
-        id: fsd.id,
-        display_string: fsd.display_string || `Card ending ${fsd.id?.slice(-4) || '****'}`,
-        type: fsd.type,
-      });
-    }
 
     return {
       id: account.id,
