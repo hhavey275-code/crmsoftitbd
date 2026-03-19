@@ -41,3 +41,9 @@ verify_jwt = false
 
 [functions.ocr-seller-payment]
 verify_jwt = false
+
+[functions.tiktok-sync]
+verify_jwt = false
+
+[functions.tiktok-topup]
+verify_jwt = false
