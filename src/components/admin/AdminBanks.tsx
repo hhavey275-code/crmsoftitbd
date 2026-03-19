@@ -327,7 +327,7 @@ export function AdminBanks() {
                         <>
                           <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => {
                             setEditingBank(b);
-                            setForm({ bank_name: b.bank_name, account_name: b.account_name, account_number: b.account_number, branch: b.branch || "", routing_number: b.routing_number || "", telegram_group_id: b.telegram_group_id || "" });
+                            setForm({ bank_name: b.bank_name, account_name: b.account_name, account_number: b.account_number, branch: b.branch || "", routing_number: b.routing_number || "", telegram_group_id: b.telegram_group_id || "", seller_id: b.seller_id || "" });
                           }}>
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
