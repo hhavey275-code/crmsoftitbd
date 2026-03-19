@@ -492,6 +492,18 @@ export function AdminBanks() {
             <div><Label>Branch</Label><Input value={form.branch} onChange={e => setForm(f => ({ ...f, branch: e.target.value }))} /></div>
             <div><Label>Routing Number</Label><Input value={form.routing_number} onChange={e => setForm(f => ({ ...f, routing_number: e.target.value }))} /></div>
             <div><Label>Telegram Group ID <span className="text-xs text-muted-foreground">(for proof forwarding)</span></Label><Input placeholder="-100xxxxxxxxxx" value={form.telegram_group_id} onChange={e => setForm(f => ({ ...f, telegram_group_id: e.target.value }))} /></div>
+            <div>
+              <Label>Assign to Seller <span className="text-xs text-muted-foreground">(optional)</span></Label>
+              <Select value={form.seller_id} onValueChange={v => setForm(f => ({ ...f, seller_id: v === "none" ? "" : v }))}>
+                <SelectTrigger><SelectValue placeholder="No seller" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No seller</SelectItem>
+                  {sellers?.map((s: any) => (
+                    <SelectItem key={s.user_id} value={s.user_id}>{s.full_name || s.email}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAdd(false)}>Cancel</Button>
