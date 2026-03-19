@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
     }
 
     // --- Parse body ---
-    const { ad_account_id, amount } = await req.json();
+    const { ad_account_id, amount, dry_run } = await req.json();
     if (!ad_account_id || !amount || amount <= 0) return json({ error: "ad_account_id and positive amount required" }, 400);
 
     // --- Fetch ad account with BM ---
@@ -100,6 +100,16 @@ Deno.serve(async (req) => {
       : Number(account.spend_cap);
 
     const maxWithdrawable = Math.max(0, currentSpendCapDollars - realAmountSpentDollars);
+
+    // --- Dry run: return meta only, no actual withdraw ---
+    if (dry_run) {
+      return json({
+        dry_run: true,
+        real_amount_spent: realAmountSpentDollars,
+        current_spend_cap: currentSpendCapDollars,
+        max_withdrawable: maxWithdrawable,
+      });
+    }
 
     if (amount > maxWithdrawable + 0.01) {
       return json({

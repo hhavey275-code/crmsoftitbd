@@ -94,7 +94,7 @@ export function AdminAdAccounts() {
     setFetchingWithdrawMeta(true);
     try {
       const { data } = await supabase.functions.invoke("spend-cap-withdraw", {
-        body: { ad_account_id: account.id, amount: 0.001 },
+        body: { ad_account_id: account.id, amount: 1, dry_run: true },
       });
       if (data?.max_withdrawable !== undefined) {
         setWithdrawMeta({
