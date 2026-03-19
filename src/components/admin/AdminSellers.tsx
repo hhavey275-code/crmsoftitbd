@@ -460,14 +460,14 @@ export function AdminSellers() {
                       const typeColor = t.type === "usdt_received" ? "text-blue-600" : t.type === "bdt_payment" ? "text-green-600" : "text-orange-500";
                       return (
                         <tr key={t.id} className="hover:bg-muted/30">
-                          <td className="border border-border px-3 py-1.5 whitespace-nowrap">{format(new Date(t.created_at), "MMM d, yyyy")}</td>
-                          <td className={cn("border border-border px-3 py-1.5 font-medium", typeColor)}>{typeLabel}</td>
-                          <td className="border border-border px-3 py-1.5 text-right">{Number(t.bdt_amount) > 0 ? `৳${Number(t.bdt_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "—"}</td>
-                          <td className="border border-border px-3 py-1.5 text-right">{Number(t.usdt_amount) > 0 ? `$${Number(t.usdt_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "—"}</td>
-                          <td className="border border-border px-3 py-1.5 text-right">{Number(t.rate) > 0 ? Number(t.rate).toFixed(1) : "—"}</td>
-                          <td className="border border-border px-3 py-1.5 text-right">{convertedBdt > 0 ? `৳${convertedBdt.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "—"}</td>
-                          <td className="border border-border px-3 py-1.5 max-w-[140px] truncate font-sans">{t.description || "—"}</td>
-                          <td className="border border-border px-3 py-1.5 font-sans">
+                          <td className="border border-border px-3 py-1.5 whitespace-nowrap font-medium">{format(new Date(t.created_at), "MMM d, yyyy")}</td>
+                          <td className={cn("border border-border px-3 py-1.5 font-bold", typeColor)}>{typeLabel}</td>
+                          <td className="border border-border px-3 py-1.5 text-right font-semibold">{Number(t.bdt_amount) > 0 ? `৳${Number(t.bdt_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "—"}</td>
+                          <td className="border border-border px-3 py-1.5 text-right font-semibold">{Number(t.usdt_amount) > 0 ? `$${Number(t.usdt_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "—"}</td>
+                          <td className="border border-border px-3 py-1.5 text-right font-semibold">{Number(t.rate) > 0 ? Number(t.rate).toFixed(1) : "—"}</td>
+                          <td className="border border-border px-3 py-1.5 text-right font-semibold">{convertedBdt > 0 ? `৳${convertedBdt.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "—"}</td>
+                          <td className="border border-border px-3 py-1.5 max-w-[140px] truncate font-medium">{t.description || "—"}</td>
+                          <td className="border border-border px-3 py-1.5 font-medium">
                             {t.proof_url ? (
                               <button onClick={() => setProofUrl(t.proof_url)} className="text-primary hover:underline flex items-center gap-1">
                                 <ImageIcon className="h-3.5 w-3.5" /> View
