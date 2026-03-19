@@ -552,52 +552,53 @@ export default function ClientDetailPage() {
           </div>
         )}
 
-        {/* Date Range Filter */}
-        {!isMobile && (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium text-muted-foreground">Period:</span>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className={cn("w-[140px] justify-start text-left font-normal", !dateFrom && "text-muted-foreground")}>
-                  <CalendarIcon className="mr-1 h-3 w-3" />
-                  {dateFrom ? format(dateFrom, "MMM d, yyyy") : "From"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className="p-3 pointer-events-auto" />
-              </PopoverContent>
-            </Popover>
-            <span className="text-muted-foreground">—</span>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className={cn("w-[140px] justify-start text-left font-normal", !dateTo && "text-muted-foreground")}>
-                  <CalendarIcon className="mr-1 h-3 w-3" />
-                  {dateTo ? format(dateTo, "MMM d, yyyy") : "To"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className="p-3 pointer-events-auto" />
-              </PopoverContent>
-            </Popover>
-          </div>
-        )}
-
         {/* Main Tabs */}
         <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList className={cn("bg-muted/60 p-1 rounded-lg", isMobile && "w-full")}>
-            <TabsTrigger value="info" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "flex-1 text-xs")}>
-              <User className="h-3.5 w-3.5" />
-              {isMobile ? "Info" : "Client Info"}
-            </TabsTrigger>
-            <TabsTrigger value="overview" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "flex-1 text-xs")}>
-              <LayoutDashboard className="h-3.5 w-3.5" />
-              Overview
-            </TabsTrigger>
-            <TabsTrigger value="transactions" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "flex-1 text-xs")}>
-              <Receipt className="h-3.5 w-3.5" />
-              {isMobile ? "Txns" : "Transactions"}
-            </TabsTrigger>
-          </TabsList>
+          <div className={cn("flex items-center gap-3 flex-wrap", isMobile && "flex-col items-stretch gap-2")}>
+            {/* Date Range Filter inline */}
+            {!isMobile && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-muted-foreground">Period:</span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className={cn("w-[140px] justify-start text-left font-normal", !dateFrom && "text-muted-foreground")}>
+                      <CalendarIcon className="mr-1 h-3 w-3" />
+                      {dateFrom ? format(dateFrom, "MMM d, yyyy") : "From"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className="p-3 pointer-events-auto" />
+                  </PopoverContent>
+                </Popover>
+                <span className="text-muted-foreground">—</span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className={cn("w-[140px] justify-start text-left font-normal", !dateTo && "text-muted-foreground")}>
+                      <CalendarIcon className="mr-1 h-3 w-3" />
+                      {dateTo ? format(dateTo, "MMM d, yyyy") : "To"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className="p-3 pointer-events-auto" />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+            <TabsList className={cn("bg-muted/60 p-1 rounded-lg", isMobile && "w-full")}>
+              <TabsTrigger value="info" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "flex-1 text-xs")}>
+                <User className="h-3.5 w-3.5" />
+                {isMobile ? "Info" : "Client Info"}
+              </TabsTrigger>
+              <TabsTrigger value="overview" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "flex-1 text-xs")}>
+                <LayoutDashboard className="h-3.5 w-3.5" />
+                Overview
+              </TabsTrigger>
+              <TabsTrigger value="transactions" className={cn("gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm", isMobile && "flex-1 text-xs")}>
+                <Receipt className="h-3.5 w-3.5" />
+                {isMobile ? "Txns" : "Transactions"}
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Client Info Tab */}
           <TabsContent value="info" className="mt-0">
