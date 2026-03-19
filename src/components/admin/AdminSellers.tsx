@@ -480,9 +480,9 @@ export function AdminSellers() {
                     {(!sellerTxns || sellerTxns.length === 0) && (
                       <tr><td colSpan={8} className="border border-border text-center text-muted-foreground py-8">No transactions</td></tr>
                     )}
-                    )}
-                  </TableBody>
-                </Table>
+                  </tbody>
+                </table>
+              </div>
               </div>
             </CardContent>
           </Card>
