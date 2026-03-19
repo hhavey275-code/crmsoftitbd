@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { DollarSign, Banknote, ImageIcon, UserCog, ArrowLeftRight, Landmark, X } from "lucide-react";
+import { DollarSign, Banknote, ImageIcon, UserCog, ArrowLeftRight, Landmark, X, ScanLine, Loader2, Upload } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -29,6 +29,107 @@ export function AdminSellers() {
   const [proofUrl, setProofUrl] = useState<string | null>(null);
   const [showAssignBank, setShowAssignBank] = useState(false);
   const [selectedBankId, setSelectedBankId] = useState("");
+
+  // OCR states
+  const [showOcrDialog, setShowOcrDialog] = useState(false);
+  const [ocrUploading, setOcrUploading] = useState(false);
+  const [ocrProcessing, setOcrProcessing] = useState(false);
+  const [ocrImageUrl, setOcrImageUrl] = useState<string | null>(null);
+  const [ocrPreviewUrl, setOcrPreviewUrl] = useState<string | null>(null);
+  const [ocrResult, setOcrResult] = useState<{ bdt_amount: string; date: string; reference: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const resetOcr = () => {
+    setOcrUploading(false);
+    setOcrProcessing(false);
+    setOcrImageUrl(null);
+    setOcrPreviewUrl(null);
+    setOcrResult(null);
+  };
+
+  const uploadOcrImage = useCallback(async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload an image file");
+      return;
+    }
+    setOcrUploading(true);
+    try {
+      const ext = file.name.split(".").pop() || "png";
+      const path = `ocr-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("payment-proofs").upload(path, file);
+      if (upErr) throw upErr;
+      const { data: urlData } = supabase.storage.from("payment-proofs").getPublicUrl(path);
+      const publicUrl = urlData.publicUrl;
+      setOcrImageUrl(publicUrl);
+      setOcrPreviewUrl(URL.createObjectURL(file));
+
+      // Now call OCR
+      setOcrUploading(false);
+      setOcrProcessing(true);
+      const { data, error } = await supabase.functions.invoke("ocr-seller-payment", {
+        body: { image_url: publicUrl },
+      });
+      if (error) throw error;
+      setOcrResult({
+        bdt_amount: data.bdt_amount?.toString() || "",
+        date: data.date || "",
+        reference: data.reference || "",
+      });
+    } catch (e: any) {
+      toast.error(e.message || "Upload/OCR failed");
+      resetOcr();
+    } finally {
+      setOcrUploading(false);
+      setOcrProcessing(false);
+    }
+  }, []);
+
+  // Handle Ctrl+V paste
+  useEffect(() => {
+    if (!showOcrDialog) return;
+    const handler = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (file) uploadOcrImage(file);
+          break;
+        }
+      }
+    };
+    document.addEventListener("paste", handler);
+    return () => document.removeEventListener("paste", handler);
+  }, [showOcrDialog, uploadOcrImage]);
+
+  // Save OCR result as seller transaction
+  const saveOcrMutation = useMutation({
+    mutationFn: async () => {
+      if (!ocrResult || !selectedSeller || !ocrImageUrl) throw new Error("Missing data");
+      const bdtAmount = Number(ocrResult.bdt_amount);
+      if (!bdtAmount || bdtAmount <= 0) throw new Error("Enter a valid BDT amount");
+      const entry: any = {
+        seller_id: selectedSeller.user_id,
+        type: "bdt_payment",
+        bdt_amount: bdtAmount,
+        usdt_amount: 0,
+        rate: 0,
+        description: ocrResult.reference ? `TrxID: ${ocrResult.reference}` : undefined,
+        proof_url: ocrImageUrl,
+      };
+      if (ocrResult.date) entry.created_at = new Date(ocrResult.date).toISOString();
+      const { error } = await (supabase as any).from("seller_transactions").insert(entry);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("BDT Payment recorded from screenshot!");
+      logSystemAction("OCR BDT Payment", `Seller: ${selectedSeller.full_name || selectedSeller.email}, Amount: ৳${ocrResult?.bdt_amount}`, user?.id, user?.email);
+      queryClient.invalidateQueries({ queryKey: ["admin-seller-txns", selectedSeller.user_id] });
+      setShowOcrDialog(false);
+      resetOcr();
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
 
   // Fetch all sellers (users with seller role)
   const { data: sellers } = useQuery({
@@ -284,6 +385,9 @@ export function AdminSellers() {
               <Button size="sm" variant="outline" onClick={() => { setEntryType("bdt_payment"); setShowEntryDialog(true); }}>
                 <Banknote className="h-4 w-4 mr-1" /> Record BDT Payment
               </Button>
+              <Button size="sm" variant="outline" onClick={() => { setShowOcrDialog(true); resetOcr(); }}>
+                <ScanLine className="h-4 w-4 mr-1" /> OCR BDT Payment
+              </Button>
             </div>
           </div>
 
@@ -453,35 +557,74 @@ export function AdminSellers() {
         </DialogContent>
       </Dialog>
 
-      {/* Assign Bank Dialog */}
-      <Dialog open={showAssignBank} onOpenChange={setShowAssignBank}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Assign Bank to {selectedSeller?.full_name || selectedSeller?.email}</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label>Select Bank</Label>
-              <Select value={selectedBankId} onValueChange={setSelectedBankId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose an unassigned bank..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {unassignedBanks?.map((b: any) => (
-                    <SelectItem key={b.id} value={b.id}>
-                      {b.bank_name} — {b.account_name} (****{b.account_number?.slice(-4)})
-                    </SelectItem>
-                  ))}
-                  {(!unassignedBanks || unassignedBanks.length === 0) && (
-                    <SelectItem value="_none" disabled>No unassigned banks available</SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
+      {/* OCR BDT Payment Dialog */}
+      <Dialog open={showOcrDialog} onOpenChange={(v) => { setShowOcrDialog(v); if (!v) resetOcr(); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>OCR BDT Payment</DialogTitle></DialogHeader>
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
+            accept="image/*"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) uploadOcrImage(f);
+              e.target.value = "";
+            }}
+          />
+
+          {!ocrPreviewUrl && !ocrUploading && (
+            <div
+              className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-colors"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Click to upload or <strong>Ctrl+V</strong> to paste screenshot</p>
             </div>
-          </div>
+          )}
+
+          {ocrUploading && (
+            <div className="flex items-center justify-center py-8 gap-2">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span className="text-sm text-muted-foreground">Uploading...</span>
+            </div>
+          )}
+
+          {ocrPreviewUrl && (
+            <img src={ocrPreviewUrl} alt="Payment screenshot" className="w-full rounded-md max-h-48 object-contain border" />
+          )}
+
+          {ocrProcessing && (
+            <div className="flex items-center justify-center py-4 gap-2">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span className="text-sm text-muted-foreground">Extracting data with AI...</span>
+            </div>
+          )}
+
+          {ocrResult && (
+            <div className="space-y-3">
+              <div>
+                <Label>BDT Amount</Label>
+                <Input type="number" value={ocrResult.bdt_amount} onChange={(e) => setOcrResult({ ...ocrResult, bdt_amount: e.target.value })} />
+              </div>
+              <div>
+                <Label>Transaction Date</Label>
+                <Input type="date" value={ocrResult.date} onChange={(e) => setOcrResult({ ...ocrResult, date: e.target.value })} />
+              </div>
+              <div>
+                <Label>Reference / TrxID</Label>
+                <Input value={ocrResult.reference} onChange={(e) => setOcrResult({ ...ocrResult, reference: e.target.value })} />
+              </div>
+            </div>
+          )}
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAssignBank(false)}>Cancel</Button>
-            <Button onClick={() => assignBankMutation.mutate()} disabled={!selectedBankId || assignBankMutation.isPending}>
-              {assignBankMutation.isPending ? "Assigning..." : "Assign Bank"}
-            </Button>
+            <Button variant="outline" onClick={() => { setShowOcrDialog(false); resetOcr(); }}>Cancel</Button>
+            {ocrResult && (
+              <Button onClick={() => saveOcrMutation.mutate()} disabled={saveOcrMutation.isPending}>
+                {saveOcrMutation.isPending ? "Saving..." : "Confirm & Save"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
