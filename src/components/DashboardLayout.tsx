@@ -3,6 +3,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { NotificationBell } from "@/components/NotificationBell";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { ChatWidget } from "@/components/ChatWidget";
 import { useAuth } from "@/contexts/AuthContext";
 import { Zap } from "lucide-react";
@@ -48,6 +49,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               ) : null}
             </div>
             <div className="flex items-center gap-2">
+              <ThemeToggle />
               <NotificationBell />
             </div>
           </header>

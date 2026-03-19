@@ -17,6 +17,7 @@ import {
   Store,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useSidebarBadges } from "@/hooks/useSidebarBadges";
@@ -174,6 +175,10 @@ export function AppSidebar() {
             <p className="text-xs text-sidebar-muted truncate">{profile.email}</p>
           </div>
         )}
+        <div className={collapsed ? "flex justify-center mb-2" : "flex items-center gap-2 mb-2"}>
+          <ThemeToggle />
+          {!collapsed && <span className="text-sm text-sidebar-foreground">Theme</span>}
+        </div>
         <Button
           variant="ghost"
           className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-destructive"
