@@ -101,6 +101,16 @@ Deno.serve(async (req) => {
 
     const maxWithdrawable = Math.max(0, currentSpendCapDollars - realAmountSpentDollars);
 
+    // --- Dry run: return meta only, no actual withdraw ---
+    if (dry_run) {
+      return json({
+        dry_run: true,
+        real_amount_spent: realAmountSpentDollars,
+        current_spend_cap: currentSpendCapDollars,
+        max_withdrawable: maxWithdrawable,
+      });
+    }
+
     if (amount > maxWithdrawable + 0.01) {
       return json({
         error: `Cannot withdraw $${amount}. Maximum withdrawable is $${maxWithdrawable.toFixed(2)} (spend cap $${currentSpendCapDollars.toFixed(2)} - spent $${realAmountSpentDollars.toFixed(2)})`,
