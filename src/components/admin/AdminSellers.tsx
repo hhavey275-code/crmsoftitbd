@@ -30,6 +30,10 @@ export function AdminSellers() {
   const [showAssignBank, setShowAssignBank] = useState(false);
   const [selectedBankId, setSelectedBankId] = useState("");
 
+  // Inline edit states
+  const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
+  const [editValue, setEditValue] = useState("");
+
   // OCR states
   const [showOcrDialog, setShowOcrDialog] = useState(false);
   const [ocrUploading, setOcrUploading] = useState(false);
