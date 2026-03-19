@@ -335,6 +335,96 @@ export function AdminSellers() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  // Delete transaction
+  const deleteTxnMutation = useMutation({
+    mutationFn: async (txnId: string) => {
+      const { error } = await (supabase as any).from("seller_transactions").delete().eq("id", txnId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Transaction deleted!");
+      queryClient.invalidateQueries({ queryKey: ["admin-seller-txns", selectedSeller.user_id] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  // Inline update transaction
+  const updateTxnMutation = useMutation({
+    mutationFn: async ({ id, field, value }: { id: string; field: string; value: any }) => {
+      const { error } = await (supabase as any).from("seller_transactions").update({ [field]: value }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-seller-txns", selectedSeller.user_id] });
+      setEditingCell(null);
+    },
+    onError: (e: any) => { toast.error(e.message); setEditingCell(null); },
+  });
+
+  // Add empty row
+  const addEmptyRowMutation = useMutation({
+    mutationFn: async (type: string) => {
+      const entry = {
+        seller_id: selectedSeller.user_id,
+        type,
+        bdt_amount: 0,
+        usdt_amount: 0,
+        rate: 0,
+        description: "",
+      };
+      const { error } = await (supabase as any).from("seller_transactions").insert(entry);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("New row added!");
+      queryClient.invalidateQueries({ queryKey: ["admin-seller-txns", selectedSeller.user_id] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const startEdit = (id: string, field: string, currentValue: any) => {
+    setEditingCell({ id, field });
+    setEditValue(String(currentValue ?? ""));
+  };
+
+  const commitEdit = () => {
+    if (!editingCell) return;
+    const { id, field } = editingCell;
+    let finalValue: any = editValue;
+    if (["bdt_amount", "usdt_amount", "rate"].includes(field)) {
+      finalValue = Number(editValue) || 0;
+    }
+    updateTxnMutation.mutate({ id, field, value: finalValue });
+  };
+
+  const renderEditableCell = (txn: any, field: string, displayValue: string, className?: string) => {
+    const isEditing = editingCell?.id === txn.id && editingCell?.field === field;
+    if (isEditing) {
+      return (
+        <td className="border border-border px-1 py-0.5 text-center">
+          <input
+            autoFocus
+            className="w-full bg-transparent text-center text-[13px] font-semibold outline-none border-b-2 border-primary px-1 py-0.5"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={commitEdit}
+            onKeyDown={(e) => { if (e.key === "Enter") commitEdit(); if (e.key === "Escape") setEditingCell(null); }}
+            style={{ fontFamily: "'Google Sans', 'Roboto', 'Arial', sans-serif" }}
+          />
+        </td>
+      );
+    }
+    return (
+      <td
+        className={cn("border border-border px-3 py-1.5 text-center cursor-pointer hover:bg-primary/10 transition-colors", className)}
+        onClick={() => startEdit(txn.id, field, field === "description" ? (txn[field] || "") : (txn[field] || 0))}
+        title="Click to edit"
+      >
+        {displayValue}
+      </td>
+    );
+  };
+
   return (
     <div className="space-y-4 md:space-y-6 relative">
       <div className="flex items-center justify-between">
