@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { logSystemAction } from "@/lib/systemLog";
 import { format } from "date-fns";
 
-const emptyForm = { bank_name: "", account_name: "", account_number: "", branch: "", routing_number: "", telegram_group_id: "" };
+const emptyForm = { bank_name: "", account_name: "", account_number: "", branch: "", routing_number: "", telegram_group_id: "", seller_id: "" };
 
 function BankStatsDialog({ bankId, bankName, open, onClose }: { bankId: string; bankName: string; open: boolean; onClose: () => void }) {
   const queryClient = useQueryClient();
