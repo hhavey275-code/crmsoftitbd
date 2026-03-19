@@ -288,7 +288,7 @@ export default function AdAccountDetailPage() {
               <CardTitle className="text-base">Spend Overview</CardTitle>
             </CardHeader>
             <CardContent>
-              <SpendProgressBar amountSpent={Number(account.amount_spent)} spendCap={Number(account.spend_cap)} />
+              <SpendProgressBar amountSpent={Number(account.amount_spent)} spendCap={Number(account.spend_cap)} balanceAfterTopup={Number((account as any).balance_after_topup ?? 0)} />
               <div className="mt-4">
                 <Button variant="outline" size="sm" asChild>
                   <a

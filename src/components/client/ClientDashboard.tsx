@@ -544,7 +544,7 @@ export function ClientDashboard() {
                             </a>
                           </TableCell>
                           <TableCell>
-                            <SpendProgressBar amountSpent={Number(account.amount_spent)} spendCap={Number(account.spend_cap)} />
+                            <SpendProgressBar amountSpent={Number(account.amount_spent)} spendCap={Number(account.spend_cap)} balanceAfterTopup={Number((account as any).balance_after_topup ?? 0)} />
                           </TableCell>
                           <TableCell><StatusBadge status={account.status} /></TableCell>
                           <TableCell className="text-right">

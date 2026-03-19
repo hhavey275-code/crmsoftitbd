@@ -1062,7 +1062,7 @@ export default function ClientDetailPage() {
                                   </div>
                                 </TableCell>
                                 <TableCell onClick={(e) => e.stopPropagation()}>
-                                  <SpendProgressBar amountSpent={Number(acc.amount_spent)} spendCap={Number(acc.spend_cap)} />
+                                  <SpendProgressBar amountSpent={Number(acc.amount_spent)} spendCap={Number(acc.spend_cap)} balanceAfterTopup={Number((acc as any).balance_after_topup ?? 0)} />
                                 </TableCell>
                                 <TableCell><StatusBadge status={acc.status} /></TableCell>
                                 <TableCell className="whitespace-nowrap">

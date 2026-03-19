@@ -205,7 +205,7 @@ export function AdminTikTokAccounts() {
                     <TableCell className="text-muted-foreground">{acc.account_id}</TableCell>
                     <TableCell>{(acc as any).business_managers?.name ?? "—"}</TableCell>
                     <TableCell>
-                      <SpendProgressBar amountSpent={acc.amount_spent} spendCap={acc.spend_cap} />
+                      <SpendProgressBar amountSpent={acc.amount_spent} spendCap={acc.spend_cap} balanceAfterTopup={Number((acc as any).balance_after_topup ?? 0)} />
                     </TableCell>
                     <TableCell><StatusBadge status={acc.status} /></TableCell>
                     <TableCell>
