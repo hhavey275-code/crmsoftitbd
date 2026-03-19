@@ -65,10 +65,9 @@ Deno.serve(async (req) => {
       .from("user_roles")
       .select("role")
       .eq("user_id", callerId)
-      .eq("role", "admin")
-      .single();
+      .in("role", ["admin", "superadmin"]);
 
-    const isAdmin = !!roleData;
+    const isAdmin = (roleData ?? []).length > 0;
 
     const { ad_account_id, new_name } = await req.json();
     if (!ad_account_id || !new_name || !new_name.trim()) {
