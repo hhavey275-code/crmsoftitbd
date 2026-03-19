@@ -789,7 +789,7 @@ export default function ClientDetailPage() {
                     const ids = adAccounts.map((a: any) => a.id);
                     const { chunkedMetaSync } = await import("@/lib/chunkedMetaSync");
                     await chunkedMetaSync(ids);
-                    await refetchInsights();
+                    await Promise.all([refetchInsights(), refetchAdAccounts()]);
                     toast.success("Insights updated from Meta!");
                   } catch { toast.error("Failed to update from Meta"); } finally { setInsightsLoading(false); }
                 }}
