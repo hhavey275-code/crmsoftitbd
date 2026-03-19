@@ -540,7 +540,15 @@ export function AdminSellers() {
                     <CardContent className="p-3 space-y-1.5" style={{ fontFamily: "'Google Sans', 'Roboto', 'Arial', sans-serif" }}>
                       <div className="flex items-center justify-between">
                         <span className={cn("text-sm font-bold", typeColor)}>{typeLabel}</span>
-                        <span className="text-xs text-muted-foreground font-medium">{format(new Date(t.created_at), "MMM d, yyyy")}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground font-medium">{format(new Date(t.created_at), "MMM d, yyyy")}</span>
+                          <button
+                            onClick={() => { if (confirm("Delete this entry?")) deleteTxnMutation.mutate(t.id); }}
+                            className="text-muted-foreground hover:text-destructive p-0.5"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </div>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[13px]">
                         <div className="text-center">
