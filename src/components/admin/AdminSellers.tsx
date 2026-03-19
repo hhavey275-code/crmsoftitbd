@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { DollarSign, Banknote, ImageIcon, UserCog, ArrowLeftRight } from "lucide-react";
+import { DollarSign, Banknote, ImageIcon, UserCog, ArrowLeftRight, Landmark, X } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -27,6 +27,8 @@ export function AdminSellers() {
   const [entryForm, setEntryForm] = useState({ usdt_amount: "", bdt_amount: "", rate: "", description: "" });
   const [showEntryDialog, setShowEntryDialog] = useState(false);
   const [proofUrl, setProofUrl] = useState<string | null>(null);
+  const [showAssignBank, setShowAssignBank] = useState(false);
+  const [selectedBankId, setSelectedBankId] = useState("");
 
   // Fetch all sellers (users with seller role)
   const { data: sellers } = useQuery({
@@ -78,6 +80,58 @@ export function AdminSellers() {
         .eq("status", "active");
       return (data as any[]) ?? [];
     },
+  });
+
+  // Fetch unassigned active banks
+  const { data: unassignedBanks } = useQuery({
+    queryKey: ["unassigned-banks", selectedSeller?.user_id],
+    enabled: !!selectedSeller,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("bank_accounts")
+        .select("id, bank_name, account_number, account_name")
+        .eq("status", "active")
+        .is("seller_id", null);
+      return (data as any[]) ?? [];
+    },
+  });
+
+  // Assign bank to seller
+  const assignBankMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedBankId || !selectedSeller) throw new Error("Select a bank");
+      const { error } = await supabase
+        .from("bank_accounts")
+        .update({ seller_id: selectedSeller.user_id })
+        .eq("id", selectedBankId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Bank assigned to seller!");
+      logSystemAction("Bank Assigned to Seller", `Bank assigned to ${selectedSeller.full_name || selectedSeller.email}`, user?.id, user?.email);
+      queryClient.invalidateQueries({ queryKey: ["admin-seller-banks", selectedSeller.user_id] });
+      queryClient.invalidateQueries({ queryKey: ["unassigned-banks"] });
+      setShowAssignBank(false);
+      setSelectedBankId("");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  // Unassign bank from seller
+  const unassignBankMutation = useMutation({
+    mutationFn: async (bankId: string) => {
+      const { error } = await supabase
+        .from("bank_accounts")
+        .update({ seller_id: null })
+        .eq("id", bankId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Bank unassigned!");
+      queryClient.invalidateQueries({ queryKey: ["admin-seller-banks", selectedSeller.user_id] });
+      queryClient.invalidateQueries({ queryKey: ["unassigned-banks"] });
+    },
+    onError: (e: any) => toast.error(e.message),
   });
 
   // Calculate totals for selected seller
@@ -221,6 +275,9 @@ export function AdminSellers() {
           <div className="flex items-center justify-between flex-wrap gap-2">
             <h2 className="text-lg font-semibold">{selectedSeller.full_name || selectedSeller.email} — Ledger</h2>
             <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => { setShowAssignBank(true); setSelectedBankId(""); }}>
+                <Landmark className="h-4 w-4 mr-1" /> Assign Bank
+              </Button>
               <Button size="sm" variant="outline" onClick={() => { setEntryType("usdt_received"); setShowEntryDialog(true); }}>
                 <DollarSign className="h-4 w-4 mr-1" /> Record USDT
               </Button>
@@ -265,7 +322,12 @@ export function AdminSellers() {
             <div className="flex flex-wrap gap-2">
               <span className="text-xs text-muted-foreground self-center">Assigned Banks:</span>
               {sellerBanks.map((b: any) => (
-                <span key={b.id} className="text-xs bg-muted px-2 py-1 rounded-md">{b.bank_name} ****{b.account_number?.slice(-4)}</span>
+                <span key={b.id} className="text-xs bg-muted px-2 py-1 rounded-md inline-flex items-center gap-1">
+                  {b.bank_name} ****{b.account_number?.slice(-4)}
+                  <button onClick={() => unassignBankMutation.mutate(b.id)} className="hover:text-destructive ml-0.5" title="Unassign">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
               ))}
             </div>
           )}
@@ -388,6 +450,39 @@ export function AdminSellers() {
       <Dialog open={!!proofUrl} onOpenChange={() => setProofUrl(null)}>
         <DialogContent className="max-w-lg">
           {proofUrl && <img src={proofUrl} alt="Proof" className="w-full rounded-md" />}
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign Bank Dialog */}
+      <Dialog open={showAssignBank} onOpenChange={setShowAssignBank}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Assign Bank to {selectedSeller?.full_name || selectedSeller?.email}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Select Bank</Label>
+              <Select value={selectedBankId} onValueChange={setSelectedBankId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose an unassigned bank..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {unassignedBanks?.map((b: any) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.bank_name} — {b.account_name} (****{b.account_number?.slice(-4)})
+                    </SelectItem>
+                  ))}
+                  {(!unassignedBanks || unassignedBanks.length === 0) && (
+                    <SelectItem value="_none" disabled>No unassigned banks available</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAssignBank(false)}>Cancel</Button>
+            <Button onClick={() => assignBankMutation.mutate()} disabled={!selectedBankId || assignBankMutation.isPending}>
+              {assignBankMutation.isPending ? "Assigning..." : "Assign Bank"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
