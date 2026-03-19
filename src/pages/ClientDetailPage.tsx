@@ -1125,15 +1125,23 @@ export default function ClientDetailPage() {
                                   </div>
                                 </TableCell>
                                 <TableCell onClick={(e) => e.stopPropagation()}>
-                                  <Button
-                                    size="icon"
-                                    variant="default"
-                                    className="h-8 w-8"
-                                    onClick={() => { setSelectedAccountId(acc.id); setTopUpDialogOpen(true); setTopUpAmount(""); }}
-                                    title="Top Up"
-                                  >
-                                    <ArrowUpCircle className="h-4 w-4" />
-                                  </Button>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button size="icon" variant="default" className="h-8 w-8" title="Actions">
+                                        <ChevronDown className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={() => { setSelectedAccountId(acc.id); setTopUpDialogOpen(true); setTopUpAmount(""); }}>
+                                        <ArrowUpCircle className="h-4 w-4 mr-2 text-primary" />
+                                        Top Up
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => openWithdrawDialog(acc.id)}>
+                                        <ArrowDownCircle className="h-4 w-4 mr-2 text-orange-500" />
+                                        Withdraw
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                                 </TableCell>
                               </TableRow>
                               );
