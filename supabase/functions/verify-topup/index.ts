@@ -317,6 +317,28 @@ Deno.serve(async (req) => {
       await forwardProofToTelegram(supabase, proof_url, caption, bank_account_id);
     }
 
+    // Auto-sync to seller ledger if bank has a seller assigned
+    if (bank_account_id) {
+      const { data: bankForSeller } = await supabase
+        .from('bank_accounts')
+        .select('seller_id')
+        .eq('id', bank_account_id)
+        .single();
+      if (bankForSeller?.seller_id) {
+        await supabase.from('seller_transactions').insert({
+          seller_id: bankForSeller.seller_id,
+          type: 'client_topup',
+          bdt_amount: bdtNum,
+          usdt_amount: 0,
+          rate: 0,
+          description: `Client top-up auto-approved — $${amount}`,
+          bank_account_id: bank_account_id,
+          top_up_request_id: request_id,
+          proof_url: proof_url || null,
+        });
+      }
+    }
+
     return new Response(JSON.stringify({ ok: true, auto_approved: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error: any) {
