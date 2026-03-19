@@ -370,7 +370,9 @@ Deno.serve(async (req) => {
     // ============================================
     // STEP 4: Update DB spend cap
     // ============================================
-    await supabase.from("ad_accounts").update({ spend_cap: newSpendCapDollars }).eq("id", ad_account_id);
+    const currentAmountSpent = Number(account.amount_spent);
+    const remainingAfterTopup = newSpendCapDollars - currentAmountSpent;
+    await supabase.from("ad_accounts").update({ spend_cap: newSpendCapDollars, balance_after_topup: remainingAfterTopup }).eq("id", ad_account_id);
 
     // Log success
     await supabase.from("system_logs").insert({

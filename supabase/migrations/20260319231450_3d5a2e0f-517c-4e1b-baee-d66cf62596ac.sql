@@ -1,0 +1,1 @@
+ALTER TABLE ad_accounts ADD COLUMN balance_after_topup NUMERIC DEFAULT 0;
