@@ -297,31 +297,12 @@ async function processAccount(
     const balance = accountData?.balance ? parseFloat(accountData.balance) / 100 : 0;
 
     // ---- Daily Spending Limit ----
-    // Try multiple possible Meta fields and keep the first non-zero value.
-    const fetchDailyCandidate = async (field: string, version = "v24.0") => {
-      try {
-        const res = await fetch(`https://graph.facebook.com/${version}/${actId}?fields=${field}&access_token=${accessToken}`);
-        const data = await res.json();
-        const parsed = extractCurrencyFromPayload(data, field);
-        if (data?.error) {
-          console.log(`${field} error for ${actId}: ${JSON.stringify(data.error)}`);
-        } else {
-          console.log(`${field} raw for ${actId}: ${JSON.stringify(data?.[field])} -> ${parsed}`);
-        }
-        return parsed;
-      } catch {
-        return 0;
-      }
-    };
+    // Prefer active ad-set daily budgets (what users see as daily limit in Ads Manager).
+    let dailySpendLimit = await fetchActiveDailyBudget(actId, accessToken);
 
-    let dailySpendLimit = await fetchDailyCandidate("adtrust_dsl", "v25.0");
-    if (!dailySpendLimit) dailySpendLimit = await fetchDailyCandidate("daily_spend_limit", "v25.0");
-    if (!dailySpendLimit) dailySpendLimit = await fetchDailyCandidate("min_daily_budget", "v24.0");
-
-    // Final fallback: spend_cap
+    // Fallback: account spend cap when ad-set budget is not available.
     if (!dailySpendLimit) {
       dailySpendLimit = extractCurrencyFromPayload(accountData, "spend_cap");
-      console.log(`spend_cap fallback for ${actId}: ${dailySpendLimit}`);
     }
 
     // ---- Billing Threshold ----
