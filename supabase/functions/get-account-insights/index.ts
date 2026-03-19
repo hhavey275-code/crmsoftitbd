@@ -264,48 +264,13 @@ async function processAccount(
 
     const balance = accountData?.balance ? parseFloat(accountData.balance) / 100 : 0;
 
-    // Fetch optional fields independently so one invalid field doesn't break the other
-    let dailySpendLimit = 0;
-    let billingThreshold = 0;
-
-    const fetchOptionalCurrencyField = async (
-      field: string,
-      options?: { path?: string; fieldsExpr?: string }
-    ) => {
-      try {
-        const path = options?.path ?? "";
-        const fieldsExpr = options?.fieldsExpr ?? field;
-        const target = path ? `/${path}` : "";
-        const res = await fetch(
-          `https://graph.facebook.com/v24.0/${actId}${target}?fields=${encodeURIComponent(fieldsExpr)}&access_token=${accessToken}`
-        );
-        const data = await res.json();
-
-        if (data?.error) {
-          console.log(`[optional-meta-field-error] act=${actId} field=${field} expr=${fieldsExpr} path=${path || "account"} code=${data.error.code ?? ""} subcode=${data.error.error_subcode ?? ""} message=${data.error.message ?? ""}`);
-          return 0;
-        }
-
-        return extractCurrencyFromPayload(data, field);
-      } catch {
-        return 0;
-      }
-    };
-
-    [dailySpendLimit, billingThreshold] = await Promise.all([
-      fetchOptionalCurrencyField("daily_spend_limit"),
-      fetchOptionalCurrencyField("min_billing_threshold"),
-    ]);
-
-    // Fallbacks for accounts where primary fields are unavailable
+    // Use currently supported Ad Account fields for limits/threshold-like metrics
+    let dailySpendLimit = normalizeCurrency(extractNumericValue(accountData?.min_daily_budget));
     if (!dailySpendLimit) {
-      dailySpendLimit = await fetchOptionalCurrencyField("adtrust_dsl");
+      dailySpendLimit = normalizeCurrency(extractNumericValue(accountData?.spend_cap));
     }
-    if (!billingThreshold) {
-      billingThreshold = await fetchOptionalCurrencyField("threshold_amount", {
-        fieldsExpr: "adspaymentcycle{threshold_amount}",
-      });
-    }
+
+    let billingThreshold = normalizeCurrency(extractNumericValue(accountData?.min_campaign_group_spend_cap));
 
     let adAccountUpdate: any = undefined;
     if (!isSingleDate && !isDateRange && accountData?.amount_spent !== undefined) {
