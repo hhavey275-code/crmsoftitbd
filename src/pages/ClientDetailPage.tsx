@@ -25,7 +25,7 @@ import { toast } from "sonner";
 import {
   User, Building2, Phone, CalendarDays, Wallet, MonitorSmartphone,
   CheckCircle, XCircle, TrendingUp, TrendingDown, DollarSign, CalendarIcon, Save,
-  Plus, Minus, ArrowUpCircle, ArrowDownCircle, CreditCard, Shield, Receipt, ShoppingCart, RefreshCw, ListChecks, Search, LayoutDashboard, FileText, LogIn, AppWindow, ExternalLink, ChevronDown
+  Plus, Minus, ArrowUpCircle, CreditCard, Shield, Receipt, ShoppingCart, RefreshCw, ListChecks, Search, LayoutDashboard, FileText, LogIn, AppWindow, ExternalLink, Loader2
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
