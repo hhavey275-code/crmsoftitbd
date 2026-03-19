@@ -17,7 +17,6 @@ import { cn } from "@/lib/utils";
 
 interface InsightsData {
   balance: number;
-  billing_threshold: number;
   cards: { id: string; display_string: string; type: number }[];
   updated_at?: string;
 }
