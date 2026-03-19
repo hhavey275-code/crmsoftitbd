@@ -90,6 +90,35 @@ async function fetchActiveCampaignCount(actId: string, accessToken: string): Pro
   }
 }
 
+async function fetchActiveDailyBudget(actId: string, accessToken: string): Promise<number> {
+  try {
+    const filterParam = encodeURIComponent(JSON.stringify([{"field":"effective_status","operator":"IN","value":["ACTIVE"]}]));
+    let url = `https://graph.facebook.com/v24.0/${actId}/adsets?fields=daily_budget&filtering=${filterParam}&limit=200&access_token=${accessToken}`;
+    let total = 0;
+    let pageGuard = 0;
+
+    while (url && pageGuard < 5) {
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data?.error) return 0;
+
+      for (const row of data?.data ?? []) {
+        const raw = extractNumericValue(row?.daily_budget);
+        if (raw !== null && raw > 0) {
+          total += normalizeCurrency(raw);
+        }
+      }
+
+      url = data?.paging?.next ?? "";
+      pageGuard += 1;
+    }
+
+    return Number(total.toFixed(2));
+  } catch {
+    return 0;
+  }
+}
+
 // Check for Meta API rate limit errors
 function checkRateLimit(data: any): number | null {
   if (data?.error?.code === 17 || data?.error?.code === 32 || data?.error?.code === 4) return data.error.code;
