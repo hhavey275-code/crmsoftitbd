@@ -290,27 +290,30 @@ export default function ClientDetailPage() {
     onError: (err: any) => toast.error(friendlyEdgeError(err)),
   });
 
-  const openWithdrawDialog = async (accountId: string) => {
-    setWithdrawAccountId(accountId);
+  const fetchWithdrawMeta = async (accountId: string) => {
     setWithdrawAmount("");
-    setWithdrawMaxInfo(null);
-    setWithdrawDialogOpen(true);
-    setFetchingWithdrawInfo(true);
+    setWithdrawMeta(null);
+    setFetchingWithdrawMeta(true);
     try {
       const { data, error } = await supabase.functions.invoke("spend-cap-withdraw", {
         body: { ad_account_id: accountId, amount: 1, dry_run: true },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      setWithdrawMaxInfo({
+      setWithdrawMeta({
         max_withdrawable: data.max_withdrawable,
         current_spend_cap: data.current_spend_cap,
         real_amount_spent: data.real_amount_spent,
       });
     } catch (err: any) {
-      toast.error(friendlyEdgeError(err));
+      const acc = adAccounts?.find((a: any) => a.id === accountId);
+      setWithdrawMeta({
+        real_amount_spent: Number(acc?.amount_spent ?? 0),
+        current_spend_cap: Number(acc?.spend_cap ?? 0),
+        max_withdrawable: Math.max(0, Number(acc?.spend_cap ?? 0) - Number(acc?.amount_spent ?? 0)),
+      });
     } finally {
-      setFetchingWithdrawInfo(false);
+      setFetchingWithdrawMeta(false);
     }
   };
 
@@ -319,7 +322,7 @@ export default function ClientDetailPage() {
       const amt = parseFloat(withdrawAmount);
       if (!amt || amt <= 0) throw new Error("Invalid amount");
       const { data, error } = await supabase.functions.invoke("spend-cap-withdraw", {
-        body: { ad_account_id: withdrawAccountId, amount: amt },
+        body: { ad_account_id: selectedAccountId, amount: amt },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -327,10 +330,11 @@ export default function ClientDetailPage() {
     },
     onSuccess: (data) => {
       toast.success(`Withdrawn! Cap: $${Number(data.old_spend_cap).toLocaleString()} → $${Number(data.new_spend_cap).toLocaleString()}`);
-      setWithdrawDialogOpen(false);
-      setWithdrawAccountId("");
+      setTopUpDialogOpen(false);
+      setSelectedAccountId("");
       setWithdrawAmount("");
-      setWithdrawMaxInfo(null);
+      setWithdrawMeta(null);
+      setDialogTab("topup");
       invalidateAll();
     },
     onError: (err: any) => toast.error(friendlyEdgeError(err)),
