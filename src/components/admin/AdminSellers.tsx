@@ -483,7 +483,6 @@ export function AdminSellers() {
                   </tbody>
                 </table>
               </div>
-              </div>
             </CardContent>
           </Card>
         </div>
