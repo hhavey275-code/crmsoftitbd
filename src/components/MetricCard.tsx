@@ -21,7 +21,7 @@ export function MetricCard({ title, value, subtitle, icon: Icon, iconBg, iconCol
   const isSmall = size === "sm" || isXs;
 
   return (
-    <Card className={cn("bg-card border border-border/60 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_2px_6px_rgba(0,0,0,0.06)] transition-shadow duration-200", className)}>
+    <Card className={cn("bg-card border border-border/60 shadow-[0_1px_2px_rgba(0,0,0,0.04)] dark:shadow-[0_1px_2px_rgba(0,0,0,0.2)] hover:shadow-[0_2px_6px_rgba(0,0,0,0.06)] dark:hover:shadow-[0_2px_6px_rgba(0,0,0,0.3)] transition-shadow duration-200", className)}>
       <CardContent className={isXs ? "p-2" : isSmall ? "p-3" : "p-5"}>
         <div className={cn("flex items-center", isXs ? "gap-2" : "gap-3")}>
           <div className={cn("flex shrink-0 items-center justify-center rounded-lg", isXs ? "h-7 w-7" : isSmall ? "h-8 w-8" : "h-10 w-10", iconBg || "bg-primary/10")}>
