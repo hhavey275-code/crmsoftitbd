@@ -17,7 +17,6 @@ import { cn } from "@/lib/utils";
 
 interface InsightsData {
   balance: number;
-  billing_threshold: number;
   cards: { id: string; display_string: string; type: number }[];
   updated_at?: string;
 }
@@ -268,14 +267,6 @@ export default function BillingsPage() {
                         <span className="text-muted-foreground">Balance: </span>
                         <span className="font-semibold text-foreground">${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
-                      <div className="text-xs">
-                        <span className="text-muted-foreground">Threshold: </span>
-                        <span className="font-semibold text-foreground">
-                          {Number((ins as InsightsData)?.billing_threshold ?? 0) > 0
-                            ? `$${Number((ins as InsightsData).billing_threshold).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                            : "—"}
-                        </span>
-                      </div>
                       {ins?.cards?.[0] && (
                         <div className="flex items-center gap-1">
                           <CardBrandIcon displayString={ins.cards[0].display_string} size="xs" />
@@ -347,7 +338,7 @@ export default function BillingsPage() {
                             {sortDir === "asc" ? <ArrowUp className="h-3 w-3 ml-1" /> : <ArrowDown className="h-3 w-3 ml-1" />}
                           </button>
                         </TableHead>
-                        <TableHead className="text-right w-[110px]">Threshold</TableHead>
+                        
                         <TableHead>Status</TableHead>
                         <TableHead>Payment</TableHead>
                         <TableHead className="w-[80px]"></TableHead>
@@ -372,9 +363,6 @@ export default function BillingsPage() {
                             </TableCell>
                             <TableCell className="py-2.5 text-right font-semibold text-sm">
                               ${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </TableCell>
-                            <TableCell className="py-2.5 text-right text-sm">
-                              {ins?.billing_threshold ? `$${Number(ins.billing_threshold).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
                             </TableCell>
                             <TableCell className="py-2.5">
                               <StatusBadge status={acc.status} />
