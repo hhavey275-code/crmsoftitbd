@@ -212,6 +212,18 @@ export function AdminBanks() {
     },
   });
 
+  // Fetch sellers for bank assignment
+  const { data: sellers } = useQuery({
+    queryKey: ["admin-sellers-list"],
+    queryFn: async () => {
+      const { data: roles } = await (supabase as any).from("user_roles").select("user_id").eq("role", "seller");
+      if (!roles?.length) return [];
+      const sellerIds = roles.map((r: any) => r.user_id);
+      const { data: profs } = await supabase.from("profiles").select("user_id, full_name, email").in("user_id", sellerIds);
+      return (profs as any[]) ?? [];
+    },
+  });
+
   const { data: clientBanks } = useQuery({
     queryKey: ["admin-client-banks"],
     queryFn: async () => {
