@@ -491,7 +491,7 @@ export function ClientAdAccounts() {
 
                       {/* Spend progress */}
                       <div className="mt-2" onClick={(e) => e.stopPropagation()}>
-                        <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} />
+                        <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} balanceAfterTopup={Number((a as any).balance_after_topup ?? 0)} />
                       </div>
 
                       {/* Insights row */}
