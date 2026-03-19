@@ -592,6 +592,7 @@ export function AdminSellers() {
                         <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Converted BDT</th>
                         <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Note</th>
                         <th className="border border-border px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Proof</th>
+                        <th className="border border-border px-2 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap w-10"></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -600,14 +601,14 @@ export function AdminSellers() {
                         const typeLabel = t.type === "usdt_received" ? "USDT Received" : t.type === "bdt_payment" ? "BDT Payment" : "Client Top-Up";
                         const typeColor = t.type === "usdt_received" ? "text-blue-600" : t.type === "bdt_payment" ? "text-green-600" : "text-orange-500";
                         return (
-                          <tr key={t.id} className="hover:bg-muted/30">
+                          <tr key={t.id} className="hover:bg-muted/30 group">
                             <td className="border border-border px-3 py-1.5 text-center whitespace-nowrap font-medium">{format(new Date(t.created_at), "MMM d, yyyy")}</td>
                             <td className={cn("border border-border px-3 py-1.5 text-center font-bold", typeColor)}>{typeLabel}</td>
-                            <td className="border border-border px-3 py-1.5 text-center font-semibold">৳{Number(t.bdt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                            <td className="border border-border px-3 py-1.5 text-center font-semibold">${Number(t.usdt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                            <td className="border border-border px-3 py-1.5 text-center font-semibold">{Number(t.rate || 0).toFixed(1)}</td>
+                            {renderEditableCell(t, "bdt_amount", `৳${Number(t.bdt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, "font-semibold")}
+                            {renderEditableCell(t, "usdt_amount", `$${Number(t.usdt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, "font-semibold")}
+                            {renderEditableCell(t, "rate", Number(t.rate || 0).toFixed(1), "font-semibold")}
                             <td className="border border-border px-3 py-1.5 text-center font-semibold">৳{convertedBdt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                            <td className="border border-border px-3 py-1.5 text-center max-w-[140px] truncate font-medium">{t.description || "—"}</td>
+                            {renderEditableCell(t, "description", t.description || "—", "max-w-[140px] truncate font-medium")}
                             <td className="border border-border px-3 py-1.5 text-center font-medium">
                               {t.proof_url ? (
                                 <button onClick={() => setProofUrl(t.proof_url)} className="text-primary hover:underline inline-flex items-center gap-1 mx-auto">
@@ -615,14 +616,32 @@ export function AdminSellers() {
                                 </button>
                               ) : "—"}
                             </td>
+                            <td className="border border-border px-1 py-1.5 text-center">
+                              <button
+                                onClick={() => { if (confirm("Delete this row?")) deleteTxnMutation.mutate(t.id); }}
+                                className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded"
+                                title="Delete row"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </td>
                           </tr>
                         );
                       })}
                       {(!sellerTxns || sellerTxns.length === 0) && (
-                        <tr><td colSpan={8} className="border border-border text-center text-muted-foreground py-8">No transactions</td></tr>
+                        <tr><td colSpan={9} className="border border-border text-center text-muted-foreground py-8">No transactions</td></tr>
                       )}
                     </tbody>
                   </table>
+                  {/* Add Row Buttons */}
+                  <div className="flex gap-2 p-2 border-t border-border bg-muted/30">
+                    <Button size="sm" variant="ghost" className="text-xs h-7 gap-1" onClick={() => addEmptyRowMutation.mutate("bdt_payment")}>
+                      <Plus className="h-3 w-3" /> BDT Row
+                    </Button>
+                    <Button size="sm" variant="ghost" className="text-xs h-7 gap-1" onClick={() => addEmptyRowMutation.mutate("usdt_received")}>
+                      <Plus className="h-3 w-3" /> USDT Row
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
