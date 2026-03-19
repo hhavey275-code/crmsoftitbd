@@ -90,6 +90,44 @@ async function fetchActiveCampaignCount(actId: string, accessToken: string): Pro
   }
 }
 
+async function fetchBudgetTotalByEdge(actId: string, accessToken: string, edge: "campaigns" | "adsets"): Promise<number> {
+  try {
+    const filterParam = encodeURIComponent(JSON.stringify([{"field":"effective_status","operator":"IN","value":["ACTIVE"]}]));
+    let url = `https://graph.facebook.com/v24.0/${actId}/${edge}?fields=daily_budget&filtering=${filterParam}&limit=200&access_token=${accessToken}`;
+    let total = 0;
+    let pageGuard = 0;
+
+    while (url && pageGuard < 5) {
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data?.error) return 0;
+
+      for (const row of data?.data ?? []) {
+        const raw = extractNumericValue(row?.daily_budget);
+        if (raw !== null && raw > 0) {
+          total += normalizeCurrency(raw);
+        }
+      }
+
+      url = data?.paging?.next ?? "";
+      pageGuard += 1;
+    }
+
+    return Number(total.toFixed(2));
+  } catch {
+    return 0;
+  }
+}
+
+async function fetchActiveDailyBudget(actId: string, accessToken: string): Promise<number> {
+  const [campaignBudgetTotal, adsetBudgetTotal] = await Promise.all([
+    fetchBudgetTotalByEdge(actId, accessToken, "campaigns"),
+    fetchBudgetTotalByEdge(actId, accessToken, "adsets"),
+  ]);
+
+  return Number(Math.max(campaignBudgetTotal, adsetBudgetTotal).toFixed(2));
+}
+
 // Check for Meta API rate limit errors
 function checkRateLimit(data: any): number | null {
   if (data?.error?.code === 17 || data?.error?.code === 32 || data?.error?.code === 4) return data.error.code;
@@ -268,25 +306,22 @@ async function processAccount(
     const balance = accountData?.balance ? parseFloat(accountData.balance) / 100 : 0;
 
     // ---- Daily Spending Limit ----
-    // Try adtrust_dsl separately (may fail for some accounts)
+    // Prefer account-level campaign-group spend cap when available.
     let dailySpendLimit = 0;
     try {
-      const dslRes = await fetch(`https://graph.facebook.com/v24.0/${actId}?fields=adtrust_dsl&access_token=${accessToken}`);
-      const dslData = await dslRes.json();
-      if (dslData?.adtrust_dsl !== undefined && !dslData?.error) {
-        const raw = parseFloat(String(dslData.adtrust_dsl));
-        if (Number.isFinite(raw) && raw > 0) {
-          dailySpendLimit = raw / 100;
-        }
-      }
-    } catch { /* ignore - field not available */ }
-    
-    // Fallback: use spend_cap
-    if (!dailySpendLimit && accountData?.spend_cap) {
-      const sc = parseFloat(String(accountData.spend_cap));
-      if (Number.isFinite(sc) && sc > 0) {
-        dailySpendLimit = sc / 100;
-      }
+      const cgRes = await fetch(`https://graph.facebook.com/v24.0/${actId}?fields=min_campaign_group_spend_cap&access_token=${accessToken}`);
+      const cgData = await cgRes.json();
+      dailySpendLimit = extractCurrencyFromPayload(cgData, "min_campaign_group_spend_cap");
+    } catch { /* ignore */ }
+
+    // Fallback 1: active campaign/ad-set daily budgets.
+    if (!dailySpendLimit) {
+      dailySpendLimit = await fetchActiveDailyBudget(actId, accessToken);
+    }
+
+    // Fallback 2: account spend cap.
+    if (!dailySpendLimit) {
+      dailySpendLimit = extractCurrencyFromPayload(accountData, "spend_cap");
     }
 
     // ---- Billing Threshold ----
