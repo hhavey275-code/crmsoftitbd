@@ -275,6 +275,9 @@ export function AdminSellers() {
           <div className="flex items-center justify-between flex-wrap gap-2">
             <h2 className="text-lg font-semibold">{selectedSeller.full_name || selectedSeller.email} — Ledger</h2>
             <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => { setShowAssignBank(true); setSelectedBankId(""); }}>
+                <Landmark className="h-4 w-4 mr-1" /> Assign Bank
+              </Button>
               <Button size="sm" variant="outline" onClick={() => { setEntryType("usdt_received"); setShowEntryDialog(true); }}>
                 <DollarSign className="h-4 w-4 mr-1" /> Record USDT
               </Button>
