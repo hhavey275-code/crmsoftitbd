@@ -134,6 +134,7 @@ export type Database = {
           account_id: string
           account_name: string
           amount_spent: number
+          balance_after_topup: number | null
           business_manager_id: string | null
           business_name: string | null
           created_at: string
@@ -148,6 +149,7 @@ export type Database = {
           account_id: string
           account_name: string
           amount_spent?: number
+          balance_after_topup?: number | null
           business_manager_id?: string | null
           business_name?: string | null
           created_at?: string
@@ -162,6 +164,7 @@ export type Database = {
           account_id?: string
           account_name?: string
           amount_spent?: number
+          balance_after_topup?: number | null
           business_manager_id?: string | null
           business_name?: string | null
           created_at?: string
