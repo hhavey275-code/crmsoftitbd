@@ -289,14 +289,6 @@ export default function AdAccountDetailPage() {
             </CardHeader>
             <CardContent>
               <SpendProgressBar amountSpent={Number(account.amount_spent)} spendCap={Number(account.spend_cap)} />
-              <div className="flex justify-between text-sm mt-4 p-3 rounded-lg bg-muted/50">
-                <span className="text-muted-foreground">Daily Spending Limit</span>
-                <span className="font-semibold">
-                  {Number(insights?.daily_spend_limit ?? 0) > 0
-                    ? `$${Number(insights?.daily_spend_limit ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                    : "Not set in Meta"}
-                </span>
-              </div>
               <div className="mt-4">
                 <Button variant="outline" size="sm" asChild>
                   <a
