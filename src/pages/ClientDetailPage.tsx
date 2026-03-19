@@ -1392,6 +1392,86 @@ export default function ClientDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Withdraw Dialog */}
+      <Dialog open={withdrawDialogOpen} onOpenChange={(open) => !open && setWithdrawDialogOpen(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Withdraw from Ad Account</DialogTitle>
+            <DialogDescription>Reduce spend cap and credit the client's wallet.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-muted">
+              <span className="flex items-center gap-2"><Wallet className="h-4 w-4" /> Client Wallet</span>
+              <span className={cn("font-semibold", walletBalance < 0 ? "text-destructive" : "")}>${walletBalance.toLocaleString()}</span>
+            </div>
+            <div className="space-y-2">
+              <Label>Ad Account</Label>
+              <Select value={withdrawAccountId} onValueChange={(val) => { setWithdrawAccountId(val); openWithdrawDialog(val); }}>
+                <SelectTrigger><SelectValue placeholder="Select ad account" /></SelectTrigger>
+                <SelectContent>
+                  {adAccounts?.map((acc: any) => (
+                    <SelectItem key={acc.id} value={acc.id}>{acc.account_name} ({acc.account_id})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {fetchingWithdrawInfo && (
+              <p className="text-sm text-muted-foreground text-center">Fetching account info...</p>
+            )}
+            {withdrawMaxInfo && (
+              <div className="text-sm space-y-1 bg-muted/50 rounded-lg p-3">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Current Spend Cap</span>
+                  <span className="font-medium">${withdrawMaxInfo.current_spend_cap.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Amount Spent</span>
+                  <span className="font-medium">${withdrawMaxInfo.real_amount_spent.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Max Withdrawable</span>
+                  <span className="font-bold text-orange-500">${withdrawMaxInfo.max_withdrawable.toLocaleString()}</span>
+                </div>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Withdraw Amount (USD)</Label>
+              <Input
+                type="number"
+                min="1"
+                step="0.01"
+                max={withdrawMaxInfo?.max_withdrawable}
+                value={withdrawAmount}
+                onChange={(e) => setWithdrawAmount(e.target.value)}
+                placeholder={withdrawMaxInfo ? `Max: $${withdrawMaxInfo.max_withdrawable.toLocaleString()}` : "0.00"}
+              />
+            </div>
+            {withdrawAccountId && parseFloat(withdrawAmount) > 0 && withdrawMaxInfo && (
+              <div className="text-sm space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">New Spend Cap</span>
+                  <span className="font-medium text-orange-500">${(withdrawMaxInfo.current_spend_cap - parseFloat(withdrawAmount)).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Wallet After</span>
+                  <span className="font-medium text-primary">${(walletBalance + parseFloat(withdrawAmount)).toLocaleString()}</span>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWithdrawDialogOpen(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => withdrawMutation.mutate()}
+              disabled={!withdrawAccountId || !withdrawAmount || parseFloat(withdrawAmount) <= 0 || (withdrawMaxInfo ? parseFloat(withdrawAmount) > withdrawMaxInfo.max_withdrawable : true) || withdrawMutation.isPending}
+            >
+              {withdrawMutation.isPending ? "Processing..." : "Withdraw Now"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
