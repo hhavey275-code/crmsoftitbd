@@ -57,6 +57,12 @@ export default function ClientDetailPage() {
   // Top-up dialog
   const [topUpDialogOpen, setTopUpDialogOpen] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState("");
+  // Withdraw dialog
+  const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
+  const [withdrawAccountId, setWithdrawAccountId] = useState("");
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [withdrawMaxInfo, setWithdrawMaxInfo] = useState<{ max_withdrawable: number; current_spend_cap: number; real_amount_spent: number } | null>(null);
+  const [fetchingWithdrawInfo, setFetchingWithdrawInfo] = useState(false);
   const [topUpAmount, setTopUpAmount] = useState("");
 
   // Bulk assign/unassign
