@@ -62,6 +62,11 @@ const clientNavItems = [
   { title: "Settings", url: "/settings", icon: Settings, key: "settings" },
 ];
 
+const sellerNavItems = [
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, key: "dashboard" },
+  { title: "Settings", url: "/settings", icon: Settings, key: "settings" },
+];
+
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
