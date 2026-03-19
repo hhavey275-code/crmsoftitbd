@@ -342,30 +342,31 @@ async function processAccount(
     console.log(`DEBUG_META_FIELDS[${actId}]:`, JSON.stringify(debugInfo));
 
     // ---- Daily Spending Limit ----
+    // Priority: 1) Sum of active campaign/adset daily budgets (what Ads Manager shows)
+    //           2) adtrust_dsl (account-level trust limit, often unavailable)
+    //           3) spend_cap as last resort
     let dailySpendLimit = 0;
 
-    // Try adtrust_dsl first (this is the "daily spending limit" in Ads Manager)
-    if (adtrustDsl?.adtrust_dsl !== undefined && !adtrustDsl?.error) {
+    // Priority 1: Sum of all ACTIVE campaign/adset daily budgets
+    dailySpendLimit = await fetchActiveDailyBudget(actId, accessToken);
+
+    // Priority 2: adtrust_dsl
+    if (!dailySpendLimit && adtrustDsl?.adtrust_dsl !== undefined && !adtrustDsl?.error) {
       const raw = parseFloat(String(adtrustDsl.adtrust_dsl));
       if (Number.isFinite(raw) && raw > 0) {
         dailySpendLimit = raw / 100;
       }
     }
 
-    // Fallback 1: min_campaign_group_spend_cap
-    if (!dailySpendLimit && cgData && !cgData?.error) {
-      dailySpendLimit = extractCurrencyFromPayload(cgData, "min_campaign_group_spend_cap");
+    // Priority 3: spend_cap (account level)
+    if (!dailySpendLimit && accountData?.spend_cap) {
+      const raw = parseFloat(String(accountData.spend_cap));
+      if (Number.isFinite(raw) && raw > 0) {
+        dailySpendLimit = raw / 100;
+      }
     }
 
-    // Fallback 2: active campaign/ad-set daily budgets
-    if (!dailySpendLimit) {
-      dailySpendLimit = await fetchActiveDailyBudget(actId, accessToken);
-    }
-
-    // Fallback 3: account spend cap
-    if (!dailySpendLimit) {
-      dailySpendLimit = extractCurrencyFromPayload(accountData, "spend_cap");
-    }
+    console.log(`DEBUG_DSL_FINAL[${actId}]: activeBudget=${dailySpendLimit}`);
 
     // ---- Billing Threshold ----
     let billingThreshold = 0;
