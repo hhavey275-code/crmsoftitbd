@@ -18,13 +18,14 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn, friendlyEdgeError } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   User, Building2, Phone, CalendarDays, Wallet, MonitorSmartphone,
   CheckCircle, XCircle, TrendingUp, TrendingDown, DollarSign, CalendarIcon, Save,
-  Plus, Minus, ArrowUpCircle, CreditCard, Shield, Receipt, ShoppingCart, RefreshCw, ListChecks, Search, LayoutDashboard, FileText, LogIn, AppWindow, ExternalLink
+  Plus, Minus, ArrowUpCircle, ArrowDownCircle, CreditCard, Shield, Receipt, ShoppingCart, RefreshCw, ListChecks, Search, LayoutDashboard, FileText, LogIn, AppWindow, ExternalLink, ChevronDown
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -56,6 +57,12 @@ export default function ClientDetailPage() {
   // Top-up dialog
   const [topUpDialogOpen, setTopUpDialogOpen] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState("");
+  // Withdraw dialog
+  const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
+  const [withdrawAccountId, setWithdrawAccountId] = useState("");
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [withdrawMaxInfo, setWithdrawMaxInfo] = useState<{ max_withdrawable: number; current_spend_cap: number; real_amount_spent: number } | null>(null);
+  const [fetchingWithdrawInfo, setFetchingWithdrawInfo] = useState(false);
   const [topUpAmount, setTopUpAmount] = useState("");
 
   // Bulk assign/unassign
@@ -285,6 +292,52 @@ export default function ClientDetailPage() {
     onError: (err: any) => toast.error(friendlyEdgeError(err)),
   });
 
+  const openWithdrawDialog = async (accountId: string) => {
+    setWithdrawAccountId(accountId);
+    setWithdrawAmount("");
+    setWithdrawMaxInfo(null);
+    setWithdrawDialogOpen(true);
+    setFetchingWithdrawInfo(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("spend-cap-withdraw", {
+        body: { ad_account_id: accountId, amount: 1, dry_run: true },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setWithdrawMaxInfo({
+        max_withdrawable: data.max_withdrawable,
+        current_spend_cap: data.current_spend_cap,
+        real_amount_spent: data.real_amount_spent,
+      });
+    } catch (err: any) {
+      toast.error(friendlyEdgeError(err));
+    } finally {
+      setFetchingWithdrawInfo(false);
+    }
+  };
+
+  const withdrawMutation = useMutation({
+    mutationFn: async () => {
+      const amt = parseFloat(withdrawAmount);
+      if (!amt || amt <= 0) throw new Error("Invalid amount");
+      const { data, error } = await supabase.functions.invoke("spend-cap-withdraw", {
+        body: { ad_account_id: withdrawAccountId, amount: amt },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data) => {
+      toast.success(`Withdrawn! Cap: $${Number(data.old_spend_cap).toLocaleString()} → $${Number(data.new_spend_cap).toLocaleString()}`);
+      setWithdrawDialogOpen(false);
+      setWithdrawAccountId("");
+      setWithdrawAmount("");
+      setWithdrawMaxInfo(null);
+      invalidateAll();
+    },
+    onError: (err: any) => toast.error(friendlyEdgeError(err)),
+  });
+
   const activeAccounts = adAccounts?.filter((a: any) => a.status === "active") ?? [];
   const disabledAccounts = adAccounts?.filter((a: any) => a.status !== "active") ?? [];
   const totalRemaining = adAccounts?.reduce((sum: number, a: any) => sum + (Number(a.spend_cap) - Number(a.amount_spent)), 0) ?? 0;
@@ -358,14 +411,28 @@ export default function ClientDetailPage() {
                   <span>Limit: <span className="font-medium text-foreground">${Number(acc.spend_cap).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
                 </div>
                 <div onClick={(e) => e.stopPropagation()}>
-                  <Button
-                    size="sm"
-                    className="gap-1 bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs h-8"
-                    onClick={() => { setSelectedAccountId(acc.id); setTopUpDialogOpen(true); setTopUpAmount(""); }}
-                  >
-                    <ArrowUpCircle className="h-3.5 w-3.5" />
-                    Top Up
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        size="sm"
+                        className="gap-1 bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs h-8"
+                      >
+                        <DollarSign className="h-3.5 w-3.5" />
+                        Actions
+                        <ChevronDown className="h-3 w-3" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => { setSelectedAccountId(acc.id); setTopUpDialogOpen(true); setTopUpAmount(""); }}>
+                        <ArrowUpCircle className="h-4 w-4 mr-2 text-primary" />
+                        Top Up
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => openWithdrawDialog(acc.id)}>
+                        <ArrowDownCircle className="h-4 w-4 mr-2 text-orange-500" />
+                        Withdraw
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
 
@@ -481,13 +548,27 @@ export default function ClientDetailPage() {
                   <LogIn className="h-3 w-3 mr-1" />Login
                 </Button>
               )}
-              <Button
-                size="sm"
-                className="bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs h-8"
-                onClick={() => { setTopUpDialogOpen(true); setSelectedAccountId(""); setTopUpAmount(""); }}
-              >
-                <ArrowUpCircle className="h-3 w-3 mr-1" />Top Up
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    className="bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-4 font-semibold text-xs h-8"
+                  >
+                    <DollarSign className="h-3 w-3 mr-1" />Actions
+                    <ChevronDown className="h-3 w-3 ml-0.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => { setTopUpDialogOpen(true); setSelectedAccountId(""); setTopUpAmount(""); }}>
+                    <ArrowUpCircle className="h-4 w-4 mr-2 text-primary" />
+                    Top Up
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => { setWithdrawDialogOpen(true); setWithdrawAccountId(""); setWithdrawAmount(""); setWithdrawMaxInfo(null); }}>
+                    <ArrowDownCircle className="h-4 w-4 mr-2 text-orange-500" />
+                    Withdraw
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button
                 size="sm"
                 variant="outline"
@@ -536,12 +617,24 @@ export default function ClientDetailPage() {
                   <LogIn className="h-3.5 w-3.5 mr-1" />Login as Client
                 </Button>
               )}
-              <Button
-                className="bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-5 font-semibold"
-                onClick={() => { setTopUpDialogOpen(true); setSelectedAccountId(""); setTopUpAmount(""); }}
-              >
-                <ArrowUpCircle className="h-4 w-4 mr-2" />Top Up
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button className="bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground shadow-md shadow-primary/25 rounded-full px-5 font-semibold">
+                    <DollarSign className="h-4 w-4 mr-2" />Actions
+                    <ChevronDown className="h-4 w-4 ml-1" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => { setTopUpDialogOpen(true); setSelectedAccountId(""); setTopUpAmount(""); }}>
+                    <ArrowUpCircle className="h-4 w-4 mr-2 text-primary" />
+                    Top Up
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => { setWithdrawDialogOpen(true); setWithdrawAccountId(""); setWithdrawAmount(""); setWithdrawMaxInfo(null); }}>
+                    <ArrowDownCircle className="h-4 w-4 mr-2 text-orange-500" />
+                    Withdraw
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         )}
@@ -1032,15 +1125,23 @@ export default function ClientDetailPage() {
                                   </div>
                                 </TableCell>
                                 <TableCell onClick={(e) => e.stopPropagation()}>
-                                  <Button
-                                    size="icon"
-                                    variant="default"
-                                    className="h-8 w-8"
-                                    onClick={() => { setSelectedAccountId(acc.id); setTopUpDialogOpen(true); setTopUpAmount(""); }}
-                                    title="Top Up"
-                                  >
-                                    <ArrowUpCircle className="h-4 w-4" />
-                                  </Button>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button size="icon" variant="default" className="h-8 w-8" title="Actions">
+                                        <ChevronDown className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={() => { setSelectedAccountId(acc.id); setTopUpDialogOpen(true); setTopUpAmount(""); }}>
+                                        <ArrowUpCircle className="h-4 w-4 mr-2 text-primary" />
+                                        Top Up
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => openWithdrawDialog(acc.id)}>
+                                        <ArrowDownCircle className="h-4 w-4 mr-2 text-orange-500" />
+                                        Withdraw
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                                 </TableCell>
                               </TableRow>
                               );
@@ -1287,6 +1388,86 @@ export default function ClientDetailPage() {
               disabled={!selectedAccountId || !topUpAmount || parseFloat(topUpAmount) <= 0 || topUpMutation.isPending}
             >
               {topUpMutation.isPending ? "Processing..." : "Top Up Now"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Withdraw Dialog */}
+      <Dialog open={withdrawDialogOpen} onOpenChange={(open) => !open && setWithdrawDialogOpen(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Withdraw from Ad Account</DialogTitle>
+            <DialogDescription>Reduce spend cap and credit the client's wallet.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-muted">
+              <span className="flex items-center gap-2"><Wallet className="h-4 w-4" /> Client Wallet</span>
+              <span className={cn("font-semibold", walletBalance < 0 ? "text-destructive" : "")}>${walletBalance.toLocaleString()}</span>
+            </div>
+            <div className="space-y-2">
+              <Label>Ad Account</Label>
+              <Select value={withdrawAccountId} onValueChange={(val) => { setWithdrawAccountId(val); openWithdrawDialog(val); }}>
+                <SelectTrigger><SelectValue placeholder="Select ad account" /></SelectTrigger>
+                <SelectContent>
+                  {adAccounts?.map((acc: any) => (
+                    <SelectItem key={acc.id} value={acc.id}>{acc.account_name} ({acc.account_id})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {fetchingWithdrawInfo && (
+              <p className="text-sm text-muted-foreground text-center">Fetching account info...</p>
+            )}
+            {withdrawMaxInfo && (
+              <div className="text-sm space-y-1 bg-muted/50 rounded-lg p-3">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Current Spend Cap</span>
+                  <span className="font-medium">${withdrawMaxInfo.current_spend_cap.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Amount Spent</span>
+                  <span className="font-medium">${withdrawMaxInfo.real_amount_spent.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Max Withdrawable</span>
+                  <span className="font-bold text-orange-500">${withdrawMaxInfo.max_withdrawable.toLocaleString()}</span>
+                </div>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Withdraw Amount (USD)</Label>
+              <Input
+                type="number"
+                min="1"
+                step="0.01"
+                max={withdrawMaxInfo?.max_withdrawable}
+                value={withdrawAmount}
+                onChange={(e) => setWithdrawAmount(e.target.value)}
+                placeholder={withdrawMaxInfo ? `Max: $${withdrawMaxInfo.max_withdrawable.toLocaleString()}` : "0.00"}
+              />
+            </div>
+            {withdrawAccountId && parseFloat(withdrawAmount) > 0 && withdrawMaxInfo && (
+              <div className="text-sm space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">New Spend Cap</span>
+                  <span className="font-medium text-orange-500">${(withdrawMaxInfo.current_spend_cap - parseFloat(withdrawAmount)).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Wallet After</span>
+                  <span className="font-medium text-primary">${(walletBalance + parseFloat(withdrawAmount)).toLocaleString()}</span>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWithdrawDialogOpen(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => withdrawMutation.mutate()}
+              disabled={!withdrawAccountId || !withdrawAmount || parseFloat(withdrawAmount) <= 0 || (withdrawMaxInfo ? parseFloat(withdrawAmount) > withdrawMaxInfo.max_withdrawable : true) || withdrawMutation.isPending}
+            >
+              {withdrawMutation.isPending ? "Processing..." : "Withdraw Now"}
             </Button>
           </DialogFooter>
         </DialogContent>
