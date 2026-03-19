@@ -557,35 +557,74 @@ export function AdminSellers() {
         </DialogContent>
       </Dialog>
 
-      {/* Assign Bank Dialog */}
-      <Dialog open={showAssignBank} onOpenChange={setShowAssignBank}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Assign Bank to {selectedSeller?.full_name || selectedSeller?.email}</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label>Select Bank</Label>
-              <Select value={selectedBankId} onValueChange={setSelectedBankId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose an unassigned bank..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {unassignedBanks?.map((b: any) => (
-                    <SelectItem key={b.id} value={b.id}>
-                      {b.bank_name} — {b.account_name} (****{b.account_number?.slice(-4)})
-                    </SelectItem>
-                  ))}
-                  {(!unassignedBanks || unassignedBanks.length === 0) && (
-                    <SelectItem value="_none" disabled>No unassigned banks available</SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
+      {/* OCR BDT Payment Dialog */}
+      <Dialog open={showOcrDialog} onOpenChange={(v) => { setShowOcrDialog(v); if (!v) resetOcr(); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>OCR BDT Payment</DialogTitle></DialogHeader>
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
+            accept="image/*"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) uploadOcrImage(f);
+              e.target.value = "";
+            }}
+          />
+
+          {!ocrPreviewUrl && !ocrUploading && (
+            <div
+              className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-colors"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Click to upload or <strong>Ctrl+V</strong> to paste screenshot</p>
             </div>
-          </div>
+          )}
+
+          {ocrUploading && (
+            <div className="flex items-center justify-center py-8 gap-2">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span className="text-sm text-muted-foreground">Uploading...</span>
+            </div>
+          )}
+
+          {ocrPreviewUrl && (
+            <img src={ocrPreviewUrl} alt="Payment screenshot" className="w-full rounded-md max-h-48 object-contain border" />
+          )}
+
+          {ocrProcessing && (
+            <div className="flex items-center justify-center py-4 gap-2">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span className="text-sm text-muted-foreground">Extracting data with AI...</span>
+            </div>
+          )}
+
+          {ocrResult && (
+            <div className="space-y-3">
+              <div>
+                <Label>BDT Amount</Label>
+                <Input type="number" value={ocrResult.bdt_amount} onChange={(e) => setOcrResult({ ...ocrResult, bdt_amount: e.target.value })} />
+              </div>
+              <div>
+                <Label>Transaction Date</Label>
+                <Input type="date" value={ocrResult.date} onChange={(e) => setOcrResult({ ...ocrResult, date: e.target.value })} />
+              </div>
+              <div>
+                <Label>Reference / TrxID</Label>
+                <Input value={ocrResult.reference} onChange={(e) => setOcrResult({ ...ocrResult, reference: e.target.value })} />
+              </div>
+            </div>
+          )}
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAssignBank(false)}>Cancel</Button>
-            <Button onClick={() => assignBankMutation.mutate()} disabled={!selectedBankId || assignBankMutation.isPending}>
-              {assignBankMutation.isPending ? "Assigning..." : "Assign Bank"}
-            </Button>
+            <Button variant="outline" onClick={() => { setShowOcrDialog(false); resetOcr(); }}>Cancel</Button>
+            {ocrResult && (
+              <Button onClick={() => saveOcrMutation.mutate()} disabled={saveOcrMutation.isPending}>
+                {saveOcrMutation.isPending ? "Saving..." : "Confirm & Save"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

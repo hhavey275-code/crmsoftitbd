@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.send-push-notification]
 verify_jwt = false
+
+[functions.ocr-seller-payment]
+verify_jwt = false
