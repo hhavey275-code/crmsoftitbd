@@ -364,9 +364,6 @@ export default function BillingsPage() {
                             <TableCell className="py-2.5 text-right font-semibold text-sm">
                               ${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </TableCell>
-                            <TableCell className="py-2.5 text-right text-sm">
-                              {ins?.billing_threshold ? `$${Number(ins.billing_threshold).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
-                            </TableCell>
                             <TableCell className="py-2.5">
                               <StatusBadge status={acc.status} />
                             </TableCell>
