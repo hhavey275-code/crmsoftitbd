@@ -314,7 +314,7 @@ Deno.serve(async (req) => {
       const { data: clientProfile } = await supabase.from('profiles').select('full_name, email').eq('user_id', user_id).single();
       const clientName = clientProfile?.full_name || clientProfile?.email || 'Unknown';
       const caption = `✅ <b>Auto-Approved Top-Up</b>\n👤 ${clientName}\n💰 $${amount} (৳${bdtNum.toLocaleString()})\n🔖 Ref: ${payment_reference || 'N/A'}`;
-      await forwardProofToTelegram(supabase, proof_url, caption);
+      await forwardProofToTelegram(supabase, proof_url, caption, bank_account_id);
     }
 
     return new Response(JSON.stringify({ ok: true, auto_approved: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
