@@ -484,7 +484,7 @@ export default function ClientDetailPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                  className="text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/30"
                   onClick={async () => {
                     try {
                       const res = await supabase.functions.invoke("impersonate-client", { body: { target_user_id: userId } });

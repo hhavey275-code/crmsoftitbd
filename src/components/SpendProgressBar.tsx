@@ -25,7 +25,7 @@ export function SpendProgressBar({ amountSpent, spendCap }: SpendProgressBarProp
 
   return (
     <div className="w-full min-w-[80px]">
-      <div className="text-sm font-semibold whitespace-nowrap">
+      <div className="text-sm font-semibold whitespace-nowrap text-foreground">
         ${remaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} left
       </div>
       <div className="h-2 w-full rounded-full bg-muted overflow-hidden mt-1">
