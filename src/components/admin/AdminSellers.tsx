@@ -124,10 +124,11 @@ export function AdminSellers() {
   // Revert seller back to client
   const revertMutation = useMutation({
     mutationFn: async (sellerId: string) => {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from("user_roles")
-        .update({ role: "client" })
-        .eq("user_id", sellerId);
+        .update({ role: "client" as any })
+        .eq("user_id", sellerId)
+        .eq("role", "seller" as any);
       if (error) throw error;
       return sellerId;
     },
