@@ -100,11 +100,14 @@ export function AdminSellers() {
   const convertMutation = useMutation({
     mutationFn: async () => {
       if (!selectedClientId) throw new Error("Select a client");
-      const { error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("user_roles")
-        .update({ role: "seller" })
-        .eq("user_id", selectedClientId);
+        .update({ role: "seller" as any })
+        .eq("user_id", selectedClientId)
+        .eq("role", "client" as any)
+        .select();
       if (error) throw error;
+      if (!data || data.length === 0) throw new Error("Client role not found for this user");
     },
     onSuccess: () => {
       const client = clients?.find((c: any) => c.user_id === selectedClientId);
@@ -121,10 +124,11 @@ export function AdminSellers() {
   // Revert seller back to client
   const revertMutation = useMutation({
     mutationFn: async (sellerId: string) => {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from("user_roles")
-        .update({ role: "client" })
-        .eq("user_id", sellerId);
+        .update({ role: "client" as any })
+        .eq("user_id", sellerId)
+        .eq("role", "seller" as any);
       if (error) throw error;
       return sellerId;
     },
