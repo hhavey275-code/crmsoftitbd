@@ -70,7 +70,7 @@ const sellerNavItems = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const { signOut, profile, role, isAdmin, isSuperAdmin, user } = useAuth();
+  const { signOut, profile, role, isAdmin, isSuperAdmin, isSeller, user } = useAuth();
   const { logoUrl, siteName } = useSiteSettings();
   const badges = useSidebarBadges();
 
