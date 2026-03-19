@@ -25,6 +25,7 @@ const ChatPage = lazy(() => import("./pages/ChatPage"));
 const SystemLogsPage = lazy(() => import("./pages/SystemLogsPage"));
 const FailedTopUpsPage = lazy(() => import("./pages/FailedTopUpsPage"));
 const RequestsPage = lazy(() => import("./pages/RequestsPage"));
+const SellersPage = lazy(() => import("./pages/SellersPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
