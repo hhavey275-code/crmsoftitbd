@@ -268,22 +268,31 @@ async function processAccount(
     const balance = accountData?.balance ? parseFloat(accountData.balance) / 100 : 0;
 
     // ---- Daily Spending Limit ----
-    // Meta may return adtrust_dsl as number/string/object. Parse defensively.
-    let dailySpendLimit = 0;
-    try {
-      const dslRes = await fetch(`https://graph.facebook.com/v25.0/${actId}?fields=adtrust_dsl&access_token=${accessToken}`);
-      const dslData = await dslRes.json();
-      if (dslData?.error) {
-        console.log(`adtrust_dsl error for ${actId}: ${JSON.stringify(dslData.error)}`);
-      } else if (dslData?.adtrust_dsl !== undefined) {
-        console.log(`adtrust_dsl raw for ${actId}: ${JSON.stringify(dslData.adtrust_dsl)}`);
+    // Try multiple possible Meta fields and keep the first non-zero value.
+    const fetchDailyCandidate = async (field: string, version = "v24.0") => {
+      try {
+        const res = await fetch(`https://graph.facebook.com/${version}/${actId}?fields=${field}&access_token=${accessToken}`);
+        const data = await res.json();
+        const parsed = extractCurrencyFromPayload(data, field);
+        if (data?.error) {
+          console.log(`${field} error for ${actId}: ${JSON.stringify(data.error)}`);
+        } else {
+          console.log(`${field} raw for ${actId}: ${JSON.stringify(data?.[field])} -> ${parsed}`);
+        }
+        return parsed;
+      } catch {
+        return 0;
       }
-      dailySpendLimit = extractCurrencyFromPayload(dslData, "adtrust_dsl");
-    } catch { /* ignore - field not available */ }
+    };
 
-    // Fallback: use spend_cap when DSL is unavailable
+    let dailySpendLimit = await fetchDailyCandidate("adtrust_dsl", "v25.0");
+    if (!dailySpendLimit) dailySpendLimit = await fetchDailyCandidate("daily_spend_limit", "v25.0");
+    if (!dailySpendLimit) dailySpendLimit = await fetchDailyCandidate("min_daily_budget", "v24.0");
+
+    // Final fallback: spend_cap
     if (!dailySpendLimit) {
       dailySpendLimit = extractCurrencyFromPayload(accountData, "spend_cap");
+      console.log(`spend_cap fallback for ${actId}: ${dailySpendLimit}`);
     }
 
     // ---- Billing Threshold ----
