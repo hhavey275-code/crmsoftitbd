@@ -27,6 +27,8 @@ export function AdminSellers() {
   const [entryForm, setEntryForm] = useState({ usdt_amount: "", bdt_amount: "", rate: "", description: "" });
   const [showEntryDialog, setShowEntryDialog] = useState(false);
   const [proofUrl, setProofUrl] = useState<string | null>(null);
+  const [showAssignBank, setShowAssignBank] = useState(false);
+  const [selectedBankId, setSelectedBankId] = useState("");
 
   // Fetch all sellers (users with seller role)
   const { data: sellers } = useQuery({
