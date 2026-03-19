@@ -264,13 +264,34 @@ async function processAccount(
 
     const balance = accountData?.balance ? parseFloat(accountData.balance) / 100 : 0;
 
-    // Use currently supported Ad Account fields for limits/threshold-like metrics
-    let dailySpendLimit = normalizeCurrency(extractNumericValue(accountData?.min_daily_budget));
-    if (!dailySpendLimit) {
-      dailySpendLimit = normalizeCurrency(extractNumericValue(accountData?.spend_cap));
+    // Daily Spending Limit: use adtrust_dsl (Ad Trust Daily Spend Limit) from Meta
+    // This is the daily spending limit Meta assigns based on account trust level
+    // It returns value in cents (minor units), so divide by 100
+    let dailySpendLimit = 0;
+    if (accountData?.adtrust_dsl !== undefined && accountData.adtrust_dsl !== null) {
+      const raw = parseFloat(String(accountData.adtrust_dsl));
+      if (Number.isFinite(raw) && raw > 0) {
+        dailySpendLimit = raw / 100;
+      }
     }
 
-    let billingThreshold = normalizeCurrency(extractNumericValue(accountData?.min_campaign_group_spend_cap));
+    // Billing Threshold: check funding_source_details for threshold info
+    let billingThreshold = 0;
+    const fsdForThreshold = accountData?.funding_source_details;
+    if (fsdForThreshold) {
+      // Try common threshold fields in funding_source_details
+      const thresholdRaw = fsdForThreshold.billing_activity_threshold 
+        ?? fsdForThreshold.current_balance
+        ?? fsdForThreshold.amount;
+      if (thresholdRaw !== undefined && thresholdRaw !== null) {
+        const parsed = parseFloat(String(thresholdRaw));
+        if (Number.isFinite(parsed) && parsed > 0) {
+          billingThreshold = parsed / 100;
+        }
+      }
+    }
+
+    console.log(`Account ${actId}: adtrust_dsl=${accountData?.adtrust_dsl}, dailySpendLimit=$${dailySpendLimit}, billingThreshold=$${billingThreshold}, fsd_keys=${fsdForThreshold ? Object.keys(fsdForThreshold).join(',') : 'none'}`);
 
     let adAccountUpdate: any = undefined;
     if (!isSingleDate && !isDateRange && accountData?.amount_spent !== undefined) {
