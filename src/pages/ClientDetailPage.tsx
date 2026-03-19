@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { CardBrandIcon } from "@/components/CardBrandIcon";
 
 export default function ClientDetailPage() {
   const { userId } = useParams<{ userId: string }>();
