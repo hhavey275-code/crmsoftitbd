@@ -66,7 +66,8 @@ function RobotMascot({ isCovering }: { isCovering: boolean }) {
 
 export default function Auth() {
   const { user, loading: authLoading } = useAuth();
-  const [isLogin, setIsLogin] = useState(true);
+  const location = useLocation();
+  const [isLogin, setIsLogin] = useState(location.pathname !== "/signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
