@@ -53,10 +53,12 @@ Deno.serve(async (req) => {
     const accessToken = await decryptToken(bm.access_token, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const bcId = bm.bm_id;
 
-    // Fetch advertiser accounts from TikTok BC
-    const apiUrl = `https://business-api.tiktok.com/open_api/v1.3/bc/advertiser/get/?bc_id=${bcId}&page=1&page_size=100`;
+    // Fetch advertiser accounts using oauth2/advertiser/get
+    const appId = Deno.env.get("TIKTOK_APP_ID");
+    const appSecret = Deno.env.get("TIKTOK_APP_SECRET");
+    const apiUrl = `https://business-api.tiktok.com/open_api/v1.3/oauth2/advertiser/get/?app_id=${appId}&secret=${appSecret}`;
 
-    console.log("Fetching TikTok BC advertisers, bcId:", bcId, "url:", apiUrl);
+    console.log("Fetching TikTok advertisers for BC:", bcId);
     const res = await fetch(apiUrl, {
       method: "GET",
       headers: { "Access-Token": accessToken },
