@@ -132,6 +132,38 @@ export function AdminTopUp() {
     id: string; action: ActionType; userId: string; amount: number; bdtAmount: number | null; usdRate: number | null;
   } | null>(null);
 
+  const today = startOfDay(new Date());
+  const [datePreset, setDatePreset] = useState<"today" | "yesterday" | "custom">("today");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: today,
+    to: endOfDay(new Date()),
+  });
+
+  const handlePreset = (preset: "today" | "yesterday") => {
+    setDatePreset(preset);
+    if (preset === "today") {
+      setDateRange({ from: today, to: endOfDay(new Date()) });
+    } else {
+      const yesterday = subDays(today, 1);
+      setDateRange({ from: yesterday, to: endOfDay(yesterday) });
+    }
+  };
+
+  const summaryMetrics = useMemo(() => {
+    if (!requests) return { totalUsd: 0, totalBdt: 0, autoApproved: 0, manualApproved: 0 };
+    const from = dateRange?.from ? startOfDay(dateRange.from) : today;
+    const to = dateRange?.to ? endOfDay(dateRange.to) : endOfDay(new Date());
+    const approvedInRange = requests.filter((r: any) =>
+      r.status === "approved" &&
+      isWithinInterval(new Date(r.updated_at || r.created_at), { start: from, end: to })
+    );
+    const totalUsd = approvedInRange.reduce((s: number, r: any) => s + Number(r.amount || 0), 0);
+    const totalBdt = approvedInRange.reduce((s: number, r: any) => s + Number(r.bdt_amount || 0), 0);
+    const autoApproved = approvedInRange.filter((r: any) => r.admin_note?.includes("Auto Approved by System")).length;
+    const manualApproved = approvedInRange.length - autoApproved;
+    return { totalUsd, totalBdt, autoApproved, manualApproved };
+  }, [requests, dateRange]);
+
   useEffect(() => {
     const channel = supabase.channel("admin-topup-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "top_up_requests" }, () => {
