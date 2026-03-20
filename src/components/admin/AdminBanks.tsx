@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,13 +11,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatusBadge } from "@/components/StatusBadge";
 import { toast } from "sonner";
-import { Plus, Trash2, UserPlus, Pencil, Building2, BarChart3, RotateCcw, MinusCircle } from "lucide-react";
+import { Plus, Trash2, UserPlus, Pencil, Building2, BarChart3, RotateCcw, MinusCircle, ImageIcon, X } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { logSystemAction } from "@/lib/systemLog";
 import { format } from "date-fns";
 
-const emptyForm = { bank_name: "", account_name: "", account_number: "", branch: "", routing_number: "", telegram_group_id: "", seller_id: "" };
+const emptyForm = { bank_name: "", account_name: "", account_number: "", branch: "", routing_number: "", telegram_group_id: "", seller_id: "", logo_url: "" };
 
 function BankStatsDialog({ bankId, bankName, open, onClose }: { bankId: string; bankName: string; open: boolean; onClose: () => void }) {
   const queryClient = useQueryClient();
@@ -195,6 +195,34 @@ export function AdminBanks() {
   const [selectedClient, setSelectedClient] = useState("");
   const [statsBank, setStatsBank] = useState<{ id: string; name: string } | null>(null);
   const [bankTab, setBankTab] = useState("active");
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { toast.error("Please select an image file"); return; }
+    if (file.size > 2 * 1024 * 1024) { toast.error("Logo must be under 2MB"); return; }
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+  };
+
+  const clearLogo = () => {
+    setLogoFile(null);
+    setLogoPreview(null);
+    if (logoInputRef.current) logoInputRef.current.value = "";
+  };
+
+  const uploadLogo = async (): Promise<string | null> => {
+    if (!logoFile) return form.logo_url || null;
+    const ext = logoFile.name.split(".").pop();
+    const filePath = `banks/${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from("logos").upload(filePath, logoFile);
+    if (error) throw error;
+    const { data: urlData } = supabase.storage.from("logos").getPublicUrl(filePath);
+    return urlData.publicUrl;
+  };
 
   const { data: banks } = useQuery({
     queryKey: ["admin-banks", bankTab],
@@ -234,27 +262,30 @@ export function AdminBanks() {
 
   const addMutation = useMutation({
     mutationFn: async () => {
-      const insertData: any = { bank_name: form.bank_name, account_name: form.account_name, account_number: form.account_number, branch: form.branch, routing_number: form.routing_number };
+      const logoUrl = await uploadLogo();
+      const insertData: any = { bank_name: form.bank_name, account_name: form.account_name, account_number: form.account_number, branch: form.branch, routing_number: form.routing_number, logo_url: logoUrl };
       if (form.telegram_group_id) insertData.telegram_group_id = form.telegram_group_id;
       if (form.seller_id) insertData.seller_id = form.seller_id;
       const { error } = await (supabase as any).from("bank_accounts").insert(insertData);
       if (error) throw error;
     },
-    onSuccess: () => { logSystemAction("Bank Added", `${form.bank_name} — ${form.account_number}`); toast.success("Bank added!"); queryClient.invalidateQueries({ queryKey: ["admin-banks"] }); setShowAdd(false); setForm(emptyForm); },
+    onSuccess: () => { logSystemAction("Bank Added", `${form.bank_name} — ${form.account_number}`); toast.success("Bank added!"); queryClient.invalidateQueries({ queryKey: ["admin-banks"] }); setShowAdd(false); setForm(emptyForm); clearLogo(); },
     onError: (e: any) => toast.error(e.message),
   });
 
   const editMutation = useMutation({
     mutationFn: async () => {
+      const logoUrl = await uploadLogo();
       const updateData: any = {
         bank_name: form.bank_name, account_name: form.account_name, account_number: form.account_number, branch: form.branch, routing_number: form.routing_number,
         telegram_group_id: form.telegram_group_id || null,
         seller_id: form.seller_id || null,
+        logo_url: logoUrl,
       };
       const { error } = await (supabase as any).from("bank_accounts").update(updateData).eq("id", editingBank.id);
       if (error) throw error;
     },
-    onSuccess: () => { logSystemAction("Bank Updated", `${form.bank_name} — ${form.account_number}`); toast.success("Bank updated!"); queryClient.invalidateQueries({ queryKey: ["admin-banks"] }); setEditingBank(null); setForm(emptyForm); },
+    onSuccess: () => { logSystemAction("Bank Updated", `${form.bank_name} — ${form.account_number}`); toast.success("Bank updated!"); queryClient.invalidateQueries({ queryKey: ["admin-banks"] }); setEditingBank(null); setForm(emptyForm); clearLogo(); },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -296,11 +327,47 @@ export function AdminBanks() {
 
   const isActive = bankTab === "active";
 
+  const openEditBank = (b: any) => {
+    setEditingBank(b);
+    setForm({ bank_name: b.bank_name, account_name: b.account_name, account_number: b.account_number, branch: b.branch || "", routing_number: b.routing_number || "", telegram_group_id: b.telegram_group_id || "", seller_id: b.seller_id || "", logo_url: b.logo_url || "" });
+    setLogoPreview(b.logo_url || null);
+    setLogoFile(null);
+  };
+
+  const LogoUploadField = () => (
+    <div className="space-y-2">
+      <Label>Bank Logo <span className="text-xs text-muted-foreground">(optional)</span></Label>
+      <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoChange} className="hidden" />
+      {logoPreview ? (
+        <div className="relative inline-block">
+          <img src={logoPreview} alt="Bank logo" className="h-16 w-16 rounded-lg border object-contain bg-white" />
+          <button type="button" onClick={clearLogo} className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-0.5">
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      ) : (
+        <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => logoInputRef.current?.click()}>
+          <ImageIcon className="h-4 w-4" /> Upload Logo
+        </Button>
+      )}
+    </div>
+  );
+
+  const BankLogo = ({ url, size = "sm" }: { url?: string; size?: "sm" | "md" }) => {
+    const dim = size === "sm" ? "h-8 w-8" : "h-10 w-10";
+    if (url) return <img src={url} alt="Bank" className={cn(dim, "rounded-md border object-contain bg-white shrink-0")} />;
+    return (
+      <div className={cn(dim, "rounded-md bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0")}>
+        <Building2 className="h-4 w-4 text-blue-600" />
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl md:text-2xl font-bold">Bank Accounts</h1>
-        <Button size={isMobile ? "sm" : "default"} onClick={() => setShowAdd(true)}>
+        <Button size={isMobile ? "sm" : "default"} onClick={() => { setShowAdd(true); clearLogo(); }}>
           <Plus className="mr-1.5 h-4 w-4" /> Add Bank
         </Button>
       </div>
@@ -320,9 +387,7 @@ export function AdminBanks() {
             <Card key={b.id} className="border border-border/60 shadow-sm">
               <CardContent className="p-3">
                 <div className="flex items-start gap-3">
-                  <div className="h-9 w-9 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
-                    <Building2 className="h-4 w-4 text-blue-600" />
-                  </div>
+                  <BankLogo url={b.logo_url} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-semibold truncate">{b.bank_name}</p>
@@ -337,10 +402,7 @@ export function AdminBanks() {
                       </Button>
                       {isActive ? (
                         <>
-                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => {
-                            setEditingBank(b);
-                            setForm({ bank_name: b.bank_name, account_name: b.account_name, account_number: b.account_number, branch: b.branch || "", routing_number: b.routing_number || "", telegram_group_id: b.telegram_group_id || "", seller_id: b.seller_id || "" });
-                          }}>
+                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openEditBank(b)}>
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
                           <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setShowAssign(b.id)}>
@@ -372,6 +434,7 @@ export function AdminBanks() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Logo</TableHead>
                   <TableHead>Bank Name</TableHead>
                   <TableHead>Account Name</TableHead>
                   <TableHead>Account Number</TableHead>
@@ -383,6 +446,7 @@ export function AdminBanks() {
               <TableBody>
                 {banks?.map((b: any) => (
                   <TableRow key={b.id}>
+                    <TableCell><BankLogo url={b.logo_url} /></TableCell>
                     <TableCell className="font-medium">{b.bank_name}</TableCell>
                     <TableCell>{b.account_name}</TableCell>
                     <TableCell>{b.account_number}</TableCell>
@@ -395,10 +459,7 @@ export function AdminBanks() {
                         </Button>
                         {isActive ? (
                           <>
-                            <Button size="sm" variant="ghost" onClick={() => {
-                              setEditingBank(b);
-                              setForm({ bank_name: b.bank_name, account_name: b.account_name, account_number: b.account_number, branch: b.branch || "", routing_number: b.routing_number || "", telegram_group_id: b.telegram_group_id || "", seller_id: b.seller_id || "" });
-                            }}><Pencil className="h-4 w-4" /></Button>
+                            <Button size="sm" variant="ghost" onClick={() => openEditBank(b)}><Pencil className="h-4 w-4" /></Button>
                             <Button size="sm" variant="ghost" onClick={() => setShowAssign(b.id)}><UserPlus className="h-4 w-4" /></Button>
                             <Button size="sm" variant="ghost" className="hover:text-destructive" onClick={() => deleteMutation.mutate(b.id)}><Trash2 className="h-4 w-4" /></Button>
                           </>
@@ -412,7 +473,7 @@ export function AdminBanks() {
                   </TableRow>
                 ))}
                 {(!banks || banks.length === 0) && (
-                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">{isActive ? "No active banks" : "No inactive banks"}</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">{isActive ? "No active banks" : "No inactive banks"}</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
@@ -486,6 +547,7 @@ export function AdminBanks() {
         <DialogContent>
           <DialogHeader><DialogTitle>Add Bank Account</DialogTitle></DialogHeader>
           <div className="space-y-3">
+            <LogoUploadField />
             <div><Label>Bank Name</Label><Input value={form.bank_name} onChange={e => setForm(f => ({ ...f, bank_name: e.target.value }))} /></div>
             <div><Label>Account Name</Label><Input value={form.account_name} onChange={e => setForm(f => ({ ...f, account_name: e.target.value }))} /></div>
             <div><Label>Account Number</Label><Input value={form.account_number} onChange={e => setForm(f => ({ ...f, account_number: e.target.value }))} /></div>
@@ -539,10 +601,11 @@ export function AdminBanks() {
       </Dialog>
 
       {/* Edit Bank Dialog */}
-      <Dialog open={!!editingBank} onOpenChange={(open) => { if (!open) { setEditingBank(null); setForm(emptyForm); } }}>
+      <Dialog open={!!editingBank} onOpenChange={(open) => { if (!open) { setEditingBank(null); setForm(emptyForm); clearLogo(); } }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Bank Account</DialogTitle></DialogHeader>
           <div className="space-y-3">
+            <LogoUploadField />
             <div><Label>Bank Name</Label><Input value={form.bank_name} onChange={e => setForm(f => ({ ...f, bank_name: e.target.value }))} /></div>
             <div><Label>Account Name</Label><Input value={form.account_name} onChange={e => setForm(f => ({ ...f, account_name: e.target.value }))} /></div>
             <div><Label>Account Number</Label><Input value={form.account_number} onChange={e => setForm(f => ({ ...f, account_number: e.target.value }))} /></div>
@@ -563,7 +626,7 @@ export function AdminBanks() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setEditingBank(null); setForm(emptyForm); }}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setEditingBank(null); setForm(emptyForm); clearLogo(); }}>Cancel</Button>
             <Button onClick={() => editMutation.mutate()} disabled={!form.bank_name || !form.account_name || !form.account_number || editMutation.isPending}>
               {editMutation.isPending ? "Saving..." : "Save Changes"}
             </Button>

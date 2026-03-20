@@ -228,6 +228,7 @@ export type Database = {
           branch: string | null
           created_at: string | null
           id: string
+          logo_url: string | null
           routing_number: string | null
           seller_id: string | null
           status: string
@@ -241,6 +242,7 @@ export type Database = {
           branch?: string | null
           created_at?: string | null
           id?: string
+          logo_url?: string | null
           routing_number?: string | null
           seller_id?: string | null
           status?: string
@@ -254,6 +256,7 @@ export type Database = {
           branch?: string | null
           created_at?: string | null
           id?: string
+          logo_url?: string | null
           routing_number?: string | null
           seller_id?: string | null
           status?: string
