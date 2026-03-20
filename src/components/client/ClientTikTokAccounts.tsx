@@ -52,7 +52,7 @@ export function ClientTikTokAccounts() {
     },
     onSuccess: () => {
       toast.success(`Top up successful: $${topUpAmount}`, {
-        duration: 10000,
+        duration: 5000,
         description: "CRM spend cap updated. Admin will confirm in TikTok.",
       });
       setTopUpAccount(null);
