@@ -490,14 +490,6 @@ export function ClientTopUp() {
                         </Button>
                       ) : "—"}
                     </TableCell>
-                    <TableCell className="text-sm max-w-[200px]">
-                      {r.admin_note && !r.admin_note.startsWith('Auto-verification:') ? (
-                        <span className="flex items-start gap-1 text-muted-foreground">
-                          <MessageSquare className="h-3 w-3 mt-0.5 shrink-0" />
-                          {r.admin_note}
-                        </span>
-                      ) : "—"}
-                    </TableCell>
                   </TableRow>
                 ))}
                 {(!myRequests || myRequests.length === 0) && (
