@@ -1,52 +1,59 @@
 
 
-# TikTok Fraud Detection: Disable → Delete Campaigns + Admin Notify
+# TikTok Admin Spend Cap Management + Fraud Flagging
 
-## Overview
+## Requirements
 
-When fraud is detected (spending cap mismatch during verify or sync), the system will:
-1. **First**: DISABLE all running campaigns (immediate spend stop)
-2. **If fraud persists on next sync**: DELETE the disabled campaigns
-3. **Notify admins** with campaign details at each step
+1. **Admin manually sets spend cap** after unfreezing a client — this becomes the new baseline
+2. **"Update Spend Cap" action** in admin TikTok accounts list (action button per account) and detail page
+3. **Admin updates spend cap via API** — calls TikTok budget API to set exact spend cap, then updates CRM
+4. **Client dashboard reflects** the updated spend cap in realtime
+5. **Red flag on mismatched accounts** — when fraud is detected, mark the specific ad account (not just freeze client) so admin can see which accounts had issues
 
-## Implementation
+## Technical Plan
 
-### Files to Modify
+### 1. Add `fraud_flag` column to `ad_accounts` table
+- New boolean column `fraud_flag` (default: false)
+- When fraud is detected in `tiktok-sync-client` and `tiktok-verify-topup`, set `fraud_flag = true` on the specific ad account
+- When admin manually updates spend cap, reset `fraud_flag = false`
+
+### 2. Admin "Update Spend Cap" dialog
+- In `AdminTikTokAccounts.tsx`: Add dropdown menu per account row with "Top Up" and "Update Spend Cap" options
+- In `AdAccountDetailPage.tsx`: Add "Update Spend Cap" button alongside Top Up for TikTok accounts
+- Dialog lets admin enter exact new spend cap value (not increment)
+- On submit: directly update `ad_accounts.spend_cap` in DB + call TikTok API to set budget via BC, then reset `fraud_flag = false`
+- Since TikTok BC API doesn't support setting spend cap for postpaid accounts, we'll update CRM only (like current top-up flow) and open TikTok billing page for manual confirmation
+
+### 3. Red flag visual indicator
+- In `AdminTikTokAccounts.tsx`: Show a red warning icon/badge next to account name when `fraud_flag = true`
+- In `AdAccountDetailPage.tsx`: Show alert banner when `fraud_flag = true`
+- In `ClientTikTokAccounts.tsx`: Not visible to clients (admin-only indicator)
+
+### 4. Edge function changes
+- `tiktok-sync-client`: On fraud detection, also set `fraud_flag = true` on the specific ad account
+- `tiktok-verify-topup`: On mismatch, also set `fraud_flag = true` on the specific ad account
+
+### 5. Client dashboard realtime
+- Already handled via existing `refetchInterval: 120000` in `ClientTikTokAccounts.tsx`
+- When admin updates `spend_cap` in DB, client's next poll (or page reload) picks it up automatically
+
+## Files to Modify
 
 | File | Change |
 |------|--------|
-| `supabase/functions/tiktok-verify-topup/index.ts` | Add campaign DISABLE logic on mismatch + admin notification with campaign count |
-| `supabase/functions/tiktok-sync-client/index.ts` | Add fraud check: if campaigns still found after freeze, DELETE them + notify |
+| **Migration** | Add `fraud_flag boolean default false` to `ad_accounts` |
+| `supabase/functions/tiktok-sync-client/index.ts` | Set `fraud_flag = true` on fraud detection |
+| `supabase/functions/tiktok-verify-topup/index.ts` | Set `fraud_flag = true` on mismatch |
+| `src/components/admin/AdminTikTokAccounts.tsx` | Add dropdown menu with "Update Spend Cap" action, red flag indicator |
+| `src/pages/AdAccountDetailPage.tsx` | Add "Update Spend Cap" button for TikTok, fraud alert banner, reset flag on update |
 
-### Campaign Management Flow
+## Update Spend Cap Flow
 
 ```text
-Mismatch Detected (verify-topup or sync-client)
-  │
-  ├─ 1st time: Freeze account + DISABLE campaigns
-  │     GET /campaign/get/ (filter: CAMPAIGN_STATUS_ENABLE)
-  │     POST /campaign/update/status/ (opt_status: "DISABLE")
-  │     → Log: "Disabled X campaigns"
-  │     → Notify admins: "Fraud detected, X campaigns disabled"
-  │
-  └─ Next sync (account already frozen): DELETE disabled campaigns
-        GET /campaign/get/ (filter: CAMPAIGN_STATUS_DISABLE)
-        POST /campaign/update/status/ (opt_status: "DELETE")
-        → Log: "Deleted X campaigns"
-        → Notify admins: "X campaigns permanently deleted"
+Admin clicks "Update Spend Cap" on TikTok account
+  → Dialog: enter exact new spend cap value
+  → Submit: update ad_accounts.spend_cap = new value, fraud_flag = false
+  → Open TikTok billing page for manual confirmation
+  → Client sees updated spend cap on next refresh
 ```
-
-### TikTok API Calls
-
-1. **Fetch campaigns**: `GET /open_api/v1.3/campaign/get/?advertiser_id={id}&filtering={"status":"CAMPAIGN_STATUS_ENABLE"}&page_size=100`
-2. **Update status**: `POST /open_api/v1.3/campaign/update/status/` with body `{advertiser_id, campaign_ids[], opt_status: "DISABLE" or "DELETE"}`
-3. Batch limit: 20 campaign IDs per call
-
-### Key Details
-
-- Campaign disable/delete uses the same BC access token already available
-- If API call fails, account freeze still proceeds — campaign action is best-effort with error logging
-- Admin notifications include: client name, account name, campaign count, action taken (disabled/deleted)
-- `tiktok-verify-topup`: On mismatch → freeze + DISABLE campaigns
-- `tiktok-sync-client`: On already-frozen account with disabled campaigns found → DELETE them
 
