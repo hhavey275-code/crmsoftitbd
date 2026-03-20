@@ -76,48 +76,11 @@ export default function Auth() {
   const [monthlySpend, setMonthlySpend] = useState("");
   const [loading, setLoading] = useState(false);
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
-
-  const callbackParams = new URLSearchParams(window.location.search);
-  const authCodeFromUrl = callbackParams.get("auth_code");
-  const callbackState = (callbackParams.get("state") ?? "").toLowerCase();
-  const hasTikTokCallback = Boolean(authCodeFromUrl) && callbackState.startsWith("tiktok");
-
-  const [tiktokProcessing, setTiktokProcessing] = useState(hasTikTokCallback);
   const navigate = useNavigate();
   const { logoUrl, siteName, welcomeTitle, welcomeNote } = useSiteSettings();
 
-  // Auto-detect TikTok OAuth callback and exchange auth_code for token
-  useEffect(() => {
-    if (!hasTikTokCallback || !authCodeFromUrl) return;
-
-    setTiktokProcessing(true);
-    toast.info("TikTok auth code detected, exchanging for token...");
-
-    (async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke("tiktok-oauth", {
-          body: { auth_code: authCodeFromUrl },
-        });
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error);
-        if (data?.access_token) {
-          await navigator.clipboard.writeText(data.access_token);
-          toast.success("TikTok Access Token copied to clipboard! Use it to add your Business Center.", { duration: 10000 });
-          console.log("TikTok OAuth result:", data);
-        }
-      } catch (err: any) {
-        toast.error("TikTok token exchange failed: " + (err?.message || "Unknown error"));
-        console.error("TikTok OAuth error:", err);
-      }
-
-      // Clean URL and allow normal authenticated redirect
-      window.history.replaceState({}, "", window.location.pathname);
-      setTiktokProcessing(false);
-    })();
-  }, []);
-
-  // Redirect authenticated users to dashboard (but never before TikTok callback is handled)
-  if (!authLoading && user && !tiktokProcessing && !hasTikTokCallback) {
+  // Redirect authenticated users to dashboard
+  if (!authLoading && user) {
     return <Navigate to="/dashboard" replace />;
   }
 

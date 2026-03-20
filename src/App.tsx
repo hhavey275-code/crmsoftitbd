@@ -1,12 +1,14 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import Auth from "./pages/Auth";
 
 // Lazy load all dashboard pages
@@ -45,6 +47,55 @@ const PageLoader = () => (
     <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
   </div>
 );
+
+const TikTokOAuthCallbackHandler = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const authCode = params.get("auth_code");
+    const state = (params.get("state") ?? "").toLowerCase();
+
+    if (!authCode || !state.startsWith("tiktok")) return;
+
+    let cancelled = false;
+
+    (async () => {
+      toast.info("TikTok auth code detected, exchanging for token...");
+
+      try {
+        const { data, error } = await supabase.functions.invoke("tiktok-oauth", {
+          body: { auth_code: authCode },
+        });
+
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+
+        if (data?.access_token) {
+          await navigator.clipboard.writeText(data.access_token);
+          toast.success("TikTok Access Token copied to clipboard! Use it to add your Business Center.", {
+            duration: 10000,
+          });
+        } else {
+          toast.error("TikTok token exchange failed: No access token returned");
+        }
+      } catch (err: any) {
+        toast.error("TikTok token exchange failed: " + (err?.message || "Unknown error"));
+      }
+
+      if (!cancelled) {
+        navigate("/dashboard", { replace: true });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [location.search, navigate]);
+
+  return null;
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
