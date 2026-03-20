@@ -136,6 +136,7 @@ Deno.serve(async (req) => {
         spend_cap: currentBudget,
         amount_spent: currentBudgetCost,
         balance_after_topup: remainingAfterTopup,
+        fraud_flag: false,
       }).eq("id", ad_account_id);
 
       await supabase.from("system_logs").insert({
