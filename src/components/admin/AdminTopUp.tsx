@@ -226,8 +226,8 @@ export function AdminTopUp() {
     );
     const totalUsd = approvedInRange.reduce((s: number, r: any) => s + Number(r.amount || 0), 0);
     const totalBdt = approvedInRange.reduce((s: number, r: any) => s + Number(r.bdt_amount || 0), 0);
-    const autoApproved = approvedInRange.filter((r: any) => r.admin_note?.includes("Auto Approved by System")).length;
-    const manualApproved = approvedInRange.length - autoApproved;
+    const autoApproved = approvedInRange.filter((r: any) => !r.reviewed_by).length;
+    const manualApproved = approvedInRange.filter((r: any) => !!r.reviewed_by).length;
     return { totalUsd, totalBdt, autoApproved, manualApproved };
   }, [requests, dateRange]);
 
