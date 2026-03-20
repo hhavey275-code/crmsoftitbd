@@ -292,16 +292,35 @@ Deno.serve(async (req) => {
       verificationLog.push(`❌ Telegram SMS no match (${matchInfo}, messages checked: ${telegramMsgs?.length ?? 0}, window: ${windowStart} → ${windowEnd})`);
     }
 
-    // Decision
-    const ocrAvailable = ocrRef !== '' || ocrAmount > 0;
-    const allPassed = ocrAvailable ? (ocrRefMatch && ocrAmountMatch && telegramMatch) : telegramMatch;
-    const logText = `Auto-verification: ${verificationLog.join(' | ')}`;
+    // Decision — per method
+    let allPassed = false;
+    if (method === 'atm_deposit') {
+      allPassed = ocrAmountMatch && ocrAccountMatch && ocrAtmCredit && ocrRefMatch && telegramMatch;
+    } else if (method === 'cash_deposit') {
+      allPassed = ocrAmountMatch && ocrAccountMatch && telegramMatch;
+    } else {
+      // bank_transfer — existing logic
+      const ocrAvailable = ocrRef !== '' || ocrAmount > 0;
+      allPassed = ocrAvailable ? (ocrRefMatch && ocrAmountMatch && telegramMatch) : telegramMatch;
+    }
+    const logText = `Auto-verification (${method}): ${verificationLog.join(' | ')}`;
 
     if (!allPassed) {
       await supabase.from('top_up_requests').update({ admin_note: logText }).eq('id', request_id);
       const failReasons: string[] = [];
-      if (ocrAvailable && !ocrRefMatch) failReasons.push('OCR ref mismatch');
-      if (ocrAvailable && !ocrAmountMatch) failReasons.push('OCR amount mismatch');
+      if (method === 'atm_deposit') {
+        if (!ocrRefMatch) failReasons.push('OCR ref mismatch');
+        if (!ocrAmountMatch) failReasons.push('OCR amount mismatch');
+        if (!ocrAccountMatch) failReasons.push('OCR account mismatch');
+        if (!ocrAtmCredit) failReasons.push('ATM Transfer Credit not found');
+      } else if (method === 'cash_deposit') {
+        if (!ocrAmountMatch) failReasons.push('OCR amount mismatch');
+        if (!ocrAccountMatch) failReasons.push('OCR account mismatch');
+      } else {
+        const ocrAvailable = ocrRef !== '' || ocrAmount > 0;
+        if (ocrAvailable && !ocrRefMatch) failReasons.push('OCR ref mismatch');
+        if (ocrAvailable && !ocrAmountMatch) failReasons.push('OCR amount mismatch');
+      }
       if (!telegramMatch) failReasons.push('No Telegram SMS match');
       return new Response(JSON.stringify({ ok: true, auto_approved: false, reason: failReasons.join(', '), retry_suggested: !telegramMatch }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
