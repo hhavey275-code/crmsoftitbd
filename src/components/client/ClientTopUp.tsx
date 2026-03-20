@@ -239,7 +239,7 @@ export function ClientTopUp() {
         usd_rate: usdRate,
         bank_account_id: selectedBank,
         payment_reference: paymentRef || null,
-        payment_method: "bank_transfer",
+        payment_method: paymentMethod === "online_transfer" ? "bank_transfer" : paymentMethod,
         proof_url: proofUrl,
       } as any).select("id").single();
       if (error) throw error;
