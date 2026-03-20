@@ -413,7 +413,7 @@ export function AdminTikTokAccounts() {
                         <span className="text-[11px] text-muted-foreground font-mono">{a.account_id}</span>
                         {a.business_managers?.bm_id && (
                           <a
-                            href={`https://business.tiktok.com/manage/payment/v2?org_id=${a.business_managers.bm_id}&filters=3,1,2,4,5&selectAccountType=1`}
+                            href={`https://business.tiktok.com/manage/payment/v2?org_id=${a.business_managers.bm_id}&aadvid=${a.account_id}&filters=3,1,2,4,5&selectAccountType=1`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-muted-foreground hover:text-primary"
