@@ -437,6 +437,7 @@ export function AdminTikTokAccounts() {
                       <ArrowUpCircle className="h-3.5 w-3.5" />
                       Top Up
                     </Button>
+                    </div>
                   </div>
 
                   {ins && (
