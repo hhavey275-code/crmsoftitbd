@@ -292,6 +292,24 @@ export function ClientTopUp() {
           </CardHeader>
           <CardContent className="p-4 pt-2 space-y-3">
             <div className="space-y-2">
+              <Label>Payment Method</Label>
+              <RadioGroup value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as any)} className="flex flex-col gap-2">
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="online_transfer" id="pm-online" />
+                  <Label htmlFor="pm-online" className="font-normal cursor-pointer">Online Bank Transfer</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="atm_deposit" id="pm-atm" />
+                  <Label htmlFor="pm-atm" className="font-normal cursor-pointer">ATM Deposit</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="cash_deposit" id="pm-cash" />
+                  <Label htmlFor="pm-cash" className="font-normal cursor-pointer">Cash Deposit</Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            <div className="space-y-2">
               <Label>Payment Bank</Label>
               <Select value={selectedBank} onValueChange={setSelectedBank}>
                 <SelectTrigger>
