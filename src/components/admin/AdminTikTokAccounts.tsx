@@ -160,8 +160,24 @@ export function AdminTikTokAccounts() {
       if (data?.error) throw new Error(data.error);
       return data;
     },
-    onSuccess: () => {
-      toast.success(`Top up successful: $${topUpAmount}`);
+    onSuccess: (data) => {
+      const acc = topUpAccount;
+      const amt = topUpAmount;
+      const bmId = acc?.business_managers?.bm_id;
+      const billingUrl = bmId
+        ? `https://business.tiktok.com/manage/payment/v2?org_id=${bmId}&aadvid=${acc?.account_id}`
+        : `https://ads.tiktok.com/i18n/account/payment?aadvid=${acc?.account_id}`;
+      
+      toast.success(
+        `CRM spend cap updated: +$${amt}. Now update TikTok Budget Manager.`,
+        {
+          duration: 15000,
+          action: {
+            label: "Open TikTok Budget Manager →",
+            onClick: () => window.open(billingUrl, "_blank"),
+          },
+        }
+      );
       setTopUpAccount(null);
       setTopUpAmount("");
       queryClient.invalidateQueries({ queryKey: ["tiktok-ad-accounts"] });
