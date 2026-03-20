@@ -559,7 +559,7 @@ export function AdminTikTokAccounts() {
                           ) : <span className="text-sm text-muted-foreground">{name}</span>;
                         })()}
                       </TableCell>
-                      <TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <Button size="icon" className="h-8 w-8 bg-blue-600 hover:bg-blue-700 text-white" onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }} title="Top Up">
                           <ArrowUpCircle className="h-4 w-4" />
                         </Button>
