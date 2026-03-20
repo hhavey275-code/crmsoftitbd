@@ -443,12 +443,6 @@ export function ClientTopUp() {
                       <span className="text-[11px] text-muted-foreground">Ref: {r.payment_reference}</span>
                     )}
                   </div>
-                  {r.admin_note && !r.admin_note.startsWith('Auto-verification:') && (
-                    <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1">
-                      <MessageSquare className="h-3 w-3 mt-0.5 shrink-0" />
-                      {r.admin_note}
-                    </p>
-                  )}
                   {r.status === "approved" && (
                     <div className="flex justify-end mt-2">
                       <Button size="sm" variant="ghost" className="gap-1 text-primary hover:underline h-6 px-2 text-xs" asChild>
@@ -475,7 +469,7 @@ export function ClientTopUp() {
                   <TableHead>Reference</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Invoice</TableHead>
-                  <TableHead>Note</TableHead>
+                  
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -496,18 +490,10 @@ export function ClientTopUp() {
                         </Button>
                       ) : "—"}
                     </TableCell>
-                    <TableCell className="text-sm max-w-[200px]">
-                      {r.admin_note && !r.admin_note.startsWith('Auto-verification:') ? (
-                        <span className="flex items-start gap-1 text-muted-foreground">
-                          <MessageSquare className="h-3 w-3 mt-0.5 shrink-0" />
-                          {r.admin_note}
-                        </span>
-                      ) : "—"}
-                    </TableCell>
                   </TableRow>
                 ))}
                 {(!myRequests || myRequests.length === 0) && (
-                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No requests yet</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No requests yet</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
