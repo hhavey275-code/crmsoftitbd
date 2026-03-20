@@ -326,7 +326,29 @@ export default function AdAccountDetailPage() {
                       </Button>
                     </div>
                   )}
-                  <p className="text-sm text-muted-foreground font-mono mt-1">ID: {account.account_id.replace(/^act_/, '')}</p>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="text-sm text-muted-foreground font-mono">ID: {account.account_id.replace(/^act_/, '')}</span>
+                    {isTikTok && account.business_managers?.bm_id && (
+                      <a
+                        href={`https://business.tiktok.com/manage/payment/v2?org_id=${account.business_managers.bm_id}&filters=3,1,2,4,5&selectAccountType=1`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-muted-foreground hover:text-primary"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    )}
+                    {!isTikTok && (
+                      <a
+                        href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${account.account_id.replace(/^act_/, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-muted-foreground hover:text-primary"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    )}
+                  </div>
                 </div>
               </div>
               <StatusBadge status={account.status} />
