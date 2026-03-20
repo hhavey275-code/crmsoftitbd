@@ -266,7 +266,7 @@ export function AdminAdAccounts() {
           case "account_name": valA = a.account_name?.toLowerCase(); valB = b.account_name?.toLowerCase(); break;
           case "today_spend": valA = insA?.today_spend ?? 0; valB = insB?.today_spend ?? 0; break;
           case "yesterday_spend": valA = insA?.yesterday_spend ?? 0; valB = insB?.yesterday_spend ?? 0; break;
-          case "balance": valA = insA?.balance ?? 0; valB = insB?.balance ?? 0; break;
+          case "balance": valA = Math.max(0, Number(a.spend_cap) - Number(a.amount_spent)); valB = Math.max(0, Number(b.spend_cap) - Number(b.amount_spent)); break;
           case "spend_cap": valA = Number(a.spend_cap); valB = Number(b.spend_cap); break;
           default: valA = a.account_name?.toLowerCase(); valB = b.account_name?.toLowerCase();
         }
