@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.tiktok-topup]
 verify_jwt = false
+
+[functions.tiktok-oauth]
+verify_jwt = false
