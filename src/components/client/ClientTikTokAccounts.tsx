@@ -51,7 +51,10 @@ export function ClientTikTokAccounts() {
       return data;
     },
     onSuccess: () => {
-      toast.success(`Top up successful: $${topUpAmount}`);
+      toast.success(`Top up successful: $${topUpAmount}`, {
+        duration: 10000,
+        description: "CRM spend cap updated. Admin will confirm in TikTok.",
+      });
       setTopUpAccount(null);
       setTopUpAmount("");
       queryClient.invalidateQueries({ queryKey: ["client-tiktok-accounts"] });
