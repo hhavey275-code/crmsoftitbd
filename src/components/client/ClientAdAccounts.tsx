@@ -244,6 +244,7 @@ export function ClientAdAccounts() {
         switch (sortField) {
           case "account_name": valA = a.account_name?.toLowerCase(); valB = b.account_name?.toLowerCase(); break;
           case "spend_cap": valA = Number(a.spend_cap); valB = Number(b.spend_cap); break;
+          case "balance": valA = Math.max(0, Number(a.spend_cap) - Number(a.amount_spent)); valB = Math.max(0, Number(b.spend_cap) - Number(b.amount_spent)); break;
           default: valA = a.account_name?.toLowerCase(); valB = b.account_name?.toLowerCase();
         }
         if (valA < valB) return sortDir === "asc" ? -1 : 1;
