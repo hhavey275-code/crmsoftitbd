@@ -138,6 +138,7 @@ export type Database = {
           business_manager_id: string | null
           business_name: string | null
           created_at: string
+          fraud_flag: boolean
           id: string
           platform: string
           spend_cap: number
@@ -153,6 +154,7 @@ export type Database = {
           business_manager_id?: string | null
           business_name?: string | null
           created_at?: string
+          fraud_flag?: boolean
           id?: string
           platform?: string
           spend_cap?: number
@@ -168,6 +170,7 @@ export type Database = {
           business_manager_id?: string | null
           business_name?: string | null
           created_at?: string
+          fraud_flag?: boolean
           id?: string
           platform?: string
           spend_cap?: number
