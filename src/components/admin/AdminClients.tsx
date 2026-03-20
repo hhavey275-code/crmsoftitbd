@@ -369,6 +369,11 @@ export function AdminClients() {
                       <LogIn className="h-3.5 w-3.5 mr-1" />Login
                     </Button>
                   )}
+                  {!isPending && (
+                    <Button size="sm" variant="outline" onClick={() => setBankDialogUser(client)}>
+                      <Building2 className="h-3.5 w-3.5 mr-1" />Banks
+                    </Button>
+                  )}
                 </div>
               </TableCell>
             </TableRow>
