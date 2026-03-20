@@ -344,11 +344,15 @@ export function AdminClients() {
   return (
     <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <h1 className={cn("font-bold flex items-center gap-2", isMobile ? "text-xl" : "text-2xl")}>
           <Users className={cn(isMobile ? "h-5 w-5" : "h-6 w-6")} />
           Clients
         </h1>
+        <div className={cn("relative", isMobile ? "flex-1 max-w-[200px]" : "w-64")}>
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search clients..." value={search} onChange={(e) => setSearch(e.target.value)} className={cn("pl-9 h-9", isMobile && "rounded-full text-sm")} />
+        </div>
       </div>
 
       {/* Mobile Hero Metrics */}
