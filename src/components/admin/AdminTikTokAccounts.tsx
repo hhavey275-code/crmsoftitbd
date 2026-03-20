@@ -42,6 +42,10 @@ export function AdminTikTokAccounts() {
   const [topUpAccount, setTopUpAccount] = useState<any>(null);
   const [topUpAmount, setTopUpAmount] = useState("");
 
+  // Update Spend Cap
+  const [updateCapAccount, setUpdateCapAccount] = useState<any>(null);
+  const [newSpendCap, setNewSpendCap] = useState("");
+
   // Bulk actions
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAssignDialog, setShowAssignDialog] = useState(false);
