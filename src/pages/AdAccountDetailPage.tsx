@@ -523,6 +523,43 @@ export default function AdAccountDetailPage() {
           {/* Partner BMs (Meta + Admin only) */}
           {isAdmin && id && !isTikTok && <AdAccountPartners adAccountId={id} />}
         </div>
+
+        {/* Top Up Dialog */}
+        <Dialog open={showTopUp} onOpenChange={setShowTopUp}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Top Up — {account?.account_name}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <div>
+                <Label>Amount (USD)</Label>
+                <Input
+                  type="number"
+                  placeholder="Enter amount"
+                  value={topUpAmount}
+                  onChange={(e) => setTopUpAmount(e.target.value)}
+                  min="1"
+                  autoFocus
+                />
+              </div>
+              {assignedUserId && (
+                <p className="text-xs text-muted-foreground">
+                  Wallet will be deducted for assigned client.
+                </p>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowTopUp(false)}>Cancel</Button>
+              <Button
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={() => topUpMutation.mutate()}
+                disabled={topUpMutation.isPending || !topUpAmount}
+              >
+                {topUpMutation.isPending ? "Processing..." : "Top Up"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
