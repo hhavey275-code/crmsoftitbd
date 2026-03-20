@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigationType } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
@@ -7,12 +8,21 @@ import { AdminTikTokAccounts } from "@/components/admin/AdminTikTokAccounts";
 import { ClientTikTokAccounts } from "@/components/client/ClientTikTokAccounts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+const SESSION_KEYS = ["adAccountsSearch", "tiktokAccountsSearch", "adAccountsTab"];
+
 export default function AdAccountsPage() {
   const { isAdmin } = useAuth();
   const navType = useNavigationType();
-  const isPageReload = performance?.navigation?.type === 1 || (window.performance.getEntriesByType("navigation")[0] as any)?.type === "reload";
-  const isBackNav = navType === "POP" && !isPageReload;
+  const isBackNav = navType === "POP";
   const savedTab = isBackNav ? (sessionStorage.getItem("adAccountsTab") || "meta") : "meta";
+
+  // Clear session keys on page unload (reload/close) so reload starts fresh
+  useEffect(() => {
+    const cleanup = () => SESSION_KEYS.forEach((k) => sessionStorage.removeItem(k));
+    window.addEventListener("beforeunload", cleanup);
+    return () => window.removeEventListener("beforeunload", cleanup);
+  }, []);
+
   return (
     <DashboardLayout>
       <Tabs defaultValue={savedTab} className="w-full" onValueChange={(v) => sessionStorage.setItem("adAccountsTab", v)}>

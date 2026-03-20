@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useNavigationType } from "react-router-dom";
+
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,10 +18,7 @@ import { friendlyEdgeError } from "@/lib/utils";
 export function ClientTikTokAccounts() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const navType = useNavigationType();
-  const isPageReload = performance?.navigation?.type === 1 || (window.performance.getEntriesByType("navigation")[0] as any)?.type === "reload";
-  const isBackNav = navType === "POP" && !isPageReload;
-  const [search, setSearch] = useState(() => isBackNav ? (sessionStorage.getItem("tiktokAccountsSearch") || "") : "");
+  const [search, setSearch] = useState(() => sessionStorage.getItem("tiktokAccountsSearch") || "");
   useEffect(() => { sessionStorage.setItem("tiktokAccountsSearch", search); }, [search]);
   const [topUpAccount, setTopUpAccount] = useState<any>(null);
   const [topUpAmount, setTopUpAmount] = useState("");
