@@ -46,7 +46,8 @@ export function AdminAdAccounts() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showSelect, setShowSelect] = useState(false);
-  const isBackNav = (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming)?.type === 'back_forward';
+  const navType = useNavigationType();
+  const isBackNav = navType === "POP";
   const [search, setSearch] = useState(() => isBackNav ? (sessionStorage.getItem("adAccountsSearch") || "") : "");
   useEffect(() => { sessionStorage.setItem("adAccountsSearch", search); }, [search]);
   const [statusFilter, setStatusFilter] = useState("all");
