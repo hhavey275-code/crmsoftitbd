@@ -8,7 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function AdAccountsPage() {
   const { isAdmin } = useAuth();
-  const savedTab = sessionStorage.getItem("adAccountsTab") || "meta";
+  const isBackNav = (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming)?.type === 'back_forward';
+  const savedTab = isBackNav ? (sessionStorage.getItem("adAccountsTab") || "meta") : "meta";
   return (
     <DashboardLayout>
       <Tabs defaultValue={savedTab} className="w-full" onValueChange={(v) => sessionStorage.setItem("adAccountsTab", v)}>
