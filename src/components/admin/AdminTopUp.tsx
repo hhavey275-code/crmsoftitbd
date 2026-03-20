@@ -9,13 +9,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format } from "date-fns";
+import { format, startOfDay, endOfDay, subDays, isWithinInterval } from "date-fns";
 import { toast } from "sonner";
 import { useState, Fragment, useMemo, useEffect } from "react";
-import { Check, X, Pause, ImageIcon, Radio, ChevronDown, ChevronUp, MessageSquareText, RotateCcw, ClipboardCheck, FileText } from "lucide-react";
+import { Check, X, Pause, ImageIcon, Radio, ChevronDown, ChevronUp, MessageSquareText, RotateCcw, ClipboardCheck, FileText, DollarSign, Banknote, Bot, UserCheck, CalendarIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { MetricCard } from "@/components/MetricCard";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import type { DateRange } from "react-day-picker";
 import { logSystemAction } from "@/lib/systemLog";
 
 type ActionType = "approved" | "rejected" | "hold";
@@ -128,6 +132,26 @@ export function AdminTopUp() {
     id: string; action: ActionType; userId: string; amount: number; bdtAmount: number | null; usdRate: number | null;
   } | null>(null);
 
+  const today = startOfDay(new Date());
+  const [datePreset, setDatePreset] = useState<"today" | "yesterday" | "custom">("today");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: today,
+    to: endOfDay(new Date()),
+  });
+
+  const handlePreset = (preset: "today" | "yesterday") => {
+    setDatePreset(preset);
+    if (preset === "today") {
+      setDateRange({ from: today, to: endOfDay(new Date()) });
+    } else {
+      const yesterday = subDays(today, 1);
+      setDateRange({ from: yesterday, to: endOfDay(yesterday) });
+    }
+  };
+
+
+
+
   useEffect(() => {
     const channel = supabase.channel("admin-topup-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "top_up_requests" }, () => {
@@ -191,6 +215,21 @@ export function AdminTopUp() {
   });
 
   const filtered = requests?.filter((r: any) => statusFilter === "all" || statusFilter === "bank_sms" ? true : r.status === statusFilter);
+
+  const summaryMetrics = useMemo(() => {
+    if (!requests) return { totalUsd: 0, totalBdt: 0, autoApproved: 0, manualApproved: 0 };
+    const from = dateRange?.from ? startOfDay(dateRange.from) : today;
+    const to = dateRange?.to ? endOfDay(dateRange.to) : endOfDay(new Date());
+    const approvedInRange = requests.filter((r: any) =>
+      r.status === "approved" &&
+      isWithinInterval(new Date(r.updated_at || r.created_at), { start: from, end: to })
+    );
+    const totalUsd = approvedInRange.reduce((s: number, r: any) => s + Number(r.amount || 0), 0);
+    const totalBdt = approvedInRange.reduce((s: number, r: any) => s + Number(r.bdt_amount || 0), 0);
+    const autoApproved = approvedInRange.filter((r: any) => r.admin_note?.includes("Auto Approved by System")).length;
+    const manualApproved = approvedInRange.length - autoApproved;
+    return { totalUsd, totalBdt, autoApproved, manualApproved };
+  }, [requests, dateRange]);
 
   const processMutation = useMutation({
     mutationFn: async ({ id, action, userId, amount }: { id: string; action: ActionType; userId: string; amount: number }) => {
@@ -310,6 +349,69 @@ export function AdminTopUp() {
           {isFetchingTelegram ? "Fetching..." : "Fetch Telegram"}
         </Button>
       </div>
+
+      {/* Date Picker & Summary Metrics */}
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant={datePreset === "today" ? "default" : "outline"} onClick={() => handlePreset("today")}>Today</Button>
+          <Button size="sm" variant={datePreset === "yesterday" ? "default" : "outline"} onClick={() => handlePreset("yesterday")}>Yesterday</Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button size="sm" variant={datePreset === "custom" ? "default" : "outline"} className="gap-1.5">
+                <CalendarIcon className="h-3.5 w-3.5" />
+                {datePreset === "custom" && dateRange?.from
+                  ? `${format(dateRange.from, "MMM d")}${dateRange.to && dateRange.to.getTime() !== dateRange.from.getTime() ? ` – ${format(dateRange.to, "MMM d")}` : ""}`
+                  : "Date Range"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="range"
+                selected={dateRange}
+                onSelect={(range) => { setDateRange(range); setDatePreset("custom"); }}
+                numberOfMonths={isMobile ? 1 : 2}
+                className="p-3 pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
+          <MetricCard
+            title="Total Top Up"
+            value={`$${summaryMetrics.totalUsd.toLocaleString()}`}
+            icon={DollarSign}
+            iconBg="bg-primary/10"
+            iconColor="text-primary"
+            size={isMobile ? "xs" : "sm"}
+          />
+          <MetricCard
+            title="Payment Received"
+            value={`৳${summaryMetrics.totalBdt.toLocaleString()}`}
+            icon={Banknote}
+            iconBg="bg-accent/20"
+            iconColor="text-accent-foreground"
+            size={isMobile ? "xs" : "sm"}
+          />
+          <MetricCard
+            title="Auto Approved"
+            value={summaryMetrics.autoApproved}
+            icon={Bot}
+            iconBg="bg-secondary/50"
+            iconColor="text-secondary-foreground"
+            size={isMobile ? "xs" : "sm"}
+          />
+          <MetricCard
+            title="Manual Approved"
+            value={summaryMetrics.manualApproved}
+            icon={UserCheck}
+            iconBg="bg-muted"
+            iconColor="text-muted-foreground"
+            size={isMobile ? "xs" : "sm"}
+          />
+        </div>
+      </div>
+
 
       <Tabs value={statusFilter} onValueChange={setStatusFilter}>
         <TabsList className={cn(isMobile && "w-full overflow-x-auto flex")}>
