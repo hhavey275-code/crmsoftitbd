@@ -126,9 +126,8 @@ Deno.serve(async (req) => {
       const advertiserId = String(adv.advertiser_id);
       const advertiserName = adv.advertiser_name || `TikTok ${advertiserId}`;
       const bal = budgetMap[advertiserId];
-      // grant = total allocated, balance = remaining; spent = grant - balance
-      const spendCap = bal?.grant ?? 0;
-      const amountSpent = spendCap > 0 ? Math.max(0, spendCap - (bal?.balance ?? 0)) : 0;
+      const spendCap = bal?.budget ?? 0;
+      const amountSpent = bal?.budgetCost ?? 0;
 
       const { data: existing } = await supabase
         .from("ad_accounts")
