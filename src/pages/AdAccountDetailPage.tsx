@@ -165,7 +165,7 @@ export default function AdAccountDetailPage() {
     return (
       <DashboardLayout>
         <div className="space-y-4">
-          <Button variant="ghost" onClick={() => navigate("/ad-accounts")}>
+          <Button variant="ghost" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
@@ -180,7 +180,7 @@ export default function AdAccountDetailPage() {
       <div className="space-y-6">
         {/* Back button & Update */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate("/ad-accounts")}>
+          <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-4 w-4 mr-1" />
             <span className="hidden sm:inline">Back to Ad Accounts</span>
             <span className="sm:hidden">Back</span>

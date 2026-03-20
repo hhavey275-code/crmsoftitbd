@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,7 +16,8 @@ import { logSystemAction } from "@/lib/systemLog";
 
 export function AdminTikTokAccounts() {
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() => sessionStorage.getItem("tiktokAccountsSearch") || "");
+  useEffect(() => { sessionStorage.setItem("tiktokAccountsSearch", search); }, [search]);
   const [topUpAccount, setTopUpAccount] = useState<any>(null);
   const [topUpAmount, setTopUpAmount] = useState("");
   const [showAddBc, setShowAddBc] = useState(false);

@@ -8,9 +8,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function AdAccountsPage() {
   const { isAdmin } = useAuth();
+  const savedTab = sessionStorage.getItem("adAccountsTab") || "meta";
   return (
     <DashboardLayout>
-      <Tabs defaultValue="meta" className="w-full">
+      <Tabs defaultValue={savedTab} className="w-full" onValueChange={(v) => sessionStorage.setItem("adAccountsTab", v)}>
         <TabsList className="mb-4">
           <TabsTrigger value="meta">Meta Ad Accounts</TabsTrigger>
           <TabsTrigger value="tiktok">TikTok Ad Accounts</TabsTrigger>
