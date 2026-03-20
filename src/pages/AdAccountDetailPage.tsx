@@ -156,7 +156,36 @@ export default function AdAccountDetailPage() {
     onError: (err: any) => toast.error(err.message),
   });
 
-  // Update from Meta / Update from BC
+  // Top-up mutation
+  const topUpMutation = useMutation({
+    mutationFn: async () => {
+      if (!topUpAmount) throw new Error("Enter amount");
+      const amt = parseFloat(topUpAmount);
+      if (isNaN(amt) || amt <= 0) throw new Error("Invalid amount");
+
+      const edgeFn = isTikTok ? "tiktok-topup" : "spend-cap-update";
+      const body = isTikTok
+        ? { ad_account_id: id, amount: amt, deduct_wallet: !!assignedUserId, target_user_id: assignedUserId }
+        : { ad_account_id: id, amount: amt, deduct_wallet: !!assignedUserId, target_user_id: assignedUserId };
+
+      const { data, error } = await supabase.functions.invoke(edgeFn, { body });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => {
+      toast.success(`Top up successful: $${topUpAmount}`);
+      setShowTopUp(false);
+      setTopUpAmount("");
+      queryClient.invalidateQueries({ queryKey: ["ad-account-detail", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["tiktok-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-all-wallets"] });
+    },
+    onError: (err: any) => toast.error(friendlyEdgeError(err)),
+  });
+
+
   const handleUpdateFromSource = async () => {
     if (!isAdmin && !isTikTok) {
       const now = Date.now();
