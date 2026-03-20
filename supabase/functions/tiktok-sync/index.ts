@@ -83,40 +83,44 @@ Deno.serve(async (req) => {
     console.log("Found", advertiserList.length, "advertisers");
     let syncedCount = 0;
 
-    // Process in batches of 20 to fetch budget info
-    const batchSize = 20;
-    for (let i = 0; i < advertiserList.length; i += batchSize) {
-      const batch = advertiserList.slice(i, i + batchSize);
-      const batchIds = batch.map(a => String(a.advertiser_id));
-
-      // Fetch budget info for this batch
-      let budgetMap: Record<string, { budget: number; spent: number }> = {};
-      try {
-        const budgetUrl = `https://business-api.tiktok.com/open_api/v1.3/advertiser/budget/get/?advertiser_ids=${encodeURIComponent(JSON.stringify(batchIds))}`;
-        const budgetRes = await fetch(budgetUrl, {
+    // Fetch balance/budget for all advertisers via BC endpoint (paginated)
+    let budgetMap: Record<string, { balance: number; grant: number }> = {};
+    try {
+      let page = 1;
+      let hasMore = true;
+      while (hasMore) {
+        const balanceUrl = `https://business-api.tiktok.com/open_api/v1.3/advertiser/balance/get/?bc_id=${bcId}&page=${page}&page_size=50`;
+        const balanceRes = await fetch(balanceUrl, {
           headers: { "Access-Token": accessToken },
         });
-        const budgetText = await budgetRes.text();
-        try {
-          const budgetData = JSON.parse(budgetText);
-          if (budgetData.code === 0 && budgetData.data?.list) {
-            for (const b of budgetData.data.list) {
-              budgetMap[String(b.advertiser_id)] = {
-                budget: Number(b.budget ?? 0),
-                spent: Number(b.spent ?? 0),
-              };
-            }
-          } else {
-            console.warn("Budget API error:", budgetData.message || budgetText.substring(0, 200));
-          }
-        } catch {
-          console.warn("Budget parse error:", budgetText.substring(0, 200));
+        const balanceText = await balanceRes.text();
+        let balanceData;
+        try { balanceData = JSON.parse(balanceText); } catch {
+          console.warn("Balance parse error:", balanceText.substring(0, 200));
+          break;
         }
-      } catch (e) {
-        console.warn("Budget fetch error:", e);
+        if (balanceData.code !== 0) {
+          console.warn("Balance API error:", balanceData.message);
+          break;
+        }
+        const list = balanceData.data?.list ?? [];
+        for (const b of list) {
+          budgetMap[String(b.advertiser_id)] = {
+            balance: Number(b.balance ?? 0),
+            grant: Number(b.grant ?? 0),
+          };
+        }
+        const totalPage = Math.ceil((balanceData.data?.page_info?.total_number ?? 0) / 50);
+        hasMore = page < totalPage;
+        page++;
       }
+      console.log("Fetched balance for", Object.keys(budgetMap).length, "advertisers");
+    } catch (e) {
+      console.warn("Balance fetch error:", e);
+    }
 
-      for (const adv of batch) {
+    // Upsert accounts
+    for (const adv of advertiserList) {
         const advertiserId = String(adv.advertiser_id);
         const advertiserName = adv.advertiser_name || `TikTok ${advertiserId}`;
         const budget = budgetMap[advertiserId];
