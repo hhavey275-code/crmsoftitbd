@@ -94,9 +94,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // STEP 2: Update spend cap in CRM (postpaid accounts - no TikTok API call needed)
-    // Budget Manager spending caps are managed in TikTok BC dashboard directly
-    const bm = (account as any).business_managers;
+    // STEP 2: Update spend cap in CRM (postpaid accounts)
     const oldSpendCap = Number(account.spend_cap);
     const newSpendCap = oldSpendCap + amount;
 
