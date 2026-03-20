@@ -288,7 +288,7 @@ Deno.serve(async (req) => {
     if (telegramMatch) {
       verificationLog.push(`✅ Telegram SMS matched (${telegramMatchDetail})`);
     } else {
-      const matchInfo = isMobileAgent ? `trnxID=${payment_reference}` : `bankLast4=${bankLast4}, bdt=${bdtNum}`;
+      const matchInfo = useMobileAgentFlow ? `trnxID=${payment_reference}` : `bankLast4=${bankLast4}, bdt=${bdtNum}`;
       verificationLog.push(`❌ Telegram SMS no match (${matchInfo}, messages checked: ${telegramMsgs?.length ?? 0}, window: ${windowStart} → ${windowEnd})`);
     }
 
