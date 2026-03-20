@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useNavigationType } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -46,7 +46,9 @@ export function AdminAdAccounts() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showSelect, setShowSelect] = useState(false);
-  const [search, setSearch] = useState(() => sessionStorage.getItem("adAccountsSearch") || "");
+  const navType = useNavigationType();
+  const isBackNav = navType === "POP";
+  const [search, setSearch] = useState(() => isBackNav ? (sessionStorage.getItem("adAccountsSearch") || "") : "");
   useEffect(() => { sessionStorage.setItem("adAccountsSearch", search); }, [search]);
   const [statusFilter, setStatusFilter] = useState("all");
   const [cardFilter, setCardFilter] = useState("all");

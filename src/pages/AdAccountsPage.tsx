@@ -1,4 +1,5 @@
 import { useAuth } from "@/contexts/AuthContext";
+import { useNavigationType } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { AdminAdAccounts } from "@/components/admin/AdminAdAccounts";
 import { ClientAdAccounts } from "@/components/client/ClientAdAccounts";
@@ -8,7 +9,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function AdAccountsPage() {
   const { isAdmin } = useAuth();
-  const savedTab = sessionStorage.getItem("adAccountsTab") || "meta";
+  const navType = useNavigationType();
+  const isBackNav = navType === "POP";
+  const savedTab = isBackNav ? (sessionStorage.getItem("adAccountsTab") || "meta") : "meta";
   return (
     <DashboardLayout>
       <Tabs defaultValue={savedTab} className="w-full" onValueChange={(v) => sessionStorage.setItem("adAccountsTab", v)}>
