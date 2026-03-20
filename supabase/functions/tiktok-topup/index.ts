@@ -110,77 +110,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    // STEP 2: TikTok API - Update advertiser budget (postpaid accounts)
+    // STEP 2: Update spend cap in CRM (postpaid accounts - no TikTok API call needed)
+    // Budget Manager spending caps are managed in TikTok BC dashboard directly
     const bm = (account as any).business_managers;
-    const bmToken = await decryptToken(bm.access_token, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const oldSpendCap = Number(account.spend_cap);
     const newSpendCap = oldSpendCap + amount;
-
-    try {
-      const tiktokRes = await fetch("https://business-api.tiktok.com/open_api/v1.3/advertiser/update/", {
-        method: "POST",
-        headers: {
-          "Access-Token": bmToken,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          advertiser_id: account.account_id,
-          budget: newSpendCap,
-          budget_mode: "BUDGET_MODE_DAY",
-        }),
-      });
-
-      const tiktokData = await tiktokRes.json();
-
-      if (tiktokData.code !== 0) {
-        const errMsg = tiktokData.message || "TikTok API error";
-        console.warn("TikTok budget update failed:", errMsg);
-
-        await supabase.from("failed_topups").insert({
-          user_id: walletUserId,
-          ad_account_id,
-          amount,
-          old_spend_cap: oldSpendCap,
-          error_message: errMsg,
-          status: "pending",
-        });
-
-        await supabase.from("system_logs").insert({
-          user_id: userId,
-          user_name: userName,
-          action: "TikTok Top-Up Failed",
-          details: `${account.account_name} (${account.account_id}) — $${amount} — ${errMsg}`,
-        });
-
-        return json({
-          error: `TikTok API error: ${errMsg}. Amount deducted from wallet. You can retry from Failed Top-Ups.`,
-          wallet_charged: shouldDeductWallet,
-        }, 400);
-      }
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : "Network error";
-
-      await supabase.from("failed_topups").insert({
-        user_id: walletUserId,
-        ad_account_id,
-        amount,
-        old_spend_cap: oldSpendCap,
-        error_message: errMsg,
-        status: "pending",
-      });
-
-      await supabase.from("system_logs").insert({
-        user_id: userId,
-        user_name: userName,
-        action: "TikTok Top-Up Failed",
-        details: `${account.account_name} (${account.account_id}) — $${amount} — ${errMsg}`,
-      });
-
-      return json({
-        error: `TikTok API error: ${errMsg}. Amount deducted from wallet. You can retry from Failed Top-Ups.`,
-        wallet_charged: shouldDeductWallet,
-      }, 500);
-    }
 
     // STEP 3: Update spend cap in DB
     const currentAmountSpent = Number(account.amount_spent);
