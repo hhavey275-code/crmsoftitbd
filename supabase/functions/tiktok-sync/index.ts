@@ -59,13 +59,23 @@ Deno.serve(async (req) => {
     url.searchParams.set("page", "1");
     url.searchParams.set("page_size", "100");
 
+    console.log("Fetching TikTok BC advertisers, bcId:", bcId);
     const res = await fetch(url.toString(), {
       headers: { "Access-Token": accessToken },
     });
 
-    const data = await res.json();
+    const rawText = await res.text();
+    console.log("TikTok BC advertiser response status:", res.status, "body length:", rawText.length, "preview:", rawText.substring(0, 300));
+
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch {
+      return json({ error: "Invalid response from TikTok API", raw: rawText.substring(0, 500) }, 502);
+    }
+
     if (data.code !== 0) {
-      return json({ error: data.message || "TikTok API error" }, 400);
+      return json({ error: data.message || "TikTok API error", details: data }, 400);
     }
 
     const advertisers = data.data?.list ?? [];
