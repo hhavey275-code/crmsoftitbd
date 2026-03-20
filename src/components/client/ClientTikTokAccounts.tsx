@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,9 +12,11 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowUpCircle, Search, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { ArrowUpCircle, Search, Loader2, AlertTriangle, CheckCircle2, ExternalLink, ArrowUpDown } from "lucide-react";
 import { friendlyEdgeError } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface PendingTopUp {
   ad_account_id: string;
@@ -26,8 +29,10 @@ interface PendingTopUp {
 }
 
 export function ClientTikTokAccounts() {
+  const isMobile = useIsMobile();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [search, setSearch] = useState(() => sessionStorage.getItem("tiktokAccountsSearch") || "");
   useEffect(() => { sessionStorage.setItem("tiktokAccountsSearch", search); }, [search]);
   const [topUpAccount, setTopUpAccount] = useState<any>(null);
@@ -35,6 +40,9 @@ export function ClientTikTokAccounts() {
   const [pendingTopUp, setPendingTopUp] = useState<PendingTopUp | null>(null);
   const [showVerifyDialog, setShowVerifyDialog] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [sortField, setSortField] = useState<string>("account_name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   // Restore pending top-up from sessionStorage on mount
   useEffect(() => {
@@ -87,7 +95,6 @@ export function ClientTikTokAccounts() {
     },
     onSuccess: (data) => {
       if (data.pending_verify) {
-        // Save pending state and redirect
         const pending: PendingTopUp = {
           ad_account_id: data.ad_account_id,
           account_name: topUpAccount.account_name,
@@ -105,10 +112,7 @@ export function ClientTikTokAccounts() {
         queryClient.invalidateQueries({ queryKey: ["client-tiktok-accounts"] });
         queryClient.invalidateQueries({ queryKey: ["client-wallet"] });
 
-        // Redirect to TikTok billing
         window.open(data.billing_url, "_blank");
-
-        // Show verify dialog after a short delay
         setTimeout(() => setShowVerifyDialog(true), 1000);
       } else {
         toast.success(`Top up successful: $${topUpAmount}`);
@@ -123,7 +127,6 @@ export function ClientTikTokAccounts() {
 
   const handleVerify = async (confirmed: boolean) => {
     if (!confirmed || !pendingTopUp) {
-      // If user says "No" — they didn't increase. Just close, no action.
       sessionStorage.removeItem("pendingTikTokTopUp");
       setPendingTopUp(null);
       setShowVerifyDialog(false);
@@ -165,79 +168,208 @@ export function ClientTikTokAccounts() {
   };
 
   const filtered = useMemo(() => {
-    if (!search) return accounts;
+    if (!accounts) return [];
     const s = search.toLowerCase();
-    return accounts.filter(
-      (a: any) =>
-        a.account_name.toLowerCase().includes(s) ||
-        a.account_id.toLowerCase().includes(s)
-    );
-  }, [accounts, search]);
+    return [...accounts]
+      .filter((a: any) => {
+        if (s && !a.account_name.toLowerCase().includes(s) && !a.account_id.toLowerCase().includes(s)) return false;
+        if (statusFilter !== "all" && a.status?.toLowerCase() !== statusFilter) return false;
+        return true;
+      })
+      .sort((a: any, b: any) => {
+        let valA: any, valB: any;
+        switch (sortField) {
+          case "account_name": valA = a.account_name?.toLowerCase(); valB = b.account_name?.toLowerCase(); break;
+          case "spend_cap": valA = Number(a.spend_cap); valB = Number(b.spend_cap); break;
+          default: valA = a.account_name?.toLowerCase(); valB = b.account_name?.toLowerCase();
+        }
+        if (valA < valB) return sortDir === "asc" ? -1 : 1;
+        if (valA > valB) return sortDir === "asc" ? 1 : -1;
+        return 0;
+      });
+  }, [accounts, search, statusFilter, sortField, sortDir]);
 
   const walletBalance = Number(wallet?.balance ?? 0);
   const parsedAmount = parseFloat(topUpAmount) || 0;
   const insufficientFunds = parsedAmount > walletBalance;
 
+  const getBillingUrl = (accountId: string) => {
+    return `https://business.tiktok.com/manage/payment/v2?org_id=7385945312675807249&aadvid=${accountId}`;
+  };
+
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-bold text-foreground">TikTok Ad Accounts</h2>
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search TikTok accounts..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-        />
+      {/* Filters */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[140px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 h-9 rounded-full"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[110px] md:w-[140px] h-9 text-xs">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="disabled">Disabled</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+          </SelectContent>
+        </Select>
+        {isMobile && (
+          <Select value={`${sortField}:${sortDir}`} onValueChange={(v) => { const [f, d] = v.split(":"); setSortField(f); setSortDir(d as "asc" | "desc"); }}>
+            <SelectTrigger className="w-[120px] h-9 text-xs">
+              <ArrowUpDown className="h-3 w-3 mr-1" />
+              <SelectValue placeholder="Sort" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="account_name:asc">Name A-Z</SelectItem>
+              <SelectItem value="account_name:desc">Name Z-A</SelectItem>
+              <SelectItem value="spend_cap:desc">Cap High</SelectItem>
+              <SelectItem value="spend_cap:asc">Cap Low</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Account Name</TableHead>
-                <TableHead>Account ID</TableHead>
-                <TableHead>Spend Cap</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
-                  </TableCell>
-                </TableRow>
-              ) : filtered.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                    No TikTok ad accounts assigned
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filtered.map((acc: any) => (
-                  <TableRow key={acc.id}>
-                    <TableCell className="font-medium">{acc.account_name}</TableCell>
-                    <TableCell className="text-muted-foreground">{acc.account_id}</TableCell>
-                    <TableCell>
-                      <SpendProgressBar amountSpent={acc.amount_spent} spendCap={acc.spend_cap} balanceAfterTopup={Number((acc as any).balance_after_topup ?? 0)} platform="tiktok" />
-                    </TableCell>
-                    <TableCell><StatusBadge status={acc.status} /></TableCell>
-                    <TableCell>
-                      <Button size="sm" variant="outline" onClick={() => setTopUpAccount(acc)}>
-                        <ArrowUpCircle className="h-4 w-4 mr-1" /> Top Up
+      {/* Mobile Card Layout */}
+      {isMobile ? (
+        <div className="space-y-3">
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8 text-sm">No TikTok ad accounts assigned</p>
+          ) : (
+            filtered.map((acc: any) => (
+              <Card
+                key={acc.id}
+                className="border border-border/60 shadow-sm cursor-pointer active:scale-[0.98] transition-transform"
+                onClick={() => navigate(`/ad-accounts/${acc.id}`)}
+              >
+                <CardContent className="p-3">
+                  <div className="flex-1 min-w-0">
+                    {/* Top row: name + status */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold truncate">{acc.account_name}</p>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className="text-[11px] text-muted-foreground font-mono">{acc.account_id}</span>
+                          <a
+                            href={getBillingUrl(acc.account_id)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-muted-foreground hover:text-primary"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        </div>
+                      </div>
+                      <StatusBadge status={acc.status} />
+                    </div>
+
+                    {/* Spend progress */}
+                    <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                      <SpendProgressBar
+                        amountSpent={Number(acc.amount_spent)}
+                        spendCap={Number(acc.spend_cap)}
+                        balanceAfterTopup={Number(acc.balance_after_topup ?? 0)}
+                        platform="tiktok"
+                      />
+                    </div>
+
+                    {/* Top Up button */}
+                    <div className="mt-2 flex gap-2" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        size="sm"
+                        className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground text-xs h-8"
+                        onClick={() => { setTopUpAccount(acc); setTopUpAmount(""); }}
+                      >
+                        <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
+                        Top Up
                       </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      ) : (
+        /* Desktop Table Layout */
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Account Name</TableHead>
+                  <TableHead>Account ID</TableHead>
+                  <TableHead>Spend Cap</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                ) : filtered.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      No TikTok ad accounts assigned
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filtered.map((acc: any) => (
+                    <TableRow
+                      key={acc.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => navigate(`/ad-accounts/${acc.id}`)}
+                    >
+                      <TableCell className="font-medium">{acc.account_name}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-muted-foreground font-mono text-xs">{acc.account_id}</span>
+                          <a
+                            href={getBillingUrl(acc.account_id)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-muted-foreground hover:text-primary"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        </div>
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <SpendProgressBar amountSpent={acc.amount_spent} spendCap={acc.spend_cap} balanceAfterTopup={Number(acc.balance_after_topup ?? 0)} platform="tiktok" />
+                      </TableCell>
+                      <TableCell><StatusBadge status={acc.status} /></TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Button size="sm" variant="default" className="bg-primary hover:bg-primary/90 text-primary-foreground" onClick={() => { setTopUpAccount(acc); setTopUpAmount(""); }}>
+                          <ArrowUpCircle className="h-4 w-4 mr-1" /> Top Up
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Top Up Dialog */}
       <Dialog open={!!topUpAccount} onOpenChange={(o) => !o && setTopUpAccount(null)}>
