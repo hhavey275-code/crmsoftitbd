@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     // Fetch ad account
     const { data: account, error: accErr } = await supabase
       .from("ad_accounts")
-      .select("*")
+      .select("*, business_managers(bm_id)")
       .eq("id", ad_account_id)
       .eq("platform", "tiktok")
       .single();
@@ -94,23 +94,49 @@ Deno.serve(async (req) => {
       });
     }
 
-    // STEP 2: Update spend cap in CRM (postpaid accounts)
     const oldSpendCap = Number(account.spend_cap);
     const newSpendCap = oldSpendCap + amount;
 
-    // STEP 3: Update spend cap in DB
-    const currentAmountSpent = Number(account.amount_spent);
-    const remainingAfterTopup = newSpendCap - currentAmountSpent;
-    await supabase.from("ad_accounts").update({ spend_cap: newSpendCap, balance_after_topup: remainingAfterTopup }).eq("id", ad_account_id);
+    if (isAdmin) {
+      // Admin flow: update spend cap in DB immediately
+      const currentAmountSpent = Number(account.amount_spent);
+      const remainingAfterTopup = newSpendCap - currentAmountSpent;
+      await supabase.from("ad_accounts").update({ spend_cap: newSpendCap, balance_after_topup: remainingAfterTopup }).eq("id", ad_account_id);
 
-    await supabase.from("system_logs").insert({
-      user_id: userId,
-      user_name: userName,
-      action: "TikTok Spend Cap Updated",
-      details: `${account.account_name} (${account.account_id}) — $${oldSpendCap} → $${newSpendCap}`,
-    });
+      await supabase.from("system_logs").insert({
+        user_id: userId,
+        user_name: userName,
+        action: "TikTok Spend Cap Updated",
+        details: `${account.account_name} (${account.account_id}) — $${oldSpendCap} → $${newSpendCap}`,
+      });
 
-    return json({ success: true, old_spend_cap: oldSpendCap, new_spend_cap: newSpendCap });
+      return json({ success: true, old_spend_cap: oldSpendCap, new_spend_cap: newSpendCap });
+    } else {
+      // Client flow: DON'T update spend cap yet — client must verify on TikTok
+      // Build billing redirect URL
+      const bmId = (account as any).business_managers?.bm_id;
+      const billingUrl = bmId
+        ? `https://business.tiktok.com/manage/payment/v2?org_id=${bmId}&aadvid=${account.account_id}`
+        : `https://ads.tiktok.com/i18n/account/payment?aadvid=${account.account_id}`;
+
+      await supabase.from("system_logs").insert({
+        user_id: userId,
+        user_name: userName,
+        action: "TikTok Client Top-Up (Pending Verify)",
+        details: `${account.account_name} (${account.account_id}) — Wallet deducted $${amount}, old cap $${oldSpendCap}, expected new cap $${newSpendCap}`,
+      });
+
+      return json({
+        success: true,
+        pending_verify: true,
+        old_spend_cap: oldSpendCap,
+        expected_new_cap: newSpendCap,
+        amount,
+        billing_url: billingUrl,
+        ad_account_id,
+        account_id: account.account_id,
+      });
+    }
   } catch (err) {
     console.error("tiktok-topup error:", err);
     return json({ error: err instanceof Error ? err.message : "Unknown error" }, 500);
