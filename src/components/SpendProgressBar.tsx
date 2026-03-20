@@ -2,6 +2,7 @@ interface SpendProgressBarProps {
   amountSpent: number;
   spendCap: number;
   balanceAfterTopup?: number;
+  platform?: "meta" | "tiktok";
 }
 
 export function SpendProgressBar({ amountSpent, spendCap, balanceAfterTopup }: SpendProgressBarProps) {
