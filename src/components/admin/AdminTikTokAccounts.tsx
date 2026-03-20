@@ -184,6 +184,31 @@ export function AdminTikTokAccounts() {
     onError: (err: any) => toast.error(friendlyEdgeError(err)),
   });
 
+  // Update spend cap mutation (admin sets exact value)
+  const updateCapMutation = useMutation({
+    mutationFn: async () => {
+      if (!updateCapAccount || !newSpendCap) throw new Error("Missing data");
+      const cap = parseFloat(newSpendCap);
+      if (isNaN(cap) || cap < 0) throw new Error("Invalid spend cap");
+      const { error } = await supabase.from("ad_accounts").update({ spend_cap: cap, fraud_flag: false } as any).eq("id", updateCapAccount.id);
+      if (error) throw error;
+      return cap;
+    },
+    onSuccess: (cap) => {
+      const acc = updateCapAccount;
+      const bmId = acc?.business_managers?.bm_id;
+      const billingUrl = bmId
+        ? `https://business.tiktok.com/manage/payment/v2?org_id=${bmId}&aadvid=${acc?.account_id}`
+        : `https://ads.tiktok.com/i18n/account/payment?aadvid=${acc?.account_id}`;
+      window.open(billingUrl, "_blank");
+      toast.success(`Spend cap updated to $${cap.toLocaleString()}. TikTok billing page opened.`);
+      setUpdateCapAccount(null);
+      setNewSpendCap("");
+      queryClient.invalidateQueries({ queryKey: ["tiktok-ad-accounts"] });
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
   // Bulk delete
   const deleteMutation = useMutation({
     mutationFn: async () => {
