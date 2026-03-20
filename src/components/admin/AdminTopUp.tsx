@@ -286,11 +286,18 @@ export function AdminTopUp() {
             }
             if (botToken?.value && targetGroupId) {
               const caption = `✅ <b>Approved Top-Up</b>\n👤 ${clientName}\n💰 $${amount} (৳${reqData2.bdt_amount ? Number(reqData2.bdt_amount).toLocaleString() : 'N/A'})\n🔖 Ref: ${reqData2.payment_reference || 'N/A'}`;
-              await fetch(`https://api.telegram.org/bot${botToken.value}/sendPhoto`, {
+              const tgResp = await fetch(`https://api.telegram.org/bot${botToken.value}/sendPhoto`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ chat_id: targetGroupId, photo: reqData2.proof_url, caption, parse_mode: "HTML" }),
               });
+              const tgResult = await tgResp.json();
+              if (!tgResult.ok) {
+                console.error("Telegram forward error:", tgResult);
+                toast.error(`Telegram forward failed: ${tgResult.description || 'Unknown error'}`);
+              }
+            } else {
+              console.log("Telegram forward skipped — botToken:", !!botToken?.value, "groupId:", targetGroupId);
             }
           } catch (e) {
             console.error("Telegram forward failed:", e);
