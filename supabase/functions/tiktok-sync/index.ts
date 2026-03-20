@@ -54,13 +54,11 @@ Deno.serve(async (req) => {
     const bcId = bm.bm_id;
 
     // Fetch advertiser accounts from TikTok BC
-    const url = new URL("https://business-api.tiktok.com/open_api/v1.3/bc/advertiser/get/");
-    url.searchParams.set("bc_id", bcId);
-    url.searchParams.set("page", "1");
-    url.searchParams.set("page_size", "100");
+    const apiUrl = `https://business-api.tiktok.com/open_api/v1.3/bc/advertiser/get/?bc_id=${bcId}&page=1&page_size=100`;
 
-    console.log("Fetching TikTok BC advertisers, bcId:", bcId);
-    const res = await fetch(url.toString(), {
+    console.log("Fetching TikTok BC advertisers, bcId:", bcId, "url:", apiUrl);
+    const res = await fetch(apiUrl, {
+      method: "GET",
       headers: { "Access-Token": accessToken },
     });
 
