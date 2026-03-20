@@ -436,10 +436,18 @@ export default function AdAccountDetailPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">Spend Overview</CardTitle>
                 {isAdmin && (
-                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setShowTopUp(true)}>
-                    <ArrowUpCircle className="h-4 w-4 mr-1" />
-                    Top Up
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setShowTopUp(true)}>
+                      <ArrowUpCircle className="h-4 w-4 mr-1" />
+                      Top Up
+                    </Button>
+                    {isTikTok && (
+                      <Button size="sm" variant="outline" onClick={() => { setShowUpdateCap(true); setNewSpendCap(String(account.spend_cap ?? 0)); }}>
+                        <Settings className="h-4 w-4 mr-1" />
+                        Set Cap
+                      </Button>
+                    )}
+                  </div>
                 )}
               </div>
             </CardHeader>
