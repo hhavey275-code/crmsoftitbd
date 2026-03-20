@@ -564,7 +564,7 @@ export function AdminTikTokAccounts() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} balanceAfterTopup={Number(a.balance_after_topup ?? 0)} />
+                        <SpendProgressBar amountSpent={Number(a.amount_spent)} spendCap={Number(a.spend_cap)} balanceAfterTopup={Number(a.balance_after_topup ?? 0)} platform="tiktok" />
                       </TableCell>
                       <TableCell><StatusBadge status={a.status} /></TableCell>
                       <TableCell className="whitespace-nowrap">

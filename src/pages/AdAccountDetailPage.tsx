@@ -403,7 +403,7 @@ export default function AdAccountDetailPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <SpendProgressBar amountSpent={Number(account.amount_spent)} spendCap={Number(account.spend_cap)} balanceAfterTopup={Number((account as any).balance_after_topup ?? 0)} />
+              <SpendProgressBar amountSpent={Number(account.amount_spent)} spendCap={Number(account.spend_cap)} balanceAfterTopup={Number((account as any).balance_after_topup ?? 0)} platform={isTikTok ? "tiktok" : "meta"} />
               {!isTikTok && (
                 <div className="mt-4">
                   <Button variant="outline" size="sm" asChild>
