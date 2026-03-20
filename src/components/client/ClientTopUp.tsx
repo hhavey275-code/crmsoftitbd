@@ -22,6 +22,7 @@ export function ClientTopUp() {
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
   const [bdtAmount, setBdtAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"online_transfer" | "atm_deposit" | "cash_deposit">("online_transfer");
 
   const isInactive = (profile as any)?.status === "inactive";
   const [selectedBank, setSelectedBank] = useState("");
