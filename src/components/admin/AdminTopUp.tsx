@@ -350,7 +350,69 @@ export function AdminTopUp() {
         </Button>
       </div>
 
-      <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+      {/* Date Picker & Summary Metrics */}
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant={datePreset === "today" ? "default" : "outline"} onClick={() => handlePreset("today")}>Today</Button>
+          <Button size="sm" variant={datePreset === "yesterday" ? "default" : "outline"} onClick={() => handlePreset("yesterday")}>Yesterday</Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button size="sm" variant={datePreset === "custom" ? "default" : "outline"} className="gap-1.5">
+                <CalendarIcon className="h-3.5 w-3.5" />
+                {datePreset === "custom" && dateRange?.from
+                  ? `${format(dateRange.from, "MMM d")}${dateRange.to && dateRange.to.getTime() !== dateRange.from.getTime() ? ` – ${format(dateRange.to, "MMM d")}` : ""}`
+                  : "Date Range"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="range"
+                selected={dateRange}
+                onSelect={(range) => { setDateRange(range); setDatePreset("custom"); }}
+                numberOfMonths={isMobile ? 1 : 2}
+                className="p-3 pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
+          <MetricCard
+            title="Total Top Up"
+            value={`$${summaryMetrics.totalUsd.toLocaleString()}`}
+            icon={DollarSign}
+            iconBg="bg-primary/10"
+            iconColor="text-primary"
+            size={isMobile ? "xs" : "sm"}
+          />
+          <MetricCard
+            title="Payment Received"
+            value={`৳${summaryMetrics.totalBdt.toLocaleString()}`}
+            icon={Banknote}
+            iconBg="bg-accent/20"
+            iconColor="text-accent-foreground"
+            size={isMobile ? "xs" : "sm"}
+          />
+          <MetricCard
+            title="Auto Approved"
+            value={summaryMetrics.autoApproved}
+            icon={Bot}
+            iconBg="bg-secondary/50"
+            iconColor="text-secondary-foreground"
+            size={isMobile ? "xs" : "sm"}
+          />
+          <MetricCard
+            title="Manual Approved"
+            value={summaryMetrics.manualApproved}
+            icon={UserCheck}
+            iconBg="bg-muted"
+            iconColor="text-muted-foreground"
+            size={isMobile ? "xs" : "sm"}
+          />
+        </div>
+      </div>
+
+
         <TabsList className={cn(isMobile && "w-full overflow-x-auto flex")}>
           <TabsTrigger value="all" className={cn(isMobile && "text-xs flex-1")}>All</TabsTrigger>
           <TabsTrigger value="pending" className={cn(isMobile && "text-xs flex-1")}>Pending</TabsTrigger>
