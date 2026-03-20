@@ -110,24 +110,23 @@ Deno.serve(async (req) => {
       });
     }
 
-    // STEP 2: TikTok API - Transfer funds
+    // STEP 2: TikTok API - Update advertiser budget (postpaid accounts)
     const bm = (account as any).business_managers;
     const bmToken = await decryptToken(bm.access_token, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const oldSpendCap = Number(account.spend_cap);
     const newSpendCap = oldSpendCap + amount;
 
     try {
-      const tiktokRes = await fetch("https://business-api.tiktok.com/open_api/v1.3/bc/transfer/", {
+      const tiktokRes = await fetch("https://business-api.tiktok.com/open_api/v1.3/advertiser/update/", {
         method: "POST",
         headers: {
           "Access-Token": bmToken,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          bc_id: bm.bm_id,
           advertiser_id: account.account_id,
-          transfer_type: "RECHARGE",
-          cash_amount: amount,
+          budget: newSpendCap,
+          budget_mode: "BUDGET_MODE_DAY",
         }),
       });
 
@@ -135,7 +134,7 @@ Deno.serve(async (req) => {
 
       if (tiktokData.code !== 0) {
         const errMsg = tiktokData.message || "TikTok API error";
-        console.warn("TikTok transfer failed:", errMsg);
+        console.warn("TikTok budget update failed:", errMsg);
 
         await supabase.from("failed_topups").insert({
           user_id: walletUserId,
