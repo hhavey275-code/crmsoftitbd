@@ -66,6 +66,7 @@ export function AdminAdAccounts() {
       const { data } = await supabase
         .from("ad_accounts")
         .select("*, business_managers(name)")
+        .eq("platform", "meta")
         .order("created_at", { ascending: false });
       return (data as any[]) ?? [];
     },
