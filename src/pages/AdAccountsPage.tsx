@@ -10,7 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 export default function AdAccountsPage() {
   const { isAdmin } = useAuth();
   const navType = useNavigationType();
-  const isBackNav = navType === "POP";
+  const isPageReload = performance?.navigation?.type === 1 || (window.performance.getEntriesByType("navigation")[0] as any)?.type === "reload";
+  const isBackNav = navType === "POP" && !isPageReload;
   const savedTab = isBackNav ? (sessionStorage.getItem("adAccountsTab") || "meta") : "meta";
   return (
     <DashboardLayout>

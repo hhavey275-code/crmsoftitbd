@@ -47,7 +47,8 @@ export function ClientAdAccounts() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showSelect, setShowSelect] = useState(false);
   const navType = useNavigationType();
-  const isBackNav = navType === "POP";
+  const isPageReload = performance?.navigation?.type === 1 || (window.performance.getEntriesByType("navigation")[0] as any)?.type === "reload";
+  const isBackNav = navType === "POP" && !isPageReload;
   const [search, setSearch] = useState(() => isBackNav ? (sessionStorage.getItem("adAccountsSearch") || "") : "");
   useEffect(() => { sessionStorage.setItem("adAccountsSearch", search); }, [search]);
   const [statusFilter, setStatusFilter] = useState("all");
