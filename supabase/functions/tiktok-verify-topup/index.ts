@@ -150,6 +150,7 @@ Deno.serve(async (req) => {
     } else {
       // ❌ Mismatch — freeze client account
       await supabase.from("profiles").update({ status: "inactive" }).eq("user_id", userId);
+      await supabase.from("ad_accounts").update({ fraud_flag: true }).eq("id", ad_account_id);
 
       // DISABLE all running campaigns (Phase 1)
       let disabledCount = 0;
