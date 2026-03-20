@@ -243,14 +243,14 @@ export function ClientAdAccounts() {
         let valA: any, valB: any;
         switch (sortField) {
           case "account_name": valA = a.account_name?.toLowerCase(); valB = b.account_name?.toLowerCase(); break;
-          case "spend_cap": valA = Number(a.spend_cap); valB = Number(b.spend_cap); break;
-          case "balance": {
+          case "spend_cap": {
             const insA = insights[a.id];
             const insB = insights[b.id];
             valA = insA?.balance != null ? Number(insA.balance) : Math.max(0, Number(a.spend_cap) - Number(a.amount_spent));
             valB = insB?.balance != null ? Number(insB.balance) : Math.max(0, Number(b.spend_cap) - Number(b.amount_spent));
             break;
           }
+          case "balance": valA = Number(a.spend_cap); valB = Number(b.spend_cap); break;
           default: valA = a.account_name?.toLowerCase(); valB = b.account_name?.toLowerCase();
         }
         if (valA < valB) return sortDir === "asc" ? -1 : 1;
