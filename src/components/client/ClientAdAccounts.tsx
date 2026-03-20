@@ -244,6 +244,7 @@ export function ClientAdAccounts() {
         switch (sortField) {
           case "account_name": valA = a.account_name?.toLowerCase(); valB = b.account_name?.toLowerCase(); break;
           case "spend_cap": valA = Number(a.spend_cap); valB = Number(b.spend_cap); break;
+          case "balance": valA = Math.max(0, Number(a.spend_cap) - Number(a.amount_spent)); valB = Math.max(0, Number(b.spend_cap) - Number(b.amount_spent)); break;
           default: valA = a.account_name?.toLowerCase(); valB = b.account_name?.toLowerCase();
         }
         if (valA < valB) return sortDir === "asc" ? -1 : 1;
@@ -412,7 +413,7 @@ export function ClientAdAccounts() {
             <SelectItem value="unsettled">Unsettled</SelectItem>
           </SelectContent>
         </Select>
-        {!isMobile && (
+        {!isMobile ? (
           <Select value={cardFilter} onValueChange={setCardFilter}>
             <SelectTrigger className="w-[160px] h-9">
               <SelectValue placeholder="Card" />
@@ -422,6 +423,21 @@ export function ClientAdAccounts() {
               {uniqueCards.map((card) => (
                 <SelectItem key={card} value={card}>{card}</SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <Select value={`${sortField}:${sortDir}`} onValueChange={(v) => { const [f, d] = v.split(":"); setSortField(f); setSortDir(d as "asc" | "desc"); }}>
+            <SelectTrigger className="w-[120px] h-9 text-xs">
+              <ArrowUpDown className="h-3 w-3 mr-1" />
+              <SelectValue placeholder="Sort" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="account_name:asc">Name A-Z</SelectItem>
+              <SelectItem value="account_name:desc">Name Z-A</SelectItem>
+              <SelectItem value="spend_cap:desc">Budget High</SelectItem>
+              <SelectItem value="spend_cap:asc">Budget Low</SelectItem>
+              <SelectItem value="balance:desc">Balance High</SelectItem>
+              <SelectItem value="balance:asc">Balance Low</SelectItem>
             </SelectContent>
           </Select>
         )}
