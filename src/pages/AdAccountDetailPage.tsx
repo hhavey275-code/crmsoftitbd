@@ -35,6 +35,8 @@ export default function AdAccountDetailPage() {
   const [lastMetaUpdate, setLastMetaUpdate] = useState<number>(0);
   const [showTopUp, setShowTopUp] = useState(false);
   const [topUpAmount, setTopUpAmount] = useState("");
+  const [showUpdateCap, setShowUpdateCap] = useState(false);
+  const [newSpendCap, setNewSpendCap] = useState("");
 
   const { data: account, isLoading } = useQuery({
     queryKey: ["ad-account-detail", id],
