@@ -66,6 +66,21 @@ export function ClientTikTokAccounts() {
     enabled: !!user,
   });
 
+  // Trigger background sync on mount and every 2 minutes
+  useEffect(() => {
+    if (!user) return;
+    const doSync = () => {
+      supabase.functions.invoke("tiktok-sync-client").then(({ data }) => {
+        if (data?.account_frozen) {
+          toast.error("Account frozen due to spending cap mismatch. Contact admin.");
+        }
+      }).catch(() => {});
+    };
+    doSync();
+    const interval = setInterval(doSync, 120000); // 2 min
+    return () => clearInterval(interval);
+  }, [user]);
+
   const { data: accounts = [], isLoading } = useQuery({
     queryKey: ["client-tiktok-accounts", user?.id],
     queryFn: async () => {
@@ -78,6 +93,8 @@ export function ClientTikTokAccounts() {
       return data;
     },
     enabled: !!user,
+    refetchInterval: 120000,
+    refetchOnWindowFocus: true,
   });
 
   const topUpMutation = useMutation({
