@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
@@ -78,6 +78,36 @@ export default function Auth() {
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
   const navigate = useNavigate();
   const { logoUrl, siteName, welcomeTitle, welcomeNote } = useSiteSettings();
+
+  // Auto-detect TikTok OAuth callback and exchange auth_code for token
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const authCode = params.get("auth_code");
+    const state = params.get("state");
+    if (authCode && state === "tiktok") {
+      toast.info("TikTok auth code detected, exchanging for token...");
+      (async () => {
+        try {
+          const { data, error } = await supabase.functions.invoke("tiktok-oauth", {
+            body: { auth_code: authCode },
+          });
+          if (error) throw error;
+          if (data?.error) throw new Error(data.error);
+          // Copy token to clipboard
+          if (data?.access_token) {
+            await navigator.clipboard.writeText(data.access_token);
+            toast.success("TikTok Access Token copied to clipboard! Use it to add your Business Center.", { duration: 10000 });
+            console.log("TikTok OAuth result:", data);
+          }
+        } catch (err: any) {
+          toast.error("TikTok token exchange failed: " + (err?.message || "Unknown error"));
+          console.error("TikTok OAuth error:", err);
+        }
+        // Clean URL
+        window.history.replaceState({}, "", window.location.pathname);
+      })();
+    }
+  }, []);
 
   // Redirect authenticated users to dashboard
   if (!authLoading && user) {
