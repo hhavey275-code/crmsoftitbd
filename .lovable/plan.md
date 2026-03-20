@@ -1,42 +1,52 @@
-## Add Payment Method Types: ATM Deposit & Cash Deposit
-
-### Overview
-
-Add two new payment methods alongside the existing Online Bank Transfer. The client selects a method first, then fills method-specific fields. The verification logic adapts per method.
-
-### Payment Methods
 
 
-| Method               | Ref Required | OCR Checks                        | Telegram Match            |
-| -------------------- | ------------ | --------------------------------- | ------------------------- |
-| Online Bank Transfer | Yes          | ref + amount                      | last4 + amount (existing) |
-| ATM Deposit          | Yes          | date, account number, amount, ref | last4 + amount            |
-| Cash Deposit         | No           | account number + amount+date      | last4 + amount            |
+# TikTok Fraud Detection: Disable → Delete Campaigns + Admin Notify
 
+## Overview
 
-### File Changes
+When fraud is detected (spending cap mismatch during verify or sync), the system will:
+1. **First**: DISABLE all running campaigns (immediate spend stop)
+2. **If fraud persists on next sync**: DELETE the disabled campaigns
+3. **Notify admins** with campaign details at each step
 
-**1. `src/components/client/ClientTopUp.tsx**`
+## Implementation
 
-- Add `paymentMethod` state (`online_transfer` / `atm_deposit` / `cash_deposit`)
-- Render a payment method selector (radio group or select) before bank selection
-- Hide Payment Reference field when `cash_deposit` is selected
-- Pass `payment_method` value to the insert call (currently hardcoded as `bank_transfer`)
-- Map: `online_transfer` -> `bank_transfer`, `atm_deposit` -> `atm_deposit`, `cash_deposit` -> `cash_deposit`
+### Files to Modify
 
-**2. `supabase/functions/verify-topup/index.ts**`
+| File | Change |
+|------|--------|
+| `supabase/functions/tiktok-verify-topup/index.ts` | Add campaign DISABLE logic on mismatch + admin notification with campaign count |
+| `supabase/functions/tiktok-sync-client/index.ts` | Add fraud check: if campaigns still found after freeze, DELETE them + notify |
 
-- Read `payment_method` from the request record
-- Branch OCR prompt by method:
-  - **atm_deposit**: Ask AI to extract date, account number, deposit amount, ref, and confirm "ATM Transfer Credit" text exists. Return `{"ref":"...", "amount":..., "account_number":"...", "date":"...", "is_atm_credit": true/false}`. Match OCR account_number last4 against bank last4, match amount, match ref, verify is_atm_credit=true.
-  - **cash_deposit**: Ask AI to extract account number and deposit amount only. Return `{"amount":..., "account_number":"..."}`. Match OCR account_number last4 against bank last4, match amount. Skip ref matching entirely.
-  - **bank_transfer** (default): Existing OCR logic unchanged.
-- Telegram matching: For atm_deposit and cash_deposit, use the same last4 + amount matching as current bank transfers (not mobile agent trnxID flow).
-- Decision logic per method:
-  - `bank_transfer`: existing logic
-  - `atm_deposit`: OCR (ref + amount + account + atm_credit) AND Telegram match
-  - `cash_deposit`: OCR (amount + account) AND Telegram match (no ref required)
+### Campaign Management Flow
 
-### No DB Migration Needed
+```text
+Mismatch Detected (verify-topup or sync-client)
+  │
+  ├─ 1st time: Freeze account + DISABLE campaigns
+  │     GET /campaign/get/ (filter: CAMPAIGN_STATUS_ENABLE)
+  │     POST /campaign/update/status/ (opt_status: "DISABLE")
+  │     → Log: "Disabled X campaigns"
+  │     → Notify admins: "Fraud detected, X campaigns disabled"
+  │
+  └─ Next sync (account already frozen): DELETE disabled campaigns
+        GET /campaign/get/ (filter: CAMPAIGN_STATUS_DISABLE)
+        POST /campaign/update/status/ (opt_status: "DELETE")
+        → Log: "Deleted X campaigns"
+        → Notify admins: "X campaigns permanently deleted"
+```
 
-The `payment_method` column already exists on `top_up_requests` as text with default `bank_transfer`.
+### TikTok API Calls
+
+1. **Fetch campaigns**: `GET /open_api/v1.3/campaign/get/?advertiser_id={id}&filtering={"status":"CAMPAIGN_STATUS_ENABLE"}&page_size=100`
+2. **Update status**: `POST /open_api/v1.3/campaign/update/status/` with body `{advertiser_id, campaign_ids[], opt_status: "DISABLE" or "DELETE"}`
+3. Batch limit: 20 campaign IDs per call
+
+### Key Details
+
+- Campaign disable/delete uses the same BC access token already available
+- If API call fails, account freeze still proceeds — campaign action is best-effort with error logging
+- Admin notifications include: client name, account name, campaign count, action taken (disabled/deleted)
+- `tiktok-verify-topup`: On mismatch → freeze + DISABLE campaigns
+- `tiktok-sync-client`: On already-frozen account with disabled campaigns found → DELETE them
+
