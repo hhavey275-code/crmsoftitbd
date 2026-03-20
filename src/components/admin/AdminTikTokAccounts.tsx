@@ -428,6 +428,7 @@ export function AdminTikTokAccounts() {
                       <span>Spent: <span className="font-medium text-foreground">${Number(a.amount_spent).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
                       <span>Limit: <span className="font-medium text-foreground">${Number(a.spend_cap).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
                     </div>
+                    <div onClick={(e) => e.stopPropagation()}>
                     <Button
                       size="sm"
                       className="gap-1 bg-blue-600 hover:bg-blue-700 text-white shadow-md rounded-full px-4 font-semibold text-xs h-8"
