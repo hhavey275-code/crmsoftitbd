@@ -17,7 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { ArrowUpCircle, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, AppWindow, Search, ListChecks, Trash2, ChevronLeft, ChevronRight, MoreHorizontal, Check, ChevronsUpDown, Loader2, ExternalLink } from "lucide-react";
+import { ArrowUpCircle, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, AppWindow, Search, ListChecks, Trash2, ChevronLeft, ChevronRight, MoreHorizontal, Check, ChevronsUpDown, Loader2, ExternalLink, AlertTriangle, Settings } from "lucide-react";
 import { friendlyEdgeError } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
@@ -41,6 +41,10 @@ export function AdminTikTokAccounts() {
   // Top up
   const [topUpAccount, setTopUpAccount] = useState<any>(null);
   const [topUpAmount, setTopUpAmount] = useState("");
+
+  // Update Spend Cap
+  const [updateCapAccount, setUpdateCapAccount] = useState<any>(null);
+  const [newSpendCap, setNewSpendCap] = useState("");
 
   // Bulk actions
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -178,6 +182,31 @@ export function AdminTikTokAccounts() {
       queryClient.invalidateQueries({ queryKey: ["admin-all-wallets"] });
     },
     onError: (err: any) => toast.error(friendlyEdgeError(err)),
+  });
+
+  // Update spend cap mutation (admin sets exact value)
+  const updateCapMutation = useMutation({
+    mutationFn: async () => {
+      if (!updateCapAccount || !newSpendCap) throw new Error("Missing data");
+      const cap = parseFloat(newSpendCap);
+      if (isNaN(cap) || cap < 0) throw new Error("Invalid spend cap");
+      const { error } = await supabase.from("ad_accounts").update({ spend_cap: cap, fraud_flag: false } as any).eq("id", updateCapAccount.id);
+      if (error) throw error;
+      return cap;
+    },
+    onSuccess: (cap) => {
+      const acc = updateCapAccount;
+      const bmId = acc?.business_managers?.bm_id;
+      const billingUrl = bmId
+        ? `https://business.tiktok.com/manage/payment/v2?org_id=${bmId}&aadvid=${acc?.account_id}`
+        : `https://ads.tiktok.com/i18n/account/payment?aadvid=${acc?.account_id}`;
+      window.open(billingUrl, "_blank");
+      toast.success(`Spend cap updated to $${cap.toLocaleString()}. TikTok billing page opened.`);
+      setUpdateCapAccount(null);
+      setNewSpendCap("");
+      queryClient.invalidateQueries({ queryKey: ["tiktok-ad-accounts"] });
+    },
+    onError: (err: any) => toast.error(err.message),
   });
 
   // Bulk delete
@@ -418,7 +447,10 @@ export function AdminTikTokAccounts() {
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-sm text-foreground truncate">{a.account_name}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-semibold text-sm text-foreground truncate">{a.account_name}</p>
+                        {a.fraud_flag && <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />}
+                      </div>
                       <div className="flex items-center gap-1">
                         <span className="text-[11px] text-muted-foreground font-mono">{a.account_id}</span>
                         {a.account_id && (
@@ -451,7 +483,7 @@ export function AdminTikTokAccounts() {
                       <span>Spent: <span className="font-medium text-foreground">${Number(a.amount_spent).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
                       <span>Limit: <span className="font-medium text-foreground">${Number(a.spend_cap).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
                     </div>
-                    <div onClick={(e) => e.stopPropagation()}>
+                    <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                     <Button
                       size="sm"
                       className="gap-1 bg-blue-600 hover:bg-blue-700 text-white shadow-md rounded-full px-4 font-semibold text-xs h-8"
@@ -459,6 +491,15 @@ export function AdminTikTokAccounts() {
                     >
                       <ArrowUpCircle className="h-3.5 w-3.5" />
                       Top Up
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1 rounded-full px-3 font-semibold text-xs h-8"
+                      onClick={() => { setUpdateCapAccount(a); setNewSpendCap(String(a.spend_cap ?? 0)); }}
+                    >
+                      <Settings className="h-3.5 w-3.5" />
+                      Set Cap
                     </Button>
                     </div>
                   </div>
@@ -554,7 +595,10 @@ export function AdminTikTokAccounts() {
                             <AppWindow className="h-4 w-4 text-muted-foreground" />
                           </div>
                           <div>
-                            <div className="text-sm text-primary">{a.account_name}</div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-sm text-primary">{a.account_name}</span>
+                              {a.fraud_flag && <AlertTriangle className="h-3.5 w-3.5 text-destructive" />}
+                            </div>
                             {a.business_managers?.name && <div className="text-xs text-muted-foreground">{a.business_managers.name}</div>}
                             <div className="flex items-center gap-1">
                               <span className="text-xs text-muted-foreground font-mono">{a.account_id}</span>
@@ -596,9 +640,23 @@ export function AdminTikTokAccounts() {
                         })()}
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Button size="icon" className="h-8 w-8 bg-blue-600 hover:bg-blue-700 text-white" onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }} title="Top Up">
-                          <ArrowUpCircle className="h-4 w-4" />
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="icon" variant="ghost" className="h-8 w-8">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}>
+                              <ArrowUpCircle className="h-4 w-4 mr-2" />
+                              Top Up
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => { setUpdateCapAccount(a); setNewSpendCap(String(a.spend_cap ?? 0)); }}>
+                              <Settings className="h-4 w-4 mr-2" />
+                              Update Spend Cap
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   );
@@ -670,6 +728,40 @@ export function AdminTikTokAccounts() {
             <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => topUpMutation.mutate()} disabled={topUpMutation.isPending || !topUpAmount}>
               {topUpMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
               Top Up
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Update Spend Cap Dialog */}
+      <Dialog open={!!updateCapAccount} onOpenChange={(o) => !o && setUpdateCapAccount(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Spend Cap</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">{updateCapAccount?.account_name} ({updateCapAccount?.account_id})</p>
+          {updateCapAccount?.fraud_flag && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              এই অ্যাকাউন্টে spending cap mismatch পাওয়া গেছে। নতুন spend cap সেট করলে fraud flag রিসেট হবে।
+            </div>
+          )}
+          <div>
+            <Label>New Spend Cap (USD)</Label>
+            <Input type="number" min="0" value={newSpendCap} onChange={(e) => setNewSpendCap(e.target.value)} placeholder="Enter exact spend cap" />
+          </div>
+          <div className="text-sm text-muted-foreground">
+            Current cap: <span className="font-medium text-foreground">${Number(updateCapAccount?.spend_cap ?? 0).toLocaleString()}</span>
+            {newSpendCap && <> → New: <span className="font-medium text-foreground">${Number(newSpendCap).toLocaleString()}</span></>}
+          </div>
+          <div className="rounded-md border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-700 dark:text-yellow-300">
+            ⚠️ CRM এ spend cap সেট হবে। TikTok এও manually same value সেট করতে হবে।
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUpdateCapAccount(null)}>Cancel</Button>
+            <Button onClick={() => updateCapMutation.mutate()} disabled={updateCapMutation.isPending || !newSpendCap}>
+              {updateCapMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              Update Cap
             </Button>
           </DialogFooter>
         </DialogContent>

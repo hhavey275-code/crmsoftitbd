@@ -136,6 +136,7 @@ Deno.serve(async (req) => {
         spend_cap: currentBudget,
         amount_spent: currentBudgetCost,
         balance_after_topup: remainingAfterTopup,
+        fraud_flag: false,
       }).eq("id", ad_account_id);
 
       await supabase.from("system_logs").insert({
@@ -149,6 +150,7 @@ Deno.serve(async (req) => {
     } else {
       // ❌ Mismatch — freeze client account
       await supabase.from("profiles").update({ status: "inactive" }).eq("user_id", userId);
+      await supabase.from("ad_accounts").update({ fraud_flag: true }).eq("id", ad_account_id);
 
       // DISABLE all running campaigns (Phase 1)
       let disabledCount = 0;

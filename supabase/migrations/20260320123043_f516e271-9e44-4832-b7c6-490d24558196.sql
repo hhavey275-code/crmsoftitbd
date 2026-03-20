@@ -1,0 +1,1 @@
+ALTER TABLE public.ad_accounts ADD COLUMN IF NOT EXISTS fraud_flag boolean NOT NULL DEFAULT false;

@@ -130,6 +130,7 @@ Deno.serve(async (req) => {
         if (isFraud && profile?.status !== "inactive") {
           // Phase 1: First detection — freeze + DISABLE campaigns
           await supabase.from("profiles").update({ status: "inactive" }).eq("user_id", userId);
+          await supabase.from("ad_accounts").update({ fraud_flag: true }).eq("id", acc.id);
 
           let disabledCount = 0;
           try {

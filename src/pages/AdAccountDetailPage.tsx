@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { ArrowLeft, Pencil, Check, X, ExternalLink, User, RefreshCw, Megaphone, DollarSign, ShoppingCart, MessageSquare, ChevronsUpDown, ArrowUpCircle } from "lucide-react";
+import { ArrowLeft, Pencil, Check, X, ExternalLink, User, RefreshCw, Megaphone, DollarSign, ShoppingCart, MessageSquare, ChevronsUpDown, ArrowUpCircle, AlertTriangle, Settings } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { AdAccountPartners } from "@/components/admin/AdAccountPartners";
 import { AdAccountPaymentMethods } from "@/components/admin/AdAccountPaymentMethods";
@@ -35,6 +35,8 @@ export default function AdAccountDetailPage() {
   const [lastMetaUpdate, setLastMetaUpdate] = useState<number>(0);
   const [showTopUp, setShowTopUp] = useState(false);
   const [topUpAmount, setTopUpAmount] = useState("");
+  const [showUpdateCap, setShowUpdateCap] = useState(false);
+  const [newSpendCap, setNewSpendCap] = useState("");
 
   const { data: account, isLoading } = useQuery({
     queryKey: ["ad-account-detail", id],
@@ -185,7 +187,30 @@ export default function AdAccountDetailPage() {
     onError: (err: any) => toast.error(friendlyEdgeError(err)),
   });
 
-
+  // Update spend cap mutation
+  const updateCapMutation = useMutation({
+    mutationFn: async () => {
+      if (!newSpendCap) throw new Error("Enter spend cap");
+      const cap = parseFloat(newSpendCap);
+      if (isNaN(cap) || cap < 0) throw new Error("Invalid spend cap");
+      const { error } = await supabase.from("ad_accounts").update({ spend_cap: cap, fraud_flag: false } as any).eq("id", id!);
+      if (error) throw error;
+      return cap;
+    },
+    onSuccess: (cap) => {
+      const bmId = account?.business_managers?.bm_id;
+      const billingUrl = bmId
+        ? `https://business.tiktok.com/manage/payment/v2?org_id=${bmId}&aadvid=${account?.account_id}`
+        : `https://ads.tiktok.com/i18n/account/payment?aadvid=${account?.account_id}`;
+      window.open(billingUrl, "_blank");
+      toast.success(`Spend cap set to $${cap.toLocaleString()}`);
+      setShowUpdateCap(false);
+      setNewSpendCap("");
+      queryClient.invalidateQueries({ queryKey: ["ad-account-detail", id] });
+      queryClient.invalidateQueries({ queryKey: ["tiktok-ad-accounts"] });
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
   const handleUpdateFromSource = async () => {
     if (!isAdmin && !isTikTok) {
       const now = Date.now();
@@ -317,6 +342,21 @@ export default function AdAccountDetailPage() {
           />
         </div>
 
+        {/* Fraud Alert Banner */}
+        {isAdmin && isTikTok && account.fraud_flag && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-destructive text-sm">Spending Cap Mismatch Detected</p>
+              <p className="text-sm text-destructive/80 mt-1">এই অ্যাকাউন্টে TikTok budget আর CRM spend cap এ mismatch পাওয়া গেছে। নতুন spend cap সেট করলে fraud flag রিসেট হবে।</p>
+              <Button size="sm" variant="outline" className="mt-2 border-destructive/30 text-destructive hover:bg-destructive/10" onClick={() => { setShowUpdateCap(true); setNewSpendCap(String(account.spend_cap ?? 0)); }}>
+                <Settings className="h-3.5 w-3.5 mr-1" />
+                Update Spend Cap
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Account Header */}
         <Card>
           <CardHeader>
@@ -395,10 +435,18 @@ export default function AdAccountDetailPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">Spend Overview</CardTitle>
                 {isAdmin && (
-                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setShowTopUp(true)}>
-                    <ArrowUpCircle className="h-4 w-4 mr-1" />
-                    Top Up
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setShowTopUp(true)}>
+                      <ArrowUpCircle className="h-4 w-4 mr-1" />
+                      Top Up
+                    </Button>
+                    {isTikTok && (
+                      <Button size="sm" variant="outline" onClick={() => { setShowUpdateCap(true); setNewSpendCap(String(account.spend_cap ?? 0)); }}>
+                        <Settings className="h-4 w-4 mr-1" />
+                        Set Cap
+                      </Button>
+                    )}
+                  </div>
                 )}
               </div>
             </CardHeader>
@@ -556,6 +604,47 @@ export default function AdAccountDetailPage() {
                 disabled={topUpMutation.isPending || !topUpAmount}
               >
                 {topUpMutation.isPending ? "Processing..." : "Top Up"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Update Spend Cap Dialog */}
+        <Dialog open={showUpdateCap} onOpenChange={setShowUpdateCap}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Update Spend Cap — {account?.account_name}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              {account?.fraud_flag && (
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  Fraud flag রিসেট হবে।
+                </div>
+              )}
+              <div>
+                <Label>New Spend Cap (USD)</Label>
+                <Input
+                  type="number"
+                  placeholder="Enter exact spend cap"
+                  value={newSpendCap}
+                  onChange={(e) => setNewSpendCap(e.target.value)}
+                  min="0"
+                  autoFocus
+                />
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Current: <span className="font-medium text-foreground">${Number(account?.spend_cap ?? 0).toLocaleString()}</span>
+                {newSpendCap && <> → New: <span className="font-medium text-foreground">${Number(newSpendCap).toLocaleString()}</span></>}
+              </div>
+              <div className="rounded-md border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-700 dark:text-yellow-300">
+                ⚠️ TikTok billing page open হবে — manually same value সেট করুন।
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowUpdateCap(false)}>Cancel</Button>
+              <Button onClick={() => updateCapMutation.mutate()} disabled={updateCapMutation.isPending || !newSpendCap}>
+                {updateCapMutation.isPending ? "Updating..." : "Update Cap"}
               </Button>
             </DialogFooter>
           </DialogContent>
