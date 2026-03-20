@@ -546,7 +546,20 @@ export function AdminTikTokAccounts() {
                           <div>
                             <div className="text-sm text-primary">{a.account_name}</div>
                             {a.business_managers?.name && <div className="text-xs text-muted-foreground">{a.business_managers.name}</div>}
-                            <span className="text-xs text-muted-foreground font-mono">{a.account_id}</span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs text-muted-foreground font-mono">{a.account_id}</span>
+                              {a.business_managers?.bm_id && (
+                                <a
+                                  href={`https://business.tiktok.com/manage/payment/v2?org_id=${a.business_managers.bm_id}&filters=3,1,2,4,5&selectAccountType=1`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-muted-foreground hover:text-primary"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </TableCell>
