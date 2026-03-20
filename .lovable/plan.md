@@ -1,54 +1,32 @@
 
 
-## Plan: TikTok Ad Accounts Tab (Postpaid / Spend Cap)
+## Problem
+Ad account page এ search করে কোনো account এ click করে detail page এ গেলে, back button দিলে search state হারিয়ে যায় এবং full ad account list দেখায়।
 
-### Overview
-Add a "TikTok Ad Accounts" tab next to "All Ad Accounts" (Meta) on the Ad Accounts page. TikTok accounts are postpaid with spend cap — same model as Meta. Admin can add TikTok Business Centers, sync accounts, and top up. Clients see their assigned TikTok accounts and can top up from wallet.
+## Solution
+Search text এবং active tab (meta/tiktok) কে `sessionStorage` এ persist করো, যাতে back করলে search state restore হয়।
 
-### Steps
+## Changes
 
-**1. Database Migration — Add `platform` column**
-```sql
-ALTER TABLE ad_accounts ADD COLUMN platform TEXT NOT NULL DEFAULT 'meta';
-ALTER TABLE business_managers ADD COLUMN platform TEXT NOT NULL DEFAULT 'meta';
-```
-Existing data stays as `meta`. TikTok records will have `platform = 'tiktok'`.
+### 1. `src/components/admin/AdminAdAccounts.tsx`
+- `search` state initialize করো `sessionStorage` থেকে
+- `search` পরিবর্তন হলে `sessionStorage` এ save করো
+- Component unmount বা page leave এ clear করার দরকার নেই — back আসলে restore হবে
 
-**2. Update `AdAccountsPage.tsx` — Tab wrapper**
-- Two tabs: "Meta Ad Accounts" | "TikTok Ad Accounts"
-- Meta tab renders existing `AdminAdAccounts` / `ClientAdAccounts` (no changes)
-- TikTok tab renders new components
+### 2. `src/components/client/ClientAdAccounts.tsx`
+- Same pattern — sessionStorage দিয়ে search persist করো
 
-**3. Create `AdminTikTokAccounts.tsx`**
-- Add TikTok Business Center (bc_id, name, access_token stored in `business_managers` with `platform: 'tiktok'`)
-- Sync button → calls `tiktok-sync` edge function
-- Table: Account Name, Spend Cap, Amount Spent, Status, Top Up button
-- Top up calls `tiktok-topup` edge function (same wallet-first pattern as Meta)
+### 3. `src/pages/AdAccountsPage.tsx`
+- Active tab (meta/tiktok) sessionStorage এ persist করো যাতে back করলে সঠিক tab এ ফিরে আসে
 
-**4. Create `ClientTikTokAccounts.tsx`**
-- Shows assigned TikTok accounts (filtered by `platform = 'tiktok'`)
-- Same columns: Account Name, Spend Cap, Amount Spent, Status
-- Top Up button → wallet deduction + TikTok API call
+### 4. `src/pages/AdAccountDetailPage.tsx`
+- Back button এ `navigate("/ad-accounts")` এর বদলে `navigate(-1)` ব্যবহার করো, যাতে browser history preserve হয় এবং আগের page state এ ফিরে যায়
 
-**5. Create Edge Function `tiktok-sync/index.ts`**
-- Fetches TikTok ad accounts via `GET /open_api/v1.3/bc/advertiser/get/`
-- Gets balance/status via `GET /open_api/v1.3/advertiser/balance/get/`
-- Upserts into `ad_accounts` with `platform = 'tiktok'`
+### 5. `src/components/admin/AdminTikTokAccounts.tsx` & `src/components/client/ClientTikTokAccounts.tsx`
+- TikTok tab এর search ও sessionStorage এ persist করো
 
-**6. Create Edge Function `tiktok-topup/index.ts`**
-- Same wallet-first deduction pattern as `spend-cap-update`
-- Calls TikTok `POST /open_api/v1.3/bc/transfer/` with `transfer_type: "RECHARGE"`
-- On failure → logs to `failed_topups`
-- On success → updates `ad_accounts.spend_cap`
-
-**7. Add `TIKTOK_ACCESS_TOKEN` secret**
-- Will request via `add_secret` tool for TikTok Business API authentication
-
-### Technical Notes
-- TikTok uses `advertiser_id` (numeric, no `act_` prefix)
-- TikTok API uses dollar amounts directly (not cents)
-- Since postpaid with spend cap — same `SpendProgressBar` component works
-- Existing Meta queries will add `platform = 'meta'` filter (or no filter since default is `meta`)
-- `failed_topups` table works as-is — no schema change needed
-- RLS policies unchanged — `platform` is just a column filter
+## Technical Detail
+- SessionStorage key: `"adAccountsSearch"`, `"adAccountsTab"`, `"tiktokAccountsSearch"`
+- `useState` initializer এ `sessionStorage.getItem()` দিয়ে restore
+- `useEffect` দিয়ে value change এ save
 
