@@ -399,11 +399,11 @@ export function AdminTikTokAccounts() {
             const barColor = ratio >= 0.8 ? "bg-destructive" : ratio >= 0.5 ? "bg-yellow-500" : "bg-primary";
 
             return (
-              <Card key={a.id} className="border border-border/60 shadow-sm">
+              <Card key={a.id} className="border border-border/60 shadow-sm cursor-pointer active:scale-[0.98] transition-transform" onClick={() => navigate(`/ad-accounts/${a.id}`)}>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-1">
                     {showSelect && (
-                      <div className="pt-0.5 mr-2">
+                      <div className="pt-0.5 mr-2" onClick={(e) => e.stopPropagation()}>
                         <Checkbox checked={selectedIds.has(a.id)} onCheckedChange={() => toggleSelect(a.id)} />
                       </div>
                     )}
@@ -428,6 +428,7 @@ export function AdminTikTokAccounts() {
                       <span>Spent: <span className="font-medium text-foreground">${Number(a.amount_spent).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
                       <span>Limit: <span className="font-medium text-foreground">${Number(a.spend_cap).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
                     </div>
+                    <div onClick={(e) => e.stopPropagation()}>
                     <Button
                       size="sm"
                       className="gap-1 bg-blue-600 hover:bg-blue-700 text-white shadow-md rounded-full px-4 font-semibold text-xs h-8"
@@ -436,6 +437,7 @@ export function AdminTikTokAccounts() {
                       <ArrowUpCircle className="h-3.5 w-3.5" />
                       Top Up
                     </Button>
+                    </div>
                   </div>
 
                   {ins && (
@@ -517,9 +519,9 @@ export function AdminTikTokAccounts() {
                 ) : paginatedAccounts.map((a: any) => {
                   const ins = insightsMap[a.id];
                   return (
-                    <TableRow key={a.id} className="hover:bg-muted/50" data-state={selectedIds.has(a.id) ? "selected" : undefined}>
+                    <TableRow key={a.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/ad-accounts/${a.id}`)} data-state={selectedIds.has(a.id) ? "selected" : undefined}>
                       {showSelect && (
-                        <TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
                           <Checkbox checked={selectedIds.has(a.id)} onCheckedChange={() => toggleSelect(a.id)} />
                         </TableCell>
                       )}
@@ -557,7 +559,7 @@ export function AdminTikTokAccounts() {
                           ) : <span className="text-sm text-muted-foreground">{name}</span>;
                         })()}
                       </TableCell>
-                      <TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <Button size="icon" className="h-8 w-8 bg-blue-600 hover:bg-blue-700 text-white" onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }} title="Top Up">
                           <ArrowUpCircle className="h-4 w-4" />
                         </Button>
