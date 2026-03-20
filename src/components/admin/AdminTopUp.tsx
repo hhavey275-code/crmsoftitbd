@@ -413,6 +413,7 @@ export function AdminTopUp() {
       </div>
 
 
+      <Tabs value={statusFilter} onValueChange={setStatusFilter}>
         <TabsList className={cn(isMobile && "w-full overflow-x-auto flex")}>
           <TabsTrigger value="all" className={cn(isMobile && "text-xs flex-1")}>All</TabsTrigger>
           <TabsTrigger value="pending" className={cn(isMobile && "text-xs flex-1")}>Pending</TabsTrigger>
