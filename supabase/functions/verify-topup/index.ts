@@ -228,7 +228,9 @@ Deno.serve(async (req) => {
 
     // Telegram SMS match
     const requestTime = new Date(request.created_at);
-    const windowHoursBack = isMobileAgent ? 6 : 0.5;
+    // For atm_deposit/cash_deposit, always use bank transfer matching (last4+amount), not mobile agent flow
+    const useMobileAgentFlow = isMobileAgent && method === 'bank_transfer';
+    const windowHoursBack = useMobileAgentFlow ? 6 : 0.5;
     const windowStart = new Date(requestTime.getTime() - windowHoursBack * 60 * 60 * 1000).toISOString();
     const windowEnd = new Date(requestTime.getTime() + 10 * 60 * 1000).toISOString();
 
