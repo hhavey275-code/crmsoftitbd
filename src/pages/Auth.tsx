@@ -76,11 +76,11 @@ export default function Auth() {
   const [monthlySpend, setMonthlySpend] = useState("");
   const [loading, setLoading] = useState(false);
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
+  const [tiktokProcessing, setTiktokProcessing] = useState(false);
   const navigate = useNavigate();
   const { logoUrl, siteName, welcomeTitle, welcomeNote } = useSiteSettings();
 
   // Auto-detect TikTok OAuth callback and exchange auth_code for token
-  const [tiktokProcessing, setTiktokProcessing] = useState(false);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const authCode = params.get("auth_code");
