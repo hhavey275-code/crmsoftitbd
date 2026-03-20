@@ -38,7 +38,7 @@ export default function AdAccountDetailPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("ad_accounts")
-        .select("*, business_managers(name)")
+        .select("*, business_managers(name, bm_id)")
         .eq("id", id!)
         .single();
       if (error) throw error;
