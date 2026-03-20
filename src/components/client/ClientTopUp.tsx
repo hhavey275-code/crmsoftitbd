@@ -493,7 +493,7 @@ export function ClientTopUp() {
                   </TableRow>
                 ))}
                 {(!myRequests || myRequests.length === 0) && (
-                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No requests yet</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No requests yet</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
