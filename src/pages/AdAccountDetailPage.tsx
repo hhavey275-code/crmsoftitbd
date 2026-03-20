@@ -211,22 +211,6 @@ export default function AdAccountDetailPage() {
     },
     onError: (err: any) => toast.error(err.message),
   });
-        {/* Fraud Alert Banner */}
-        {isAdmin && isTikTok && account.fraud_flag && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold text-destructive text-sm">Spending Cap Mismatch Detected</p>
-              <p className="text-sm text-destructive/80 mt-1">এই অ্যাকাউন্টে TikTok budget আর CRM spend cap এ mismatch পাওয়া গেছে। নতুন spend cap সেট করলে fraud flag রিসেট হবে।</p>
-              <Button size="sm" variant="outline" className="mt-2 border-destructive/30 text-destructive hover:bg-destructive/10" onClick={() => { setShowUpdateCap(true); setNewSpendCap(String(account.spend_cap ?? 0)); }}>
-                <Settings className="h-3.5 w-3.5 mr-1" />
-                Update Spend Cap
-              </Button>
-            </div>
-          </div>
-        )}
-
-
   const handleUpdateFromSource = async () => {
     if (!isAdmin && !isTikTok) {
       const now = Date.now();
