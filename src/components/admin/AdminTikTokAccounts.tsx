@@ -403,7 +403,7 @@ export function AdminTikTokAccounts() {
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-1">
                     {showSelect && (
-                      <div className="pt-0.5 mr-2">
+                      <div className="pt-0.5 mr-2" onClick={(e) => e.stopPropagation()}>
                         <Checkbox checked={selectedIds.has(a.id)} onCheckedChange={() => toggleSelect(a.id)} />
                       </div>
                     )}
