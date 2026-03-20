@@ -27,27 +27,41 @@ Deno.serve(async (req) => {
       return json({ error: "TikTok app credentials not configured" }, 500);
     }
 
+    console.log("Exchanging auth_code, app_id:", appId, "auth_code length:", auth_code.length);
+
+    const requestBody = {
+      app_id: appId,
+      secret: appSecret,
+      auth_code,
+    };
+
     // Exchange auth_code for access_token
     const res = await fetch(
       "https://business-api.tiktok.com/open_api/v1.3/oauth2/access_token/",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          app_id: appId,
-          secret: appSecret,
-          auth_code,
-        }),
+        body: JSON.stringify(requestBody),
       }
     );
 
-    const data = await res.json();
+    const rawText = await res.text();
+    console.log("TikTok API raw response:", rawText);
+
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch {
+      return json({ error: "Invalid response from TikTok", raw: rawText }, 502);
+    }
 
     if (data.code !== 0) {
+      console.error("TikTok token exchange failed:", JSON.stringify(data));
       return json({ error: data.message || "Token exchange failed", details: data }, 400);
     }
 
     const tokenData = data.data;
+    console.log("Token exchange success, advertiser_ids:", tokenData.advertiser_ids);
 
     return json({
       success: true,
