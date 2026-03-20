@@ -53,82 +53,119 @@ Deno.serve(async (req) => {
     const accessToken = await decryptToken(bm.access_token, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const bcId = bm.bm_id;
 
-    // Fetch advertiser accounts from TikTok BC
-    const url = new URL("https://business-api.tiktok.com/open_api/v1.3/bc/advertiser/get/");
-    url.searchParams.set("bc_id", bcId);
-    url.searchParams.set("page", "1");
-    url.searchParams.set("page_size", "100");
+    // Fetch advertiser accounts using oauth2/advertiser/get
+    const appId = Deno.env.get("TIKTOK_APP_ID");
+    const appSecret = Deno.env.get("TIKTOK_APP_SECRET");
+    const apiUrl = `https://business-api.tiktok.com/open_api/v1.3/oauth2/advertiser/get/?app_id=${appId}&secret=${appSecret}`;
 
-    const res = await fetch(url.toString(), {
+    console.log("Fetching TikTok advertisers for BC:", bcId);
+    const res = await fetch(apiUrl, {
+      method: "GET",
       headers: { "Access-Token": accessToken },
     });
 
-    const data = await res.json();
-    if (data.code !== 0) {
-      return json({ error: data.message || "TikTok API error" }, 400);
+    const rawText = await res.text();
+    console.log("TikTok BC advertiser response status:", res.status, "body length:", rawText.length, "preview:", rawText.substring(0, 300));
+
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch {
+      return json({ error: "Invalid response from TikTok API", raw: rawText.substring(0, 500) }, 502);
     }
 
-    const advertisers = data.data?.list ?? [];
+    if (data.code !== 0) {
+      return json({ error: data.message || "TikTok API error", details: data }, 400);
+    }
+
+    const advertiserIds: string[] = data.data?.list ?? [];
+    console.log("Found", advertiserIds.length, "advertiser IDs");
     let syncedCount = 0;
 
-    for (const adv of advertisers) {
-      const advertiserId = String(adv.advertiser_id);
-      const advertiserName = adv.advertiser_name || `TikTok ${advertiserId}`;
-      const status = adv.status === "STATUS_ENABLE" ? "active" 
-        : adv.status === "STATUS_DISABLE" ? "disabled" 
-        : "pending";
-
-      // Fetch budget info for this advertiser
-      let spendCap = 0;
-      let amountSpent = 0;
-
+    // Process in batches of 10 to avoid timeout
+    const batchSize = 10;
+    for (let i = 0; i < advertiserIds.length; i += batchSize) {
+      const batch = advertiserIds.slice(i, i + batchSize);
+      
+      // Fetch advertiser info for this batch
+      const infoUrl = `https://business-api.tiktok.com/open_api/v1.3/advertiser/info/?advertiser_ids=${JSON.stringify(batch)}&fields=["advertiser_id","advertiser_name","status","balance"]`;
+      
       try {
-        const budgetUrl = new URL("https://business-api.tiktok.com/open_api/v1.3/advertiser/budget/get/");
-        budgetUrl.searchParams.set("advertiser_ids", JSON.stringify([advertiserId]));
-        const budgetRes = await fetch(budgetUrl.toString(), {
+        const infoRes = await fetch(infoUrl, {
           headers: { "Access-Token": accessToken },
         });
-        const budgetData = await budgetRes.json();
-        if (budgetData.code === 0 && budgetData.data?.list?.length > 0) {
-          const budget = budgetData.data.list[0];
-          spendCap = Number(budget.budget ?? 0);
-          amountSpent = Number(budget.spent ?? 0);
+        const infoText = await infoRes.text();
+        let infoData;
+        try { infoData = JSON.parse(infoText); } catch { 
+          console.warn("Failed to parse advertiser info:", infoText.substring(0, 200));
+          continue; 
+        }
+
+        if (infoData.code !== 0) {
+          console.warn("Advertiser info API error:", infoData.message);
+          // Still upsert with just IDs
+          for (const advId of batch) {
+            const { data: existing } = await supabase
+              .from("ad_accounts")
+              .select("id")
+              .eq("account_id", String(advId))
+              .eq("platform", "tiktok")
+              .maybeSingle();
+
+            if (!existing) {
+              await supabase.from("ad_accounts").insert({
+                account_id: String(advId),
+                account_name: `TikTok ${advId}`,
+                platform: "tiktok",
+                business_manager_id: bm.id,
+                status: "active",
+                spend_cap: 0,
+                amount_spent: 0,
+              });
+            }
+            syncedCount++;
+          }
+          continue;
+        }
+
+        const advList = infoData.data?.list ?? [];
+        for (const adv of advList) {
+          const advertiserId = String(adv.advertiser_id);
+          const advertiserName = adv.advertiser_name || `TikTok ${advertiserId}`;
+          const status = adv.status === "STATUS_ENABLE" ? "active"
+            : adv.status === "STATUS_DISABLE" ? "disabled"
+            : "pending";
+          const balance = Number(adv.balance ?? 0);
+
+          const { data: existing } = await supabase
+            .from("ad_accounts")
+            .select("id")
+            .eq("account_id", advertiserId)
+            .eq("platform", "tiktok")
+            .maybeSingle();
+
+          if (existing) {
+            await supabase
+              .from("ad_accounts")
+              .update({ account_name: advertiserName, status, balance_after_topup: balance })
+              .eq("id", existing.id);
+          } else {
+            await supabase.from("ad_accounts").insert({
+              account_id: advertiserId,
+              account_name: advertiserName,
+              platform: "tiktok",
+              business_manager_id: bm.id,
+              status,
+              spend_cap: 0,
+              amount_spent: 0,
+              balance_after_topup: balance,
+            });
+          }
+          syncedCount++;
         }
       } catch (e) {
-        console.warn(`Failed to fetch budget for ${advertiserId}:`, e);
+        console.warn("Batch error:", e);
       }
-
-      // Upsert into ad_accounts
-      const { data: existing } = await supabase
-        .from("ad_accounts")
-        .select("id")
-        .eq("account_id", advertiserId)
-        .eq("platform", "tiktok")
-        .maybeSingle();
-
-      if (existing) {
-        await supabase
-          .from("ad_accounts")
-          .update({
-            account_name: advertiserName,
-            status,
-            spend_cap: spendCap,
-            amount_spent: amountSpent,
-          })
-          .eq("id", existing.id);
-      } else {
-        await supabase.from("ad_accounts").insert({
-          account_id: advertiserId,
-          account_name: advertiserName,
-          platform: "tiktok",
-          business_manager_id: bm.id,
-          status,
-          spend_cap: spendCap,
-          amount_spent: amountSpent,
-        });
-      }
-
-      syncedCount++;
     }
 
     // Update last_synced_at
