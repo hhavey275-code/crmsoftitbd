@@ -399,11 +399,8 @@ export function AdminClients() {
         </div>
       )}
 
-      {/* Search */}
-      <div className={cn("relative", isMobile ? "w-full" : "max-w-sm")}>
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Search clients..." value={search} onChange={(e) => setSearch(e.target.value)} className={cn("pl-9", isMobile && "rounded-full")} />
-      </div>
+
+
 
       <Tabs defaultValue={pendingClients.length > 0 ? "pending" : "all"}>
         <TabsList className={cn(isMobile && "w-full")}>
