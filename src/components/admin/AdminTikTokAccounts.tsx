@@ -160,8 +160,24 @@ export function AdminTikTokAccounts() {
       if (data?.error) throw new Error(data.error);
       return data;
     },
-    onSuccess: () => {
-      toast.success(`Top up successful: $${topUpAmount}`);
+    onSuccess: (data) => {
+      const acc = topUpAccount;
+      const amt = topUpAmount;
+      const bmId = acc?.business_managers?.bm_id;
+      const billingUrl = bmId
+        ? `https://business.tiktok.com/manage/payment/v2?org_id=${bmId}&aadvid=${acc?.account_id}`
+        : `https://ads.tiktok.com/i18n/account/payment?aadvid=${acc?.account_id}`;
+      
+      toast.success(
+        `CRM spend cap updated: +$${amt}. Now update TikTok Budget Manager.`,
+        {
+          duration: 15000,
+          action: {
+            label: "Open TikTok Budget Manager →",
+            onClick: () => window.open(billingUrl, "_blank"),
+          },
+        }
+      );
       setTopUpAccount(null);
       setTopUpAmount("");
       queryClient.invalidateQueries({ queryKey: ["tiktok-ad-accounts"] });
@@ -630,6 +646,9 @@ export function AdminTikTokAccounts() {
             <DialogTitle>Top Up TikTok Account</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">{topUpAccount?.account_name} ({topUpAccount?.account_id})</p>
+          <div className="rounded-md border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-700 dark:text-yellow-300">
+            ⚠️ CRM এ spend cap update হবে। Top up এর পর TikTok Budget Manager এ manually confirm করতে হবে।
+          </div>
           {assignedUserId && (
             <div className="text-sm">
               <span className="text-muted-foreground">Client: </span>
@@ -642,6 +661,13 @@ export function AdminTikTokAccounts() {
             <Label>Amount (USD)</Label>
             <Input type="number" min="1" value={topUpAmount} onChange={(e) => setTopUpAmount(e.target.value)} placeholder="Enter amount" />
           </div>
+          {topUpAmount && Number(topUpAmount) > 0 && (
+            <div className="text-sm text-muted-foreground">
+              Current cap: <span className="font-medium text-foreground">${Number(topUpAccount?.spend_cap ?? 0).toLocaleString()}</span>
+              {" → "}
+              New cap: <span className="font-medium text-foreground">${(Number(topUpAccount?.spend_cap ?? 0) + Number(topUpAmount)).toLocaleString()}</span>
+            </div>
+          )}
           {willGoNegative && assignedUserId && (
             <p className="text-xs text-destructive">⚠️ This will make the client's balance negative</p>
           )}
