@@ -392,7 +392,15 @@ export default function AdAccountDetailPage() {
           {/* Spend Info */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Spend Overview</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">Spend Overview</CardTitle>
+                {isAdmin && (
+                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setShowTopUp(true)}>
+                    <ArrowUpCircle className="h-4 w-4 mr-1" />
+                    Top Up
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               <SpendProgressBar amountSpent={Number(account.amount_spent)} spendCap={Number(account.spend_cap)} balanceAfterTopup={Number((account as any).balance_after_topup ?? 0)} />
