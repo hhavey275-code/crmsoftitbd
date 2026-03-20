@@ -399,7 +399,7 @@ export function AdminTikTokAccounts() {
             const barColor = ratio >= 0.8 ? "bg-destructive" : ratio >= 0.5 ? "bg-yellow-500" : "bg-primary";
 
             return (
-              <Card key={a.id} className="border border-border/60 shadow-sm">
+              <Card key={a.id} className="border border-border/60 shadow-sm cursor-pointer active:scale-[0.98] transition-transform" onClick={() => navigate(`/ad-accounts/${a.id}`)}>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-1">
                     {showSelect && (
