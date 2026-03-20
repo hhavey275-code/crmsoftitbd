@@ -266,12 +266,12 @@ export function AdminAdAccounts() {
           case "account_name": valA = a.account_name?.toLowerCase(); valB = b.account_name?.toLowerCase(); break;
           case "today_spend": valA = insA?.today_spend ?? 0; valB = insB?.today_spend ?? 0; break;
           case "yesterday_spend": valA = insA?.yesterday_spend ?? 0; valB = insB?.yesterday_spend ?? 0; break;
-          case "balance": {
+          case "balance": valA = Number(a.spend_cap); valB = Number(b.spend_cap); break;
+          case "spend_cap": {
             const remA = insA?.balance != null ? Number(insA.balance) : Math.max(0, Number(a.spend_cap) - Number(a.amount_spent));
             const remB = insB?.balance != null ? Number(insB.balance) : Math.max(0, Number(b.spend_cap) - Number(b.amount_spent));
             valA = remA; valB = remB; break;
           }
-          case "spend_cap": valA = Number(a.spend_cap); valB = Number(b.spend_cap); break;
           default: valA = a.account_name?.toLowerCase(); valB = b.account_name?.toLowerCase();
         }
         if (valA < valB) return sortDir === "asc" ? -1 : 1;
