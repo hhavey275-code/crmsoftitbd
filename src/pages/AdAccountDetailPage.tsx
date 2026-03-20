@@ -187,6 +187,31 @@ export default function AdAccountDetailPage() {
     onError: (err: any) => toast.error(friendlyEdgeError(err)),
   });
 
+  // Update spend cap mutation
+  const updateCapMutation = useMutation({
+    mutationFn: async () => {
+      if (!newSpendCap) throw new Error("Enter spend cap");
+      const cap = parseFloat(newSpendCap);
+      if (isNaN(cap) || cap < 0) throw new Error("Invalid spend cap");
+      const { error } = await supabase.from("ad_accounts").update({ spend_cap: cap, fraud_flag: false } as any).eq("id", id!);
+      if (error) throw error;
+      return cap;
+    },
+    onSuccess: (cap) => {
+      const bmId = account?.business_managers?.bm_id;
+      const billingUrl = bmId
+        ? `https://business.tiktok.com/manage/payment/v2?org_id=${bmId}&aadvid=${account?.account_id}`
+        : `https://ads.tiktok.com/i18n/account/payment?aadvid=${account?.account_id}`;
+      window.open(billingUrl, "_blank");
+      toast.success(`Spend cap set to $${cap.toLocaleString()}`);
+      setShowUpdateCap(false);
+      setNewSpendCap("");
+      queryClient.invalidateQueries({ queryKey: ["ad-account-detail", id] });
+      queryClient.invalidateQueries({ queryKey: ["tiktok-ad-accounts"] });
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
 
   const handleUpdateFromSource = async () => {
     if (!isAdmin && !isTikTok) {
