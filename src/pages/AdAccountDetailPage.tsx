@@ -609,6 +609,47 @@ export default function AdAccountDetailPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Update Spend Cap Dialog */}
+        <Dialog open={showUpdateCap} onOpenChange={setShowUpdateCap}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Update Spend Cap — {account?.account_name}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              {account?.fraud_flag && (
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  Fraud flag রিসেট হবে।
+                </div>
+              )}
+              <div>
+                <Label>New Spend Cap (USD)</Label>
+                <Input
+                  type="number"
+                  placeholder="Enter exact spend cap"
+                  value={newSpendCap}
+                  onChange={(e) => setNewSpendCap(e.target.value)}
+                  min="0"
+                  autoFocus
+                />
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Current: <span className="font-medium text-foreground">${Number(account?.spend_cap ?? 0).toLocaleString()}</span>
+                {newSpendCap && <> → New: <span className="font-medium text-foreground">${Number(newSpendCap).toLocaleString()}</span></>}
+              </div>
+              <div className="rounded-md border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-700 dark:text-yellow-300">
+                ⚠️ TikTok billing page open হবে — manually same value সেট করুন।
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowUpdateCap(false)}>Cancel</Button>
+              <Button onClick={() => updateCapMutation.mutate()} disabled={updateCapMutation.isPending || !newSpendCap}>
+                {updateCapMutation.isPending ? "Updating..." : "Update Cap"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
