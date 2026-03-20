@@ -83,34 +83,76 @@ Deno.serve(async (req) => {
     console.log("Found", advertiserList.length, "advertisers");
     let syncedCount = 0;
 
-    for (const adv of advertiserList) {
-      const advertiserId = String(adv.advertiser_id);
-      const advertiserName = adv.advertiser_name || `TikTok ${advertiserId}`;
+    // Process in batches of 20 to fetch budget info
+    const batchSize = 20;
+    for (let i = 0; i < advertiserList.length; i += batchSize) {
+      const batch = advertiserList.slice(i, i + batchSize);
+      const batchIds = batch.map(a => String(a.advertiser_id));
 
-      const { data: existing } = await supabase
-        .from("ad_accounts")
-        .select("id")
-        .eq("account_id", advertiserId)
-        .eq("platform", "tiktok")
-        .maybeSingle();
-
-      if (existing) {
-        await supabase
-          .from("ad_accounts")
-          .update({ account_name: advertiserName, business_manager_id: bm.id })
-          .eq("id", existing.id);
-      } else {
-        await supabase.from("ad_accounts").insert({
-          account_id: advertiserId,
-          account_name: advertiserName,
-          platform: "tiktok",
-          business_manager_id: bm.id,
-          status: "active",
-          spend_cap: 0,
-          amount_spent: 0,
+      // Fetch budget info for this batch
+      let budgetMap: Record<string, { budget: number; spent: number }> = {};
+      try {
+        const budgetUrl = `https://business-api.tiktok.com/open_api/v1.3/advertiser/budget/get/?advertiser_ids=${encodeURIComponent(JSON.stringify(batchIds))}`;
+        const budgetRes = await fetch(budgetUrl, {
+          headers: { "Access-Token": accessToken },
         });
+        const budgetText = await budgetRes.text();
+        try {
+          const budgetData = JSON.parse(budgetText);
+          if (budgetData.code === 0 && budgetData.data?.list) {
+            for (const b of budgetData.data.list) {
+              budgetMap[String(b.advertiser_id)] = {
+                budget: Number(b.budget ?? 0),
+                spent: Number(b.spent ?? 0),
+              };
+            }
+          } else {
+            console.warn("Budget API error:", budgetData.message || budgetText.substring(0, 200));
+          }
+        } catch {
+          console.warn("Budget parse error:", budgetText.substring(0, 200));
+        }
+      } catch (e) {
+        console.warn("Budget fetch error:", e);
       }
-      syncedCount++;
+
+      for (const adv of batch) {
+        const advertiserId = String(adv.advertiser_id);
+        const advertiserName = adv.advertiser_name || `TikTok ${advertiserId}`;
+        const budget = budgetMap[advertiserId];
+        const spendCap = budget?.budget ?? 0;
+        const amountSpent = budget?.spent ?? 0;
+
+        const { data: existing } = await supabase
+          .from("ad_accounts")
+          .select("id")
+          .eq("account_id", advertiserId)
+          .eq("platform", "tiktok")
+          .maybeSingle();
+
+        if (existing) {
+          await supabase
+            .from("ad_accounts")
+            .update({
+              account_name: advertiserName,
+              business_manager_id: bm.id,
+              spend_cap: spendCap,
+              amount_spent: amountSpent,
+            })
+            .eq("id", existing.id);
+        } else {
+          await supabase.from("ad_accounts").insert({
+            account_id: advertiserId,
+            account_name: advertiserName,
+            platform: "tiktok",
+            business_manager_id: bm.id,
+            status: "active",
+            spend_cap: spendCap,
+            amount_spent: amountSpent,
+          });
+        }
+        syncedCount++;
+      }
     }
 
     // Update last_synced_at
