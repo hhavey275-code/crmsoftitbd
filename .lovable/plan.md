@@ -1,59 +1,87 @@
 
 
-# TikTok Admin Spend Cap Management + Fraud Flagging
+# Bank Logo Upload + Client Bank Assignment + Multi-Step Top-Up Wizard
 
-## Requirements
+## Overview
 
-1. **Admin manually sets spend cap** after unfreezing a client — this becomes the new baseline
-2. **"Update Spend Cap" action** in admin TikTok accounts list (action button per account) and detail page
-3. **Admin updates spend cap via API** — calls TikTok budget API to set exact spend cap, then updates CRM
-4. **Client dashboard reflects** the updated spend cap in realtime
-5. **Red flag on mismatched accounts** — when fraud is detected, mark the specific ad account (not just freeze client) so admin can see which accounts had issues
+Three changes: (1) Bank logo upload in admin, (2) "Assign Banks" button in client list, (3) Complete redesign of ClientTopUp as a 3-step wizard matching the reference screenshots.
 
-## Technical Plan
+## 1. Database: Add `logo_url` to `bank_accounts`
 
-### 1. Add `fraud_flag` column to `ad_accounts` table
-- New boolean column `fraud_flag` (default: false)
-- When fraud is detected in `tiktok-sync-client` and `tiktok-verify-topup`, set `fraud_flag = true` on the specific ad account
-- When admin manually updates spend cap, reset `fraud_flag = false`
+```sql
+ALTER TABLE public.bank_accounts ADD COLUMN IF NOT EXISTS logo_url text;
+```
 
-### 2. Admin "Update Spend Cap" dialog
-- In `AdminTikTokAccounts.tsx`: Add dropdown menu per account row with "Top Up" and "Update Spend Cap" options
-- In `AdAccountDetailPage.tsx`: Add "Update Spend Cap" button alongside Top Up for TikTok accounts
-- Dialog lets admin enter exact new spend cap value (not increment)
-- On submit: directly update `ad_accounts.spend_cap` in DB + call TikTok API to set budget via BC, then reset `fraud_flag = false`
-- Since TikTok BC API doesn't support setting spend cap for postpaid accounts, we'll update CRM only (like current top-up flow) and open TikTok billing page for manual confirmation
+## 2. Admin Banks — Logo Upload
 
-### 3. Red flag visual indicator
-- In `AdminTikTokAccounts.tsx`: Show a red warning icon/badge next to account name when `fraud_flag = true`
-- In `AdAccountDetailPage.tsx`: Show alert banner when `fraud_flag = true`
-- In `ClientTikTokAccounts.tsx`: Not visible to clients (admin-only indicator)
+**File: `src/components/admin/AdminBanks.tsx`**
 
-### 4. Edge function changes
-- `tiktok-sync-client`: On fraud detection, also set `fraud_flag = true` on the specific ad account
-- `tiktok-verify-topup`: On mismatch, also set `fraud_flag = true` on the specific ad account
+- Add logo upload field in add/edit bank dialog (image file input)
+- Upload to `logos` storage bucket, save public URL as `logo_url`
+- Show bank logo thumbnail in bank list (both mobile cards and desktop table)
+- Update `emptyForm` to include `logo_url`
 
-### 5. Client dashboard realtime
-- Already handled via existing `refetchInterval: 120000` in `ClientTikTokAccounts.tsx`
-- When admin updates `spend_cap` in DB, client's next poll (or page reload) picks it up automatically
+## 3. Admin Clients — "Assign Banks" Button
 
-## Files to Modify
+**File: `src/components/admin/AdminClients.tsx`**
+
+- Add a "Banks" action button per client row (both mobile card and desktop table)
+- Opens a dialog showing:
+  - Currently assigned banks with unassign option
+  - Dropdown to assign new banks (from active `bank_accounts`)
+- Reuses same `client_banks` table logic already in AdminBanks
+
+## 4. Client Top-Up — Multi-Step Wizard Redesign
+
+**File: `src/components/client/ClientTopUp.tsx`**
+
+Complete redesign into a stepped wizard matching the reference screenshots:
+
+```text
+Step Progress Bar: ① Select Method → ② Select Bank → ③ Payment Details → ④ Review & Submit
+```
+
+**Header Bar**: Current Balance (USD) + Conversion Rate display (persistent across all steps)
+
+**Step 1 — Select Payment Method**:
+- 3 cards: Online Bank Transfer, ATM Deposit, Cash Deposit
+- Click to select and advance to Step 2
+
+**Step 2 — Select Bank**:
+- Grid of bank cards (like reference image) showing:
+  - Bank logo (from `logo_url`)
+  - Bank name, account holder name
+  - Account details (number, branch, reference ID)
+  - "Select This Account" button
+- Back button to Step 1
+
+**Step 3 — Payment Details**:
+- Selected bank info card at top (Payment To section)
+- BDT amount input with live USD conversion
+- Minimum amount hint
+- Transaction Reference field (hidden for cash deposit)
+- Payment Screenshot upload (drag/drop/paste)
+- "Back" and "Continue to Review" buttons
+
+**Step 4 — Review & Submit**:
+- Payment Method summary
+- Selected bank details card
+- Payment Details (BDT, USD, reference)
+- Screenshot preview
+- "Edit Payment Details" and "Confirm & Submit" buttons
+
+All existing logic preserved: wallet check, auto-verification retry, realtime subscription, proof upload.
+
+## Files Modified
 
 | File | Change |
 |------|--------|
-| **Migration** | Add `fraud_flag boolean default false` to `ad_accounts` |
-| `supabase/functions/tiktok-sync-client/index.ts` | Set `fraud_flag = true` on fraud detection |
-| `supabase/functions/tiktok-verify-topup/index.ts` | Set `fraud_flag = true` on mismatch |
-| `src/components/admin/AdminTikTokAccounts.tsx` | Add dropdown menu with "Update Spend Cap" action, red flag indicator |
-| `src/pages/AdAccountDetailPage.tsx` | Add "Update Spend Cap" button for TikTok, fraud alert banner, reset flag on update |
+| **Migration** | Add `logo_url text` to `bank_accounts` |
+| `src/components/admin/AdminBanks.tsx` | Logo upload in add/edit form, show logo in list |
+| `src/components/admin/AdminClients.tsx` | Add "Assign Banks" action button + dialog |
+| `src/components/client/ClientTopUp.tsx` | Full rewrite as 4-step wizard |
 
-## Update Spend Cap Flow
+## Request History Table
 
-```text
-Admin clicks "Update Spend Cap" on TikTok account
-  → Dialog: enter exact new spend cap value
-  → Submit: update ad_accounts.spend_cap = new value, fraud_flag = false
-  → Open TikTok billing page for manual confirmation
-  → Client sees updated spend cap on next refresh
-```
+The "My Requests" history table at the bottom remains unchanged — still shows after the wizard.
 
