@@ -597,7 +597,7 @@ export function AdminTikTokAccounts() {
                           <div>
                             <div className="flex items-center gap-1.5">
                               <span className="text-sm text-primary">{a.account_name}</span>
-                              {a.fraud_flag && <AlertTriangle className="h-3.5 w-3.5 text-destructive" title="Fraud detected" />}
+                              {a.fraud_flag && <AlertTriangle className="h-3.5 w-3.5 text-destructive" />}
                             </div>
                             {a.business_managers?.name && <div className="text-xs text-muted-foreground">{a.business_managers.name}</div>}
                             <div className="flex items-center gap-1">
