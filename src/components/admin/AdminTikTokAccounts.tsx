@@ -17,7 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { ArrowUpCircle, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, AppWindow, Search, ListChecks, Trash2, ChevronLeft, ChevronRight, MoreHorizontal, Check, ChevronsUpDown, Loader2 } from "lucide-react";
+import { ArrowUpCircle, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, AppWindow, Search, ListChecks, Trash2, ChevronLeft, ChevronRight, MoreHorizontal, Check, ChevronsUpDown, Loader2, ExternalLink } from "lucide-react";
 import { friendlyEdgeError } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
@@ -55,7 +55,7 @@ export function AdminTikTokAccounts() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("ad_accounts")
-        .select("*, business_managers(name)")
+        .select("*, business_managers(name, bm_id)")
         .eq("platform", "tiktok")
         .order("account_name");
       if (error) throw error;
@@ -409,7 +409,20 @@ export function AdminTikTokAccounts() {
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold text-sm text-foreground truncate">{a.account_name}</p>
-                      <span className="text-[11px] text-muted-foreground font-mono">{a.account_id}</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[11px] text-muted-foreground font-mono">{a.account_id}</span>
+                        {a.business_managers?.bm_id && (
+                          <a
+                            href={`https://business.tiktok.com/manage/payment/v2?org_id=${a.business_managers.bm_id}&filters=3,1,2,4,5&selectAccountType=1`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-muted-foreground hover:text-primary"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        )}
+                      </div>
                     </div>
                     <StatusBadge status={a.status} />
                   </div>
@@ -533,7 +546,20 @@ export function AdminTikTokAccounts() {
                           <div>
                             <div className="text-sm text-primary">{a.account_name}</div>
                             {a.business_managers?.name && <div className="text-xs text-muted-foreground">{a.business_managers.name}</div>}
-                            <span className="text-xs text-muted-foreground font-mono">{a.account_id}</span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs text-muted-foreground font-mono">{a.account_id}</span>
+                              {a.business_managers?.bm_id && (
+                                <a
+                                  href={`https://business.tiktok.com/manage/payment/v2?org_id=${a.business_managers.bm_id}&filters=3,1,2,4,5&selectAccountType=1`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-muted-foreground hover:text-primary"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </TableCell>
