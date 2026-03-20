@@ -1,39 +1,33 @@
 
-Issue ta clear: back dile search restore hobe, but reload dile search clear hobe.  
-Current bug hocche reload detect logic (`performance/navigation`) reliable na, tai stale `sessionStorage` value abar load hocche.
 
-## Fix Plan (Targeted)
+## Admin Top-Up Summary Boxes with Date Picker
 
-1. **Reload-specific cleanup add করবো (hard reset)**
-   - `src/pages/AdAccountsPage.tsx` এ `beforeunload` (and fallback `pagehide`) listener add করবো।
-   - Reload/refresh trigger হলে এই keys clear হবে:
-     - `adAccountsSearch`
-     - `tiktokAccountsSearch`
-     - `adAccountsTab`
+### What We're Building
+A row of 4 summary metric cards at the top of the Admin Top-Up page, filtered by a calendar date picker that supports Today, Yesterday, and custom date range selection.
 
-2. **Back restore behavior unchanged রাখবো**
-   - Back flow এ existing persisted search/tab restore হবে (user expectation অনুযায়ী)।
-   - `navigate(-1)` behavior detail page এ same থাকবে।
+### Metrics
+1. **Total Top Up (USD)** — sum of `amount` from approved requests in selected period
+2. **Total Payment Received (BDT)** — sum of `bdt_amount` from approved requests in selected period
+3. **Auto Approved** — count of approved requests where `admin_note` contains "Auto Approved by System" in selected period
+4. **Manual Approved** — count of approved requests that are approved but NOT auto-approved in selected period
 
-3. **Search init logic harden করবো**
-   - `AdminAdAccounts`, `ClientAdAccounts`, `AdminTikTokAccounts`, `ClientTikTokAccounts` এ initial state restore শুধু back-navigation case এ হবে।
-   - Non-back entry তে explicit empty fallback রাখবো (`""`) যাতে stale value UI te na thake।
+### Date Picker
+- Quick presets: **Today**, **Yesterday** buttons
+- **Date Range** picker using Calendar popover for custom from/to selection
+- Default: Today
 
-4. **Tab init logic harden করবো**
-   - `AdAccountsPage` এ default tab reload/new entry তে always `"meta"` থাকবে।
-   - শুধু back flow হলে saved tab restore হবে।
+### Layout
+- Date picker row at top (below heading, above tabs)
+- 4 metric cards in a 2x2 grid on mobile, 4-column row on desktop
+- Cards use existing MetricCard style or simple Card with icon + value + label
 
-5. **Regression check list**
-   - Search করে detail এ ঢুকে back → search + tab preserved.
-   - Same অবস্থায় browser reload → search empty, tab meta, full list visible.
-   - Meta + TikTok both tabs এ same behavior verify.
+### File Changes
 
-## Files to Update
-- `src/pages/AdAccountsPage.tsx`
-- `src/components/admin/AdminAdAccounts.tsx`
-- `src/components/client/ClientAdAccounts.tsx`
-- `src/components/admin/AdminTikTokAccounts.tsx`
-- `src/components/client/ClientTikTokAccounts.tsx`
+**`src/components/admin/AdminTopUp.tsx`**
+- Add date state (from/to) with Today as default
+- Add preset buttons (Today, Yesterday) + date range popover with Calendar
+- Filter approved requests by selected date range
+- Compute 4 metrics from filtered data
+- Render 4 summary Cards between the header and the Tabs
+- All data comes from the already-fetched `requests` array (no new queries needed)
 
-## Technical Note
-Reload-clear behavior কে navigation-type detection এর ওপর পুরো depend না করে **unload lifecycle cleanup** দিয়ে deterministic করা হবে, তাই refresh এর পর stale search value আর ফিরবে না।
