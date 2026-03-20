@@ -6,22 +6,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-async function decryptToken(stored: string, secret: string): Promise<string> {
-  if (!stored.startsWith("enc:")) return stored;
-  try {
-    const enc = new TextEncoder();
-    const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(secret), "PBKDF2", false, ["deriveKey"]);
-    const key = await crypto.subtle.deriveKey(
-      { name: "PBKDF2", salt: enc.encode("bm-token-enc-v1"), iterations: 100000, hash: "SHA-256" },
-      keyMaterial, { name: "AES-GCM", length: 256 }, false, ["decrypt"]
-    );
-    const combined = Uint8Array.from(atob(stored.slice(4)), c => c.charCodeAt(0));
-    const iv = combined.slice(0, 12);
-    const data = combined.slice(12);
-    const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, data);
-    return new TextDecoder().decode(decrypted);
-  } catch { return stored; }
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -67,10 +51,10 @@ Deno.serve(async (req) => {
       if (!assignment) return json({ error: "Forbidden" }, 403);
     }
 
-    // Fetch ad account with BM
+    // Fetch ad account
     const { data: account, error: accErr } = await supabase
       .from("ad_accounts")
-      .select("*, business_managers!inner(access_token, bm_id)")
+      .select("*")
       .eq("id", ad_account_id)
       .eq("platform", "tiktok")
       .single();
@@ -110,9 +94,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // STEP 2: Update spend cap in CRM (postpaid accounts - no TikTok API call needed)
-    // Budget Manager spending caps are managed in TikTok BC dashboard directly
-    const bm = (account as any).business_managers;
+    // STEP 2: Update spend cap in CRM (postpaid accounts)
     const oldSpendCap = Number(account.spend_cap);
     const newSpendCap = oldSpendCap + amount;
 

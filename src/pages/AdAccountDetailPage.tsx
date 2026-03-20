@@ -360,9 +360,9 @@ export default function AdAccountDetailPage() {
                   )}
                   <div className="flex items-center gap-1.5 mt-1">
                     <span className="text-sm text-muted-foreground font-mono">ID: {account.account_id.replace(/^act_/, '')}</span>
-                    {isTikTok && account.business_managers?.bm_id && (
+                    {isTikTok && (
                       <a
-                        href={`https://business.tiktok.com/manage/payment/v2?org_id=${account.business_managers.bm_id}&aadvid=${account.account_id}&filters=3,1,2,4,5&selectAccountType=1`}
+                        href={`https://ads.tiktok.com/i18n/account/payment?aadvid=${account.account_id}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-muted-foreground hover:text-primary"
