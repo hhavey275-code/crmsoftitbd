@@ -16,7 +16,7 @@ import { logSystemAction } from "@/lib/systemLog";
 
 export function AdminTikTokAccounts() {
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() => sessionStorage.getItem("tiktokAccountsSearch") || "");
   const [topUpAccount, setTopUpAccount] = useState<any>(null);
   const [topUpAmount, setTopUpAmount] = useState("");
   const [showAddBc, setShowAddBc] = useState(false);

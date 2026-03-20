@@ -17,7 +17,7 @@ import { friendlyEdgeError } from "@/lib/utils";
 export function ClientTikTokAccounts() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() => sessionStorage.getItem("tiktokAccountsSearch") || "");
   const [topUpAccount, setTopUpAccount] = useState<any>(null);
   const [topUpAmount, setTopUpAmount] = useState("");
 
