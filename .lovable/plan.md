@@ -1,33 +1,42 @@
+## Add Payment Method Types: ATM Deposit & Cash Deposit
+
+### Overview
+
+Add two new payment methods alongside the existing Online Bank Transfer. The client selects a method first, then fills method-specific fields. The verification logic adapts per method.
+
+### Payment Methods
 
 
-## Admin Top-Up Summary Boxes with Date Picker
+| Method               | Ref Required | OCR Checks                        | Telegram Match            |
+| -------------------- | ------------ | --------------------------------- | ------------------------- |
+| Online Bank Transfer | Yes          | ref + amount                      | last4 + amount (existing) |
+| ATM Deposit          | Yes          | date, account number, amount, ref | last4 + amount            |
+| Cash Deposit         | No           | account number + amount+date      | last4 + amount            |
 
-### What We're Building
-A row of 4 summary metric cards at the top of the Admin Top-Up page, filtered by a calendar date picker that supports Today, Yesterday, and custom date range selection.
-
-### Metrics
-1. **Total Top Up (USD)** — sum of `amount` from approved requests in selected period
-2. **Total Payment Received (BDT)** — sum of `bdt_amount` from approved requests in selected period
-3. **Auto Approved** — count of approved requests where `admin_note` contains "Auto Approved by System" in selected period
-4. **Manual Approved** — count of approved requests that are approved but NOT auto-approved in selected period
-
-### Date Picker
-- Quick presets: **Today**, **Yesterday** buttons
-- **Date Range** picker using Calendar popover for custom from/to selection
-- Default: Today
-
-### Layout
-- Date picker row at top (below heading, above tabs)
-- 4 metric cards in a 2x2 grid on mobile, 4-column row on desktop
-- Cards use existing MetricCard style or simple Card with icon + value + label
 
 ### File Changes
 
-**`src/components/admin/AdminTopUp.tsx`**
-- Add date state (from/to) with Today as default
-- Add preset buttons (Today, Yesterday) + date range popover with Calendar
-- Filter approved requests by selected date range
-- Compute 4 metrics from filtered data
-- Render 4 summary Cards between the header and the Tabs
-- All data comes from the already-fetched `requests` array (no new queries needed)
+**1. `src/components/client/ClientTopUp.tsx**`
 
+- Add `paymentMethod` state (`online_transfer` / `atm_deposit` / `cash_deposit`)
+- Render a payment method selector (radio group or select) before bank selection
+- Hide Payment Reference field when `cash_deposit` is selected
+- Pass `payment_method` value to the insert call (currently hardcoded as `bank_transfer`)
+- Map: `online_transfer` -> `bank_transfer`, `atm_deposit` -> `atm_deposit`, `cash_deposit` -> `cash_deposit`
+
+**2. `supabase/functions/verify-topup/index.ts**`
+
+- Read `payment_method` from the request record
+- Branch OCR prompt by method:
+  - **atm_deposit**: Ask AI to extract date, account number, deposit amount, ref, and confirm "ATM Transfer Credit" text exists. Return `{"ref":"...", "amount":..., "account_number":"...", "date":"...", "is_atm_credit": true/false}`. Match OCR account_number last4 against bank last4, match amount, match ref, verify is_atm_credit=true.
+  - **cash_deposit**: Ask AI to extract account number and deposit amount only. Return `{"amount":..., "account_number":"..."}`. Match OCR account_number last4 against bank last4, match amount. Skip ref matching entirely.
+  - **bank_transfer** (default): Existing OCR logic unchanged.
+- Telegram matching: For atm_deposit and cash_deposit, use the same last4 + amount matching as current bank transfers (not mobile agent trnxID flow).
+- Decision logic per method:
+  - `bank_transfer`: existing logic
+  - `atm_deposit`: OCR (ref + amount + account + atm_credit) AND Telegram match
+  - `cash_deposit`: OCR (amount + account) AND Telegram match (no ref required)
+
+### No DB Migration Needed
+
+The `payment_method` column already exists on `top_up_requests` as text with default `bank_transfer`.
