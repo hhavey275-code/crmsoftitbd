@@ -78,94 +78,39 @@ Deno.serve(async (req) => {
       return json({ error: data.message || "TikTok API error", details: data }, 400);
     }
 
-    const advertiserIds: string[] = data.data?.list ?? [];
-    console.log("Found", advertiserIds.length, "advertiser IDs");
+    // The list contains objects with advertiser_id and advertiser_name
+    const advertiserList: Array<{ advertiser_id: string; advertiser_name: string }> = data.data?.list ?? [];
+    console.log("Found", advertiserList.length, "advertisers");
     let syncedCount = 0;
 
-    // Process in batches of 10 to avoid timeout
-    const batchSize = 10;
-    for (let i = 0; i < advertiserIds.length; i += batchSize) {
-      const batch = advertiserIds.slice(i, i + batchSize);
-      
-      // Fetch advertiser info for this batch
-      const infoUrl = `https://business-api.tiktok.com/open_api/v1.3/advertiser/info/?advertiser_ids=${JSON.stringify(batch)}&fields=["advertiser_id","advertiser_name","status","balance"]`;
-      
-      try {
-        const infoRes = await fetch(infoUrl, {
-          headers: { "Access-Token": accessToken },
+    for (const adv of advertiserList) {
+      const advertiserId = String(adv.advertiser_id);
+      const advertiserName = adv.advertiser_name || `TikTok ${advertiserId}`;
+
+      const { data: existing } = await supabase
+        .from("ad_accounts")
+        .select("id")
+        .eq("account_id", advertiserId)
+        .eq("platform", "tiktok")
+        .maybeSingle();
+
+      if (existing) {
+        await supabase
+          .from("ad_accounts")
+          .update({ account_name: advertiserName, business_manager_id: bm.id })
+          .eq("id", existing.id);
+      } else {
+        await supabase.from("ad_accounts").insert({
+          account_id: advertiserId,
+          account_name: advertiserName,
+          platform: "tiktok",
+          business_manager_id: bm.id,
+          status: "active",
+          spend_cap: 0,
+          amount_spent: 0,
         });
-        const infoText = await infoRes.text();
-        let infoData;
-        try { infoData = JSON.parse(infoText); } catch { 
-          console.warn("Failed to parse advertiser info:", infoText.substring(0, 200));
-          continue; 
-        }
-
-        if (infoData.code !== 0) {
-          console.warn("Advertiser info API error:", infoData.message);
-          // Still upsert with just IDs
-          for (const advId of batch) {
-            const { data: existing } = await supabase
-              .from("ad_accounts")
-              .select("id")
-              .eq("account_id", String(advId))
-              .eq("platform", "tiktok")
-              .maybeSingle();
-
-            if (!existing) {
-              await supabase.from("ad_accounts").insert({
-                account_id: String(advId),
-                account_name: `TikTok ${advId}`,
-                platform: "tiktok",
-                business_manager_id: bm.id,
-                status: "active",
-                spend_cap: 0,
-                amount_spent: 0,
-              });
-            }
-            syncedCount++;
-          }
-          continue;
-        }
-
-        const advList = infoData.data?.list ?? [];
-        for (const adv of advList) {
-          const advertiserId = String(adv.advertiser_id);
-          const advertiserName = adv.advertiser_name || `TikTok ${advertiserId}`;
-          const status = adv.status === "STATUS_ENABLE" ? "active"
-            : adv.status === "STATUS_DISABLE" ? "disabled"
-            : "pending";
-          const balance = Number(adv.balance ?? 0);
-
-          const { data: existing } = await supabase
-            .from("ad_accounts")
-            .select("id")
-            .eq("account_id", advertiserId)
-            .eq("platform", "tiktok")
-            .maybeSingle();
-
-          if (existing) {
-            await supabase
-              .from("ad_accounts")
-              .update({ account_name: advertiserName, status, balance_after_topup: balance })
-              .eq("id", existing.id);
-          } else {
-            await supabase.from("ad_accounts").insert({
-              account_id: advertiserId,
-              account_name: advertiserName,
-              platform: "tiktok",
-              business_manager_id: bm.id,
-              status,
-              spend_cap: 0,
-              amount_spent: 0,
-              balance_after_topup: balance,
-            });
-          }
-          syncedCount++;
-        }
-      } catch (e) {
-        console.warn("Batch error:", e);
       }
+      syncedCount++;
     }
 
     // Update last_synced_at
