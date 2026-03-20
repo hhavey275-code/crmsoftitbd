@@ -255,7 +255,7 @@ Deno.serve(async (req) => {
         const payload = raw.message || raw.edited_message || raw.channel_post || raw.edited_channel_post || {};
         const text = msg.text || payload.text || payload.caption || '';
 
-        if (isMobileAgent && payment_reference) {
+        if (useMobileAgentFlow && payment_reference) {
           if (text.toLowerCase().includes(payment_reference.toLowerCase())) {
             telegramMatch = true;
             matchedMsg = msg;
