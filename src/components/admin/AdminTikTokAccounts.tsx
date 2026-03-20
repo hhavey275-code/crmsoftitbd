@@ -640,9 +640,23 @@ export function AdminTikTokAccounts() {
                         })()}
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Button size="icon" className="h-8 w-8 bg-blue-600 hover:bg-blue-700 text-white" onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }} title="Top Up">
-                          <ArrowUpCircle className="h-4 w-4" />
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="icon" variant="ghost" className="h-8 w-8">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => { setTopUpAccount(a); setTopUpAmount(""); }}>
+                              <ArrowUpCircle className="h-4 w-4 mr-2" />
+                              Top Up
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => { setUpdateCapAccount(a); setNewSpendCap(String(a.spend_cap ?? 0)); }}>
+                              <Settings className="h-4 w-4 mr-2" />
+                              Update Spend Cap
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   );
