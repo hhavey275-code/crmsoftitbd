@@ -83,9 +83,51 @@ Deno.serve(async (req) => {
     console.log("Found", advertiserList.length, "advertisers");
     let syncedCount = 0;
 
+    // Fetch balance/budget for all advertisers via BC endpoint (paginated)
+    let budgetMap: Record<string, { balance: number; budget: number; budgetCost: number }> = {};
+    try {
+      let page = 1;
+      let hasMore = true;
+      while (hasMore) {
+        const balanceUrl = `https://business-api.tiktok.com/open_api/v1.3/advertiser/balance/get/?bc_id=${bcId}&page=${page}&page_size=50`;
+        const balanceRes = await fetch(balanceUrl, {
+          headers: { "Access-Token": accessToken },
+        });
+        const balanceText = await balanceRes.text();
+        console.log("Balance API response page", page, "status:", balanceRes.status, "preview:", balanceText.substring(0, 500));
+        let balanceData;
+        try { balanceData = JSON.parse(balanceText); } catch {
+          console.warn("Balance parse error:", balanceText.substring(0, 200));
+          break;
+        }
+        if (balanceData.code !== 0) {
+          console.warn("Balance API error code:", balanceData.code, "msg:", balanceData.message);
+          break;
+        }
+        const list = balanceData.data?.advertiser_account_list ?? [];
+        for (const b of list) {
+          budgetMap[String(b.advertiser_id)] = {
+            balance: Number(b.account_balance ?? 0),
+            budget: Number(b.budget ?? 0),
+            budgetCost: Number(b.budget_cost ?? 0),
+          };
+        }
+        const totalPage = Math.ceil((balanceData.data?.page_info?.total_number ?? list.length) / 50);
+        hasMore = page < totalPage;
+        page++;
+      }
+      console.log("Fetched balance for", Object.keys(budgetMap).length, "advertisers");
+    } catch (e) {
+      console.warn("Balance fetch error:", e);
+    }
+
+    // Upsert accounts
     for (const adv of advertiserList) {
       const advertiserId = String(adv.advertiser_id);
       const advertiserName = adv.advertiser_name || `TikTok ${advertiserId}`;
+      const bal = budgetMap[advertiserId];
+      const spendCap = bal?.budget ?? 0;
+      const amountSpent = bal?.budgetCost ?? 0;
 
       const { data: existing } = await supabase
         .from("ad_accounts")
@@ -97,7 +139,12 @@ Deno.serve(async (req) => {
       if (existing) {
         await supabase
           .from("ad_accounts")
-          .update({ account_name: advertiserName, business_manager_id: bm.id })
+          .update({
+            account_name: advertiserName,
+            business_manager_id: bm.id,
+            spend_cap: spendCap,
+            amount_spent: amountSpent,
+          })
           .eq("id", existing.id);
       } else {
         await supabase.from("ad_accounts").insert({
@@ -106,8 +153,8 @@ Deno.serve(async (req) => {
           platform: "tiktok",
           business_manager_id: bm.id,
           status: "active",
-          spend_cap: 0,
-          amount_spent: 0,
+          spend_cap: spendCap,
+          amount_spent: amountSpent,
         });
       }
       syncedCount++;
