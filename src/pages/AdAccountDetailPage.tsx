@@ -18,6 +18,7 @@ import { ArrowLeft, Pencil, Check, X, ExternalLink, User, RefreshCw, Megaphone, 
 import { useIsMobile } from "@/hooks/use-mobile";
 import { AdAccountPartners } from "@/components/admin/AdAccountPartners";
 import { AdAccountPaymentMethods } from "@/components/admin/AdAccountPaymentMethods";
+import { friendlyEdgeError } from "@/lib/utils";
 
 export default function AdAccountDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -46,7 +47,10 @@ export default function AdAccountDetailPage() {
     enabled: !!id,
   });
 
-  const { data: insights } = useQuery({
+  const isTikTok = account?.platform === "tiktok";
+
+  // Meta insights via edge function
+  const { data: metaInsights } = useQuery({
     queryKey: ["ad-account-insights-detail", id],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke("get-account-insights", {
@@ -55,8 +59,25 @@ export default function AdAccountDetailPage() {
       if (error) throw error;
       return data?.insights?.[id!] ?? null;
     },
-    enabled: !!id,
+    enabled: !!id && !isTikTok,
   });
+
+  // TikTok insights from DB
+  const { data: tiktokInsights } = useQuery({
+    queryKey: ["tiktok-account-insights-detail", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ad_account_insights")
+        .select("*")
+        .eq("ad_account_id", id!)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id && isTikTok,
+  });
+
+  const insights = isTikTok ? tiktokInsights : metaInsights;
 
   const { data: assignments } = useQuery({
     queryKey: ["ad-account-assignments", id],
@@ -100,28 +121,41 @@ export default function AdAccountDetailPage() {
     onError: (err: any) => toast.error(err.message),
   });
 
+  // Rename - Meta uses edge function, TikTok just updates DB
   const renameMutation = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke("rename-ad-account", {
-        body: { ad_account_id: id, new_name: newName },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      return data;
+      if (isTikTok) {
+        // TikTok: just update DB name
+        const { error } = await supabase
+          .from("ad_accounts")
+          .update({ account_name: newName.trim() })
+          .eq("id", id!);
+        if (error) throw error;
+        return { old_name: account.account_name, new_name: newName.trim() };
+      } else {
+        // Meta: use edge function to rename via API
+        const { data, error } = await supabase.functions.invoke("rename-ad-account", {
+          body: { ad_account_id: id, new_name: newName },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        return data;
+      }
     },
     onSuccess: (data) => {
       toast.success(`Renamed: ${data.old_name} → ${data.new_name}`);
       setIsRenaming(false);
       queryClient.invalidateQueries({ queryKey: ["ad-account-detail", id] });
       queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["tiktok-ad-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["client-ad-accounts"] });
     },
     onError: (err: any) => toast.error(err.message),
   });
 
-  const handleUpdateFromMeta = async () => {
-    // Rate limit for non-admin users: 15 minutes cooldown
-    if (!isAdmin) {
+  // Update from Meta / Update from BC
+  const handleUpdateFromSource = async () => {
+    if (!isAdmin && !isTikTok) {
       const now = Date.now();
       const elapsed = now - lastMetaUpdate;
       const cooldown = 15 * 60 * 1000;
@@ -134,20 +168,31 @@ export default function AdAccountDetailPage() {
 
     setUpdatingMeta(true);
     try {
-      const { error } = await supabase.functions.invoke("get-account-insights", {
-        body: { ad_account_ids: [id], source: "meta" },
-      });
-      if (error) throw error;
-      await queryClient.invalidateQueries({ queryKey: ["ad-account-insights-detail", id] });
-      if (!isAdmin) setLastMetaUpdate(Date.now());
-      toast.success("Data updated from Meta");
-    } catch (err: any) {
-      const msg = err?.message || "";
-      if (msg.includes("non-2xx")) {
-        toast.error("Meta API request failed. Please try again.");
+      if (isTikTok) {
+        // Re-sync from TikTok BC
+        if (account.business_manager_id) {
+          const { data, error } = await supabase.functions.invoke("tiktok-sync", {
+            body: { business_manager_id: account.business_manager_id },
+          });
+          if (error) throw error;
+          if (data?.error) throw new Error(data.error);
+          await queryClient.invalidateQueries({ queryKey: ["ad-account-detail", id] });
+          await queryClient.invalidateQueries({ queryKey: ["tiktok-account-insights-detail", id] });
+          toast.success("Data updated from TikTok BC");
+        } else {
+          toast.error("No Business Center linked to this account");
+        }
       } else {
-        toast.error(msg || "Failed to update from Meta");
+        const { error } = await supabase.functions.invoke("get-account-insights", {
+          body: { ad_account_ids: [id], source: "meta" },
+        });
+        if (error) throw error;
+        await queryClient.invalidateQueries({ queryKey: ["ad-account-insights-detail", id] });
+        if (!isAdmin) setLastMetaUpdate(Date.now());
+        toast.success("Data updated from Meta");
       }
+    } catch (err: any) {
+      toast.error(friendlyEdgeError(err));
     } finally {
       setUpdatingMeta(false);
     }
@@ -175,6 +220,8 @@ export default function AdAccountDetailPage() {
     );
   }
 
+  const platformLabel = isTikTok ? "TikTok" : "Meta";
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -191,9 +238,9 @@ export default function AdAccountDetailPage() {
                 Updated: {new Date(insights.updated_at).toLocaleString()}
               </span>
             )}
-            <Button onClick={handleUpdateFromMeta} disabled={updatingMeta} size="sm">
+            <Button onClick={handleUpdateFromSource} disabled={updatingMeta} size="sm">
               <RefreshCw className={`h-4 w-4 mr-1 ${updatingMeta ? "animate-spin" : ""}`} />
-              <span className="hidden sm:inline">Update from Meta</span>
+              <span className="hidden sm:inline">Update from {isTikTok ? "BC" : "Meta"}</span>
               <span className="sm:hidden">Update</span>
             </Button>
           </div>
@@ -244,9 +291,15 @@ export default function AdAccountDetailPage() {
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <svg viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6">
-                    <path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.879V14.89h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.989C18.343 21.129 22 16.99 22 12c0-5.523-4.477-10-10-10z"/>
-                  </svg>
+                  {isTikTok ? (
+                    <svg viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6">
+                      <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.88-2.88 2.89 2.89 0 012.88-2.88c.28 0 .56.04.82.12v-3.5a6.37 6.37 0 00-.82-.05A6.34 6.34 0 003.15 15.3a6.34 6.34 0 0010.47 4.81 6.3 6.3 0 001.87-4.51V9.37a8.16 8.16 0 004.73 1.51V7.43a4.85 4.85 0 01-.63-.74z"/>
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6">
+                      <path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.879V14.89h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.989C18.343 21.129 22 16.99 22 12c0-5.523-4.477-10-10-10z"/>
+                    </svg>
+                  )}
                 </div>
                 <div>
                   {isRenaming ? (
@@ -289,18 +342,26 @@ export default function AdAccountDetailPage() {
             </CardHeader>
             <CardContent>
               <SpendProgressBar amountSpent={Number(account.amount_spent)} spendCap={Number(account.spend_cap)} balanceAfterTopup={Number((account as any).balance_after_topup ?? 0)} />
-              <div className="mt-4">
-                <Button variant="outline" size="sm" asChild>
-                  <a
-                    href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${account.account_id.replace(/^act_/, '')}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <ExternalLink className="h-4 w-4 mr-1" />
-                    View Billing on Meta
-                  </a>
-                </Button>
-              </div>
+              {!isTikTok && (
+                <div className="mt-4">
+                  <Button variant="outline" size="sm" asChild>
+                    <a
+                      href={`https://business.facebook.com/billing_hub/accounts/details?asset_id=${account.account_id.replace(/^act_/, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <ExternalLink className="h-4 w-4 mr-1" />
+                      View Billing on Meta
+                    </a>
+                  </Button>
+                </div>
+              )}
+              {isTikTok && insights?.balance != null && (
+                <div className="mt-3 text-sm">
+                  <span className="text-muted-foreground">Account Balance: </span>
+                  <span className="font-semibold">${Number(insights.balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -311,13 +372,19 @@ export default function AdAccountDetailPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Business Manager</span>
-                <span className="font-medium">{account.business_managers?.name || "—"}</span>
+                <span className="text-muted-foreground">Platform</span>
+                <span className="font-medium">{platformLabel}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Business Name</span>
-                <span className="font-medium">{account.business_name || "—"}</span>
+                <span className="text-muted-foreground">{isTikTok ? "Business Center" : "Business Manager"}</span>
+                <span className="font-medium">{account.business_managers?.name || "—"}</span>
               </div>
+              {!isTikTok && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Business Name</span>
+                  <span className="font-medium">{account.business_name || "—"}</span>
+                </div>
+              )}
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Created</span>
                 <span className="font-medium">{new Date(account.created_at).toLocaleDateString()}</span>
@@ -379,8 +446,8 @@ export default function AdAccountDetailPage() {
             </Card>
           )}
 
-          {/* Payment Methods (Admin only) */}
-          {isAdmin && id && (
+          {/* Payment Methods (Meta + Admin only) */}
+          {isAdmin && id && !isTikTok && (
             <AdAccountPaymentMethods
               adAccountId={id}
               currentCards={
@@ -391,8 +458,8 @@ export default function AdAccountDetailPage() {
             />
           )}
 
-          {/* Partner BMs (Admin only) */}
-          {isAdmin && id && <AdAccountPartners adAccountId={id} />}
+          {/* Partner BMs (Meta + Admin only) */}
+          {isAdmin && id && !isTikTok && <AdAccountPartners adAccountId={id} />}
         </div>
       </div>
     </DashboardLayout>

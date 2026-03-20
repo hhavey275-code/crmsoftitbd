@@ -517,7 +517,7 @@ export function AdminTikTokAccounts() {
                 ) : paginatedAccounts.map((a: any) => {
                   const ins = insightsMap[a.id];
                   return (
-                    <TableRow key={a.id} className="hover:bg-muted/50" data-state={selectedIds.has(a.id) ? "selected" : undefined}>
+                    <TableRow key={a.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/ad-accounts/${a.id}`)} data-state={selectedIds.has(a.id) ? "selected" : undefined}>
                       {showSelect && (
                         <TableCell>
                           <Checkbox checked={selectedIds.has(a.id)} onCheckedChange={() => toggleSelect(a.id)} />
