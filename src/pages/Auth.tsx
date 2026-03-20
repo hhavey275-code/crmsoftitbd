@@ -76,6 +76,7 @@ export default function Auth() {
   const [monthlySpend, setMonthlySpend] = useState("");
   const [loading, setLoading] = useState(false);
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
+  const [tiktokProcessing, setTiktokProcessing] = useState(false);
   const navigate = useNavigate();
   const { logoUrl, siteName, welcomeTitle, welcomeNote } = useSiteSettings();
 
@@ -85,6 +86,7 @@ export default function Auth() {
     const authCode = params.get("auth_code");
     const state = params.get("state");
     if (authCode && state === "tiktok") {
+      setTiktokProcessing(true);
       toast.info("TikTok auth code detected, exchanging for token...");
       (async () => {
         try {
@@ -93,7 +95,6 @@ export default function Auth() {
           });
           if (error) throw error;
           if (data?.error) throw new Error(data.error);
-          // Copy token to clipboard
           if (data?.access_token) {
             await navigator.clipboard.writeText(data.access_token);
             toast.success("TikTok Access Token copied to clipboard! Use it to add your Business Center.", { duration: 10000 });
@@ -103,14 +104,15 @@ export default function Auth() {
           toast.error("TikTok token exchange failed: " + (err?.message || "Unknown error"));
           console.error("TikTok OAuth error:", err);
         }
-        // Clean URL
+        // Clean URL and redirect to dashboard
         window.history.replaceState({}, "", window.location.pathname);
+        setTiktokProcessing(false);
       })();
     }
   }, []);
 
-  // Redirect authenticated users to dashboard
-  if (!authLoading && user) {
+  // Redirect authenticated users to dashboard (but not while processing TikTok OAuth)
+  if (!authLoading && user && !tiktokProcessing) {
     return <Navigate to="/dashboard" replace />;
   }
 
