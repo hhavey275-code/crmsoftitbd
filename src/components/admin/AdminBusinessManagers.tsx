@@ -57,7 +57,7 @@ export function AdminBusinessManagers() {
   const { data: bms } = useQuery({
     queryKey: ["admin-business-managers"],
     queryFn: async () => {
-      const { data } = await supabase.from("business_managers").select("*").order("created_at", { ascending: false });
+      const { data } = await supabase.from("business_managers").select("*").eq("platform", "meta").order("created_at", { ascending: false });
       return (data as any[]) ?? [];
     },
   });
