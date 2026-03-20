@@ -67,10 +67,10 @@ Deno.serve(async (req) => {
       if (!assignment) return json({ error: "Forbidden" }, 403);
     }
 
-    // Fetch ad account with BM
+    // Fetch ad account
     const { data: account, error: accErr } = await supabase
       .from("ad_accounts")
-      .select("*, business_managers!inner(access_token, bm_id)")
+      .select("*")
       .eq("id", ad_account_id)
       .eq("platform", "tiktok")
       .single();
