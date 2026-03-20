@@ -17,7 +17,8 @@ import { logSystemAction } from "@/lib/systemLog";
 
 export function AdminTikTokAccounts() {
   const queryClient = useQueryClient();
-  const isBackNav = (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming)?.type === 'back_forward';
+  const navType = useNavigationType();
+  const isBackNav = navType === "POP";
   const [search, setSearch] = useState(() => isBackNav ? (sessionStorage.getItem("tiktokAccountsSearch") || "") : "");
   useEffect(() => { sessionStorage.setItem("tiktokAccountsSearch", search); }, [search]);
   const [topUpAccount, setTopUpAccount] = useState<any>(null);
