@@ -44,9 +44,10 @@ async function forwardProofToTelegram(supabase: any, proofUrl: string, caption: 
     }
 
     if (!targetGroupId) {
-      console.log('Telegram forward skipped: no group ID configured for this bank');
+      console.log('Telegram forward skipped: no group ID configured. bankAccountId:', bankAccountId);
       return;
     }
+    console.log('Telegram forwarding to group:', targetGroupId, 'bankAccountId:', bankAccountId);
 
     const resp = await fetch(`https://api.telegram.org/bot${botTokenSetting.value}/sendPhoto`, {
       method: 'POST',
