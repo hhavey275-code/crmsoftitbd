@@ -149,20 +149,8 @@ export function AdminTopUp() {
     }
   };
 
-  const summaryMetrics = useMemo(() => {
-    if (!requests) return { totalUsd: 0, totalBdt: 0, autoApproved: 0, manualApproved: 0 };
-    const from = dateRange?.from ? startOfDay(dateRange.from) : today;
-    const to = dateRange?.to ? endOfDay(dateRange.to) : endOfDay(new Date());
-    const approvedInRange = requests.filter((r: any) =>
-      r.status === "approved" &&
-      isWithinInterval(new Date(r.updated_at || r.created_at), { start: from, end: to })
-    );
-    const totalUsd = approvedInRange.reduce((s: number, r: any) => s + Number(r.amount || 0), 0);
-    const totalBdt = approvedInRange.reduce((s: number, r: any) => s + Number(r.bdt_amount || 0), 0);
-    const autoApproved = approvedInRange.filter((r: any) => r.admin_note?.includes("Auto Approved by System")).length;
-    const manualApproved = approvedInRange.length - autoApproved;
-    return { totalUsd, totalBdt, autoApproved, manualApproved };
-  }, [requests, dateRange]);
+
+
 
   useEffect(() => {
     const channel = supabase.channel("admin-topup-realtime")
