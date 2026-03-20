@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
 import { toast } from "sonner";
@@ -21,6 +22,7 @@ export function ClientTopUp() {
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
   const [bdtAmount, setBdtAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"online_transfer" | "atm_deposit" | "cash_deposit">("online_transfer");
 
   const isInactive = (profile as any)?.status === "inactive";
   const [selectedBank, setSelectedBank] = useState("");
@@ -237,7 +239,7 @@ export function ClientTopUp() {
         usd_rate: usdRate,
         bank_account_id: selectedBank,
         payment_reference: paymentRef || null,
-        payment_method: "bank_transfer",
+        payment_method: paymentMethod === "online_transfer" ? "bank_transfer" : paymentMethod,
         proof_url: proofUrl,
       } as any).select("id").single();
       if (error) throw error;
@@ -255,6 +257,7 @@ export function ClientTopUp() {
       setBdtAmount("");
       setSelectedBank("");
       setPaymentRef("");
+      setPaymentMethod("online_transfer");
       clearFile();
     },
     onError: (err: any) => toast.error(err.message),
@@ -289,6 +292,24 @@ export function ClientTopUp() {
             <CardDescription className="text-xs">Select a bank, enter BDT amount, and submit your payment details</CardDescription>
           </CardHeader>
           <CardContent className="p-4 pt-2 space-y-3">
+            <div className="space-y-2">
+              <Label>Payment Method</Label>
+              <RadioGroup value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as any)} className="flex flex-col gap-2">
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="online_transfer" id="pm-online" />
+                  <Label htmlFor="pm-online" className="font-normal cursor-pointer">Online Bank Transfer</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="atm_deposit" id="pm-atm" />
+                  <Label htmlFor="pm-atm" className="font-normal cursor-pointer">ATM Deposit</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="cash_deposit" id="pm-cash" />
+                  <Label htmlFor="pm-cash" className="font-normal cursor-pointer">Cash Deposit</Label>
+                </div>
+              </RadioGroup>
+            </div>
+
             <div className="space-y-2">
               <Label>Payment Bank</Label>
               <Select value={selectedBank} onValueChange={setSelectedBank}>
@@ -350,10 +371,12 @@ export function ClientTopUp() {
             <CardDescription className="text-xs">Attach your payment reference and screenshot</CardDescription>
           </CardHeader>
           <CardContent className="p-4 pt-2 space-y-3">
-            <div className="space-y-2">
-              <Label>Payment Reference / Transaction ID</Label>
-              <Input value={paymentRef} onChange={(e) => setPaymentRef(e.target.value)} placeholder="e.g. TXN123456" />
-            </div>
+            {paymentMethod !== "cash_deposit" && (
+              <div className="space-y-2">
+                <Label>Payment Reference / Transaction ID</Label>
+                <Input value={paymentRef} onChange={(e) => setPaymentRef(e.target.value)} placeholder="e.g. TXN123456" />
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Payment Screenshot</Label>

@@ -92,10 +92,11 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: true, message: 'Already processed' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const { bdt_amount, bank_account_id, proof_url, user_id, amount } = request;
+    const { bdt_amount, bank_account_id, proof_url, user_id, amount, payment_method } = request;
     const payment_reference = (request.payment_reference || '').trim();
     const bdtNum = Number(bdt_amount);
     const verificationLog: string[] = [];
+    const method = payment_method || 'bank_transfer';
 
     // 2. Get bank account details
     let bankLast4 = '';
@@ -112,14 +113,26 @@ Deno.serve(async (req) => {
 
     const isMobileAgent = bankName.includes('bkash') || bankName.includes('nagad');
 
-    // 3. AI OCR
+    // 3. AI OCR — branched by payment method
     let ocrRef = '';
     let ocrAmount = 0;
     let ocrRefMatch = false;
     let ocrAmountMatch = false;
+    let ocrAccountMatch = false;
+    let ocrAtmCredit = false;
+    let ocrAccountNumber = '';
 
     if (proof_url) {
       try {
+        let ocrPrompt = '';
+        if (method === 'atm_deposit') {
+          ocrPrompt = 'Extract the following from this ATM deposit receipt screenshot: transaction reference number, deposit amount (in BDT), account number, date, and whether this is an "ATM Transfer Credit" transaction. Return ONLY a JSON object like: {"ref": "ABC123", "amount": 1300, "account_number": "1234567890", "date": "2025-01-15", "is_atm_credit": true}. If you cannot find a value, use empty string for strings, 0 for amount, and false for is_atm_credit. No explanation, just JSON.';
+        } else if (method === 'cash_deposit') {
+          ocrPrompt = 'Extract the following from this cash deposit receipt screenshot: deposit amount (in BDT), account number, and date. Return ONLY a JSON object like: {"amount": 1300, "account_number": "1234567890", "date": "2025-01-15"}. If you cannot find a value, use empty string for strings and 0 for amount. No explanation, just JSON.';
+        } else {
+          ocrPrompt = 'Extract the transaction reference number and the BASE payment amount (in BDT) from this payment screenshot. IMPORTANT: If the screenshot shows a breakdown like "৳1,300.00 + ৳16.25" or "amount + charge", extract ONLY the base amount (1300), NOT the total including charges/fees/VAT. The base amount is the actual money sent, excluding any service charge, VAT, or bank fee. For bKash/Nagad screenshots, look for the principal amount before fees. For bank transfer screenshots, extract the transfer amount excluding service charge and VAT. Return ONLY a JSON object like: {"ref": "ABC123", "amount": 1300}. If you cannot find a value, use empty string for ref and 0 for amount. No explanation, just JSON.';
+        }
+
         const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -131,7 +144,7 @@ Deno.serve(async (req) => {
             messages: [{
               role: 'user',
               content: [
-                { type: 'text', text: 'Extract the transaction reference number and the BASE payment amount (in BDT) from this payment screenshot. IMPORTANT: If the screenshot shows a breakdown like "৳1,300.00 + ৳16.25" or "amount + charge", extract ONLY the base amount (1300), NOT the total including charges/fees/VAT. The base amount is the actual money sent, excluding any service charge, VAT, or bank fee. For bKash/Nagad screenshots, look for the principal amount before fees. For bank transfer screenshots, extract the transfer amount excluding service charge and VAT. Return ONLY a JSON object like: {"ref": "ABC123", "amount": 1300}. If you cannot find a value, use empty string for ref and 0 for amount. No explanation, just JSON.' },
+                { type: 'text', text: ocrPrompt },
                 { type: 'image_url', image_url: { url: proof_url } },
               ],
             }],
@@ -145,6 +158,8 @@ Deno.serve(async (req) => {
             const parsed = JSON.parse(jsonMatch[0]);
             ocrRef = String(parsed.ref || '').trim();
             ocrAmount = Number(parsed.amount) || 0;
+            ocrAccountNumber = String(parsed.account_number || '').trim();
+            ocrAtmCredit = !!parsed.is_atm_credit;
           }
         }
       } catch (e) {
@@ -153,25 +168,69 @@ Deno.serve(async (req) => {
       }
     }
 
-    // OCR Ref match
-    if (ocrRef && payment_reference) {
-      ocrRefMatch = ocrRef.toLowerCase() === payment_reference.toLowerCase();
-      verificationLog.push(ocrRefMatch ? `✅ OCR Ref matched (${ocrRef})` : `❌ OCR Ref mismatch (OCR: ${ocrRef} vs Submitted: ${payment_reference})`);
+    // OCR matching logic depends on method
+    if (method === 'atm_deposit') {
+      // Ref match
+      if (ocrRef && payment_reference) {
+        ocrRefMatch = ocrRef.toLowerCase() === payment_reference.toLowerCase();
+        verificationLog.push(ocrRefMatch ? `✅ OCR Ref matched (${ocrRef})` : `❌ OCR Ref mismatch (OCR: ${ocrRef} vs Submitted: ${payment_reference})`);
+      } else {
+        verificationLog.push(`⚠️ OCR Ref skipped (OCR: "${ocrRef}", Submitted: "${payment_reference || ''}")`);
+      }
+      // Amount match
+      if (ocrAmount > 0 && bdtNum > 0) {
+        ocrAmountMatch = amountMatches(ocrAmount, bdtNum);
+        verificationLog.push(ocrAmountMatch ? `✅ OCR Amount matched (${ocrAmount} vs ${bdtNum})` : `❌ OCR Amount mismatch (${ocrAmount} vs ${bdtNum})`);
+      } else {
+        verificationLog.push(`⚠️ OCR Amount skipped`);
+      }
+      // Account match
+      if (ocrAccountNumber && bankLast4) {
+        const ocrLast4 = ocrAccountNumber.slice(-4);
+        ocrAccountMatch = ocrLast4 === bankLast4;
+        verificationLog.push(ocrAccountMatch ? `✅ OCR Account matched (last4: ${ocrLast4})` : `❌ OCR Account mismatch (OCR: ${ocrLast4} vs Bank: ${bankLast4})`);
+      } else {
+        verificationLog.push(`⚠️ OCR Account skipped`);
+      }
+      // ATM credit check
+      verificationLog.push(ocrAtmCredit ? `✅ ATM Transfer Credit confirmed` : `❌ ATM Transfer Credit not found`);
+    } else if (method === 'cash_deposit') {
+      // Amount match
+      if (ocrAmount > 0 && bdtNum > 0) {
+        ocrAmountMatch = amountMatches(ocrAmount, bdtNum);
+        verificationLog.push(ocrAmountMatch ? `✅ OCR Amount matched (${ocrAmount} vs ${bdtNum})` : `❌ OCR Amount mismatch (${ocrAmount} vs ${bdtNum})`);
+      } else {
+        verificationLog.push(`⚠️ OCR Amount skipped`);
+      }
+      // Account match
+      if (ocrAccountNumber && bankLast4) {
+        const ocrLast4 = ocrAccountNumber.slice(-4);
+        ocrAccountMatch = ocrLast4 === bankLast4;
+        verificationLog.push(ocrAccountMatch ? `✅ OCR Account matched (last4: ${ocrLast4})` : `❌ OCR Account mismatch (OCR: ${ocrLast4} vs Bank: ${bankLast4})`);
+      } else {
+        verificationLog.push(`⚠️ OCR Account skipped`);
+      }
     } else {
-      verificationLog.push(`⚠️ OCR Ref skipped (OCR: "${ocrRef}", Submitted: "${payment_reference || ''}")`);
-    }
-
-    // OCR Amount match
-    if (ocrAmount > 0 && bdtNum > 0) {
-      ocrAmountMatch = amountMatches(ocrAmount, bdtNum);
-      verificationLog.push(ocrAmountMatch ? `✅ OCR Amount matched (OCR: ৳${ocrAmount} vs Submitted: ৳${bdtNum}, diff: ৳${Math.abs(ocrAmount - bdtNum)})` : `❌ OCR Amount mismatch (OCR: ৳${ocrAmount} vs Submitted: ৳${bdtNum}, diff: ৳${Math.abs(ocrAmount - bdtNum)})`);
-    } else {
-      verificationLog.push(`⚠️ OCR Amount skipped (OCR: ${ocrAmount}, Submitted: ${bdtNum})`);
+      // bank_transfer — existing logic
+      if (ocrRef && payment_reference) {
+        ocrRefMatch = ocrRef.toLowerCase() === payment_reference.toLowerCase();
+        verificationLog.push(ocrRefMatch ? `✅ OCR Ref matched (${ocrRef})` : `❌ OCR Ref mismatch (OCR: ${ocrRef} vs Submitted: ${payment_reference})`);
+      } else {
+        verificationLog.push(`⚠️ OCR Ref skipped (OCR: "${ocrRef}", Submitted: "${payment_reference || ''}")`);
+      }
+      if (ocrAmount > 0 && bdtNum > 0) {
+        ocrAmountMatch = amountMatches(ocrAmount, bdtNum);
+        verificationLog.push(ocrAmountMatch ? `✅ OCR Amount matched (OCR: ৳${ocrAmount} vs Submitted: ৳${bdtNum}, diff: ৳${Math.abs(ocrAmount - bdtNum)})` : `❌ OCR Amount mismatch (OCR: ৳${ocrAmount} vs Submitted: ৳${bdtNum}, diff: ৳${Math.abs(ocrAmount - bdtNum)})`);
+      } else {
+        verificationLog.push(`⚠️ OCR Amount skipped (OCR: ${ocrAmount}, Submitted: ${bdtNum})`);
+      }
     }
 
     // Telegram SMS match
     const requestTime = new Date(request.created_at);
-    const windowHoursBack = isMobileAgent ? 6 : 0.5;
+    // For atm_deposit/cash_deposit, always use bank transfer matching (last4+amount), not mobile agent flow
+    const useMobileAgentFlow = isMobileAgent && method === 'bank_transfer';
+    const windowHoursBack = useMobileAgentFlow ? 6 : 0.5;
     const windowStart = new Date(requestTime.getTime() - windowHoursBack * 60 * 60 * 1000).toISOString();
     const windowEnd = new Date(requestTime.getTime() + 10 * 60 * 1000).toISOString();
 
@@ -196,7 +255,7 @@ Deno.serve(async (req) => {
         const payload = raw.message || raw.edited_message || raw.channel_post || raw.edited_channel_post || {};
         const text = msg.text || payload.text || payload.caption || '';
 
-        if (isMobileAgent && payment_reference) {
+        if (useMobileAgentFlow && payment_reference) {
           if (text.toLowerCase().includes(payment_reference.toLowerCase())) {
             telegramMatch = true;
             matchedMsg = msg;
@@ -229,20 +288,39 @@ Deno.serve(async (req) => {
     if (telegramMatch) {
       verificationLog.push(`✅ Telegram SMS matched (${telegramMatchDetail})`);
     } else {
-      const matchInfo = isMobileAgent ? `trnxID=${payment_reference}` : `bankLast4=${bankLast4}, bdt=${bdtNum}`;
+      const matchInfo = useMobileAgentFlow ? `trnxID=${payment_reference}` : `bankLast4=${bankLast4}, bdt=${bdtNum}`;
       verificationLog.push(`❌ Telegram SMS no match (${matchInfo}, messages checked: ${telegramMsgs?.length ?? 0}, window: ${windowStart} → ${windowEnd})`);
     }
 
-    // Decision
-    const ocrAvailable = ocrRef !== '' || ocrAmount > 0;
-    const allPassed = ocrAvailable ? (ocrRefMatch && ocrAmountMatch && telegramMatch) : telegramMatch;
-    const logText = `Auto-verification: ${verificationLog.join(' | ')}`;
+    // Decision — per method
+    let allPassed = false;
+    if (method === 'atm_deposit') {
+      allPassed = ocrAmountMatch && ocrAccountMatch && ocrAtmCredit && ocrRefMatch && telegramMatch;
+    } else if (method === 'cash_deposit') {
+      allPassed = ocrAmountMatch && ocrAccountMatch && telegramMatch;
+    } else {
+      // bank_transfer — existing logic
+      const ocrAvailable = ocrRef !== '' || ocrAmount > 0;
+      allPassed = ocrAvailable ? (ocrRefMatch && ocrAmountMatch && telegramMatch) : telegramMatch;
+    }
+    const logText = `Auto-verification (${method}): ${verificationLog.join(' | ')}`;
 
     if (!allPassed) {
       await supabase.from('top_up_requests').update({ admin_note: logText }).eq('id', request_id);
       const failReasons: string[] = [];
-      if (ocrAvailable && !ocrRefMatch) failReasons.push('OCR ref mismatch');
-      if (ocrAvailable && !ocrAmountMatch) failReasons.push('OCR amount mismatch');
+      if (method === 'atm_deposit') {
+        if (!ocrRefMatch) failReasons.push('OCR ref mismatch');
+        if (!ocrAmountMatch) failReasons.push('OCR amount mismatch');
+        if (!ocrAccountMatch) failReasons.push('OCR account mismatch');
+        if (!ocrAtmCredit) failReasons.push('ATM Transfer Credit not found');
+      } else if (method === 'cash_deposit') {
+        if (!ocrAmountMatch) failReasons.push('OCR amount mismatch');
+        if (!ocrAccountMatch) failReasons.push('OCR account mismatch');
+      } else {
+        const ocrAvailable = ocrRef !== '' || ocrAmount > 0;
+        if (ocrAvailable && !ocrRefMatch) failReasons.push('OCR ref mismatch');
+        if (ocrAvailable && !ocrAmountMatch) failReasons.push('OCR amount mismatch');
+      }
       if (!telegramMatch) failReasons.push('No Telegram SMS match');
       return new Response(JSON.stringify({ ok: true, auto_approved: false, reason: failReasons.join(', '), retry_suggested: !telegramMatch }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
