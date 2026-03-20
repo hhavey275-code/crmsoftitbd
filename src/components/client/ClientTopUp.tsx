@@ -443,12 +443,6 @@ export function ClientTopUp() {
                       <span className="text-[11px] text-muted-foreground">Ref: {r.payment_reference}</span>
                     )}
                   </div>
-                  {r.admin_note && !r.admin_note.startsWith('Auto-verification:') && (
-                    <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1">
-                      <MessageSquare className="h-3 w-3 mt-0.5 shrink-0" />
-                      {r.admin_note}
-                    </p>
-                  )}
                   {r.status === "approved" && (
                     <div className="flex justify-end mt-2">
                       <Button size="sm" variant="ghost" className="gap-1 text-primary hover:underline h-6 px-2 text-xs" asChild>
