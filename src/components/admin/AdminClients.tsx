@@ -166,6 +166,43 @@ export function AdminClients() {
     return allRoles?.find((r: any) => r.user_id === userId)?.role ?? "client";
   };
 
+  // Bank assignment queries and mutations
+  const { data: allBanks } = useQuery({
+    queryKey: ["all-active-banks"],
+    queryFn: async () => {
+      const { data } = await (supabase as any).from("bank_accounts").select("*").eq("status", "active");
+      return (data as any[]) ?? [];
+    },
+  });
+
+  const { data: userBanks } = useQuery({
+    queryKey: ["user-banks", bankDialogUser?.user_id],
+    queryFn: async () => {
+      const { data } = await (supabase as any).from("client_banks").select("*, bank_accounts(bank_name, account_number, logo_url)").eq("user_id", bankDialogUser!.user_id);
+      return (data as any[]) ?? [];
+    },
+    enabled: !!bankDialogUser,
+  });
+
+  const assignBankMutation = useMutation({
+    mutationFn: async () => {
+      if (!newBankId || !bankDialogUser) throw new Error("Select a bank");
+      const { error } = await (supabase as any).from("client_banks").insert({ user_id: bankDialogUser.user_id, bank_account_id: newBankId });
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Bank assigned!"); queryClient.invalidateQueries({ queryKey: ["user-banks", bankDialogUser?.user_id] }); setNewBankId(""); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const unassignBankMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase as any).from("client_banks").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Bank unassigned!"); queryClient.invalidateQueries({ queryKey: ["user-banks", bankDialogUser?.user_id] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   const filtered = clients?.filter((c: any) => {
     const term = search.toLowerCase();
     return !term || c.full_name?.toLowerCase().includes(term) || c.email?.toLowerCase().includes(term) || c.company?.toLowerCase().includes(term);
