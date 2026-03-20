@@ -525,6 +525,68 @@ export function AdminClients() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Assign Banks Dialog */}
+      <Dialog open={!!bankDialogUser} onOpenChange={(open) => { if (!open) { setBankDialogUser(null); setNewBankId(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-primary" />
+              Banks — {bankDialogUser?.full_name || bankDialogUser?.email}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Current assignments */}
+            <div>
+              <p className="text-sm font-medium mb-2">Assigned Banks</p>
+              {userBanks?.length === 0 && <p className="text-xs text-muted-foreground">No banks assigned</p>}
+              <div className="space-y-2">
+                {userBanks?.map((cb: any) => (
+                  <div key={cb.id} className="flex items-center justify-between p-2 rounded-md border bg-muted/30">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {cb.bank_accounts?.logo_url ? (
+                        <img src={cb.bank_accounts.logo_url} alt="" className="h-7 w-7 rounded border object-contain bg-white shrink-0" />
+                      ) : (
+                        <div className="h-7 w-7 rounded bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                          <Building2 className="h-3.5 w-3.5 text-blue-600" />
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{cb.bank_accounts?.bank_name}</p>
+                        <p className="text-[11px] text-muted-foreground">{cb.bank_accounts?.account_number}</p>
+                      </div>
+                    </div>
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 hover:text-destructive" onClick={() => unassignBankMutation.mutate(cb.id)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Add new */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Assign New Bank</p>
+              <div className="flex gap-2">
+                <Select value={newBankId} onValueChange={setNewBankId}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Select a bank" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allBanks?.filter((b: any) => !userBanks?.some((ub: any) => ub.bank_account_id === b.id)).map((b: any) => (
+                      <SelectItem key={b.id} value={b.id}>{b.bank_name} — {b.account_number}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button size="sm" onClick={() => assignBankMutation.mutate()} disabled={!newBankId || assignBankMutation.isPending}>
+                  Assign
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
