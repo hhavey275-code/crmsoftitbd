@@ -733,6 +733,40 @@ export function AdminTikTokAccounts() {
         </DialogContent>
       </Dialog>
 
+      {/* Update Spend Cap Dialog */}
+      <Dialog open={!!updateCapAccount} onOpenChange={(o) => !o && setUpdateCapAccount(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Spend Cap</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">{updateCapAccount?.account_name} ({updateCapAccount?.account_id})</p>
+          {updateCapAccount?.fraud_flag && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              এই অ্যাকাউন্টে spending cap mismatch পাওয়া গেছে। নতুন spend cap সেট করলে fraud flag রিসেট হবে।
+            </div>
+          )}
+          <div>
+            <Label>New Spend Cap (USD)</Label>
+            <Input type="number" min="0" value={newSpendCap} onChange={(e) => setNewSpendCap(e.target.value)} placeholder="Enter exact spend cap" />
+          </div>
+          <div className="text-sm text-muted-foreground">
+            Current cap: <span className="font-medium text-foreground">${Number(updateCapAccount?.spend_cap ?? 0).toLocaleString()}</span>
+            {newSpendCap && <> → New: <span className="font-medium text-foreground">${Number(newSpendCap).toLocaleString()}</span></>}
+          </div>
+          <div className="rounded-md border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-700 dark:text-yellow-300">
+            ⚠️ CRM এ spend cap সেট হবে। TikTok এও manually same value সেট করতে হবে।
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUpdateCapAccount(null)}>Cancel</Button>
+            <Button onClick={() => updateCapMutation.mutate()} disabled={updateCapMutation.isPending || !newSpendCap}>
+              {updateCapMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              Update Cap
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Assign Dialog */}
       <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
         <DialogContent>
