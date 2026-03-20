@@ -504,14 +504,6 @@ export function ClientTopUp() {
                         </span>
                       ) : "—"}
                     </TableCell>
-                    <TableCell className="text-sm">
-                      <span className="text-foreground">{getReviewerName(r)}</span>
-                      {r.status === "approved" && (
-                        <span className="block text-[10px] text-muted-foreground">
-                          {format(new Date(new Date(r.updated_at).toLocaleString("en-US", { timeZone: "Asia/Dhaka" })), "MMM d, yyyy hh:mm a")}
-                        </span>
-                      )}
-                    </TableCell>
                   </TableRow>
                 ))}
                 {(!myRequests || myRequests.length === 0) && (
