@@ -257,6 +257,7 @@ export function ClientTopUp() {
       setBdtAmount("");
       setSelectedBank("");
       setPaymentRef("");
+      setPaymentMethod("online_transfer");
       clearFile();
     },
     onError: (err: any) => toast.error(err.message),
