@@ -41,6 +41,8 @@ export function AdminClients() {
   const [search, setSearch] = useState("");
   const [permDialogUser, setPermDialogUser] = useState<any>(null);
   const [selectedMenuKeys, setSelectedMenuKeys] = useState<string[]>([]);
+  const [bankDialogUser, setBankDialogUser] = useState<any>(null);
+  const [newBankId, setNewBankId] = useState("");
 
   const { data: clients, isLoading } = useQuery({
     queryKey: ["admin-clients"],
