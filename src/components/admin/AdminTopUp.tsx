@@ -9,13 +9,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format } from "date-fns";
+import { format, startOfDay, endOfDay, subDays, isWithinInterval } from "date-fns";
 import { toast } from "sonner";
 import { useState, Fragment, useMemo, useEffect } from "react";
-import { Check, X, Pause, ImageIcon, Radio, ChevronDown, ChevronUp, MessageSquareText, RotateCcw, ClipboardCheck, FileText } from "lucide-react";
+import { Check, X, Pause, ImageIcon, Radio, ChevronDown, ChevronUp, MessageSquareText, RotateCcw, ClipboardCheck, FileText, DollarSign, Banknote, Bot, UserCheck, CalendarIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { MetricCard } from "@/components/MetricCard";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import type { DateRange } from "react-day-picker";
 import { logSystemAction } from "@/lib/systemLog";
 
 type ActionType = "approved" | "rejected" | "hold";
