@@ -114,7 +114,7 @@ export function ClientTikTokAccounts() {
                     <TableCell className="font-medium">{acc.account_name}</TableCell>
                     <TableCell className="text-muted-foreground">{acc.account_id}</TableCell>
                     <TableCell>
-                      <SpendProgressBar amountSpent={acc.amount_spent} spendCap={acc.spend_cap} balanceAfterTopup={Number((acc as any).balance_after_topup ?? 0)} />
+                      <SpendProgressBar amountSpent={acc.amount_spent} spendCap={acc.spend_cap} balanceAfterTopup={Number((acc as any).balance_after_topup ?? 0)} platform="tiktok" />
                     </TableCell>
                     <TableCell><StatusBadge status={acc.status} /></TableCell>
                     <TableCell>

@@ -2,9 +2,10 @@ interface SpendProgressBarProps {
   amountSpent: number;
   spendCap: number;
   balanceAfterTopup?: number;
+  platform?: "meta" | "tiktok";
 }
 
-export function SpendProgressBar({ amountSpent, spendCap, balanceAfterTopup }: SpendProgressBarProps) {
+export function SpendProgressBar({ amountSpent, spendCap, balanceAfterTopup, platform }: SpendProgressBarProps) {
   if (spendCap <= 0) {
     return (
       <div className="w-full">
@@ -26,12 +27,16 @@ export function SpendProgressBar({ amountSpent, spendCap, balanceAfterTopup }: S
     ratio = amountSpent / spendCap;
   }
 
+  const normalColor = platform === "tiktok"
+    ? "bg-teal-500 dark:bg-teal-400"
+    : "bg-blue-500 dark:bg-blue-400";
+
   const barColor =
     ratio >= 0.8
       ? "bg-destructive"
       : ratio >= 0.5
         ? "bg-yellow-500 dark:bg-yellow-400"
-        : "bg-teal-500 dark:bg-teal-400";
+        : normalColor;
 
   return (
     <div className="w-full min-w-[80px]">
