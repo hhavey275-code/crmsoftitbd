@@ -104,14 +104,15 @@ Deno.serve(async (req) => {
           console.warn("Balance API error code:", balanceData.code, "msg:", balanceData.message);
           break;
         }
-        const list = balanceData.data?.list ?? [];
+        const list = balanceData.data?.advertiser_account_list ?? [];
         for (const b of list) {
           budgetMap[String(b.advertiser_id)] = {
-            balance: Number(b.balance ?? 0),
-            grant: Number(b.grant ?? 0),
+            balance: Number(b.account_balance ?? 0),
+            budget: Number(b.budget ?? 0),
+            budgetCost: Number(b.budget_cost ?? 0),
           };
         }
-        const totalPage = Math.ceil((balanceData.data?.page_info?.total_number ?? 0) / 50);
+        const totalPage = Math.ceil((balanceData.data?.page_info?.total_number ?? list.length) / 50);
         hasMore = page < totalPage;
         page++;
       }
