@@ -51,5 +51,8 @@ verify_jwt = false
 [functions.tiktok-verify-topup]
 verify_jwt = false
 
+[functions.tiktok-sync-client]
+verify_jwt = false
+
 [functions.tiktok-oauth]
 verify_jwt = false

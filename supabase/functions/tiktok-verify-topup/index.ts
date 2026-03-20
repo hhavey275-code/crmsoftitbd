@@ -150,22 +150,50 @@ Deno.serve(async (req) => {
       // ❌ Mismatch — freeze client account
       await supabase.from("profiles").update({ status: "inactive" }).eq("user_id", userId);
 
+      // DISABLE all running campaigns (Phase 1)
+      let disabledCount = 0;
+      try {
+        const campUrl = `https://business-api.tiktok.com/open_api/v1.3/campaign/get/?advertiser_id=${account.account_id}&filtering={"status":"CAMPAIGN_STATUS_ENABLE"}&page_size=100`;
+        const campRes = await fetch(campUrl, { headers: { "Access-Token": accessToken } });
+        const campData = await campRes.json();
+        if (campData.code === 0 && campData.data?.list?.length > 0) {
+          const campaignIds = campData.data.list.map((c: any) => String(c.campaign_id));
+          // Batch disable in groups of 20
+          for (let i = 0; i < campaignIds.length; i += 20) {
+            const batch = campaignIds.slice(i, i + 20);
+            const disableRes = await fetch("https://business-api.tiktok.com/open_api/v1.3/campaign/update/status/", {
+              method: "POST",
+              headers: { "Access-Token": accessToken, "Content-Type": "application/json" },
+              body: JSON.stringify({ advertiser_id: account.account_id, campaign_ids: batch, opt_status: "DISABLE" }),
+            });
+            const disableData = await disableRes.json();
+            if (disableData.code === 0) disabledCount += batch.length;
+            else console.error("Campaign disable batch failed:", disableData.message);
+          }
+        }
+        console.log(`Disabled ${disabledCount} campaigns for ${account.account_id}`);
+      } catch (campErr) {
+        console.error("Campaign disable error (best-effort):", campErr);
+      }
+
+      const campaignNote = disabledCount > 0 ? ` ${disabledCount} campaigns disabled.` : "";
+
       await supabase.from("system_logs").insert({
         user_id: userId,
         user_name: userName,
         action: "TikTok Top-Up Mismatch ❌ — Account Frozen",
-        details: `${account.account_name} (${account.account_id}) — Expected cap $${expectedNewCap}, actual $${currentBudget}. Client account frozen.`,
+        details: `${account.account_name} (${account.account_id}) — Expected cap $${expectedNewCap}, actual $${currentBudget}. Client account frozen.${campaignNote}`,
       });
 
-      // Also create a notification for admins
+      // Notify all admins
       const { data: adminUsers } = await supabase.from("user_roles").select("user_id").in("role", ["admin", "superadmin"]);
       if (adminUsers) {
         for (const admin of adminUsers) {
           await supabase.from("notifications").insert({
             user_id: admin.user_id,
             type: "topup_mismatch",
-            title: "TikTok Top-Up Mismatch",
-            message: `Client ${userName} top-up mismatch on ${account.account_name}. Expected $${expectedNewCap}, actual $${currentBudget}. Account frozen.`,
+            title: "TikTok Top-Up Mismatch ⚠️",
+            message: `Client ${userName} top-up mismatch on ${account.account_name}. Expected $${expectedNewCap}, actual $${currentBudget}. Account frozen.${campaignNote}`,
             reference_id: ad_account_id,
           });
         }
@@ -177,6 +205,7 @@ Deno.serve(async (req) => {
         mismatch: true,
         expected: expectedNewCap,
         actual: currentBudget,
+        campaigns_disabled: disabledCount,
         error: "Spending cap mismatch detected. Your account has been frozen. Please contact admin.",
       });
     }
