@@ -105,6 +105,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <TikTokOAuthCallbackHandler />
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/auth" element={<Auth />} />
