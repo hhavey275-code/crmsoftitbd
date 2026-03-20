@@ -67,11 +67,11 @@ Deno.serve(async (req) => {
       if (!bm_id || !name || !access_token) throw new Error("bm_id, name, and access_token are required");
 
       const encryptedToken = await encryptToken(access_token, serviceKey);
-      const { data, error } = await supabase.from("business_managers").insert({
+      const { data, error } = await supabase.from("business_managers").upsert({
         bm_id,
         name,
         access_token: encryptedToken,
-      }).select().single();
+      }, { onConflict: "bm_id" }).select().single();
       if (error) throw error;
       return new Response(JSON.stringify({ success: true, data }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
