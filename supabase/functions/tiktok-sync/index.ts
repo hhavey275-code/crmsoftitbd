@@ -121,13 +121,14 @@ Deno.serve(async (req) => {
       console.warn("Balance fetch error:", e);
     }
 
-    // Upsert accounts
+    // Upsert accounts and insights
     for (const adv of advertiserList) {
       const advertiserId = String(adv.advertiser_id);
       const advertiserName = adv.advertiser_name || `TikTok ${advertiserId}`;
       const bal = budgetMap[advertiserId];
       const spendCap = bal?.budget ?? 0;
       const amountSpent = bal?.budgetCost ?? 0;
+      const accountBalance = bal?.balance ?? 0;
 
       const { data: existing } = await supabase
         .from("ad_accounts")
@@ -136,7 +137,10 @@ Deno.serve(async (req) => {
         .eq("platform", "tiktok")
         .maybeSingle();
 
+      let accountUuid: string;
+
       if (existing) {
+        accountUuid = existing.id;
         await supabase
           .from("ad_accounts")
           .update({
@@ -147,7 +151,7 @@ Deno.serve(async (req) => {
           })
           .eq("id", existing.id);
       } else {
-        await supabase.from("ad_accounts").insert({
+        const { data: inserted } = await supabase.from("ad_accounts").insert({
           account_id: advertiserId,
           account_name: advertiserName,
           platform: "tiktok",
@@ -155,8 +159,19 @@ Deno.serve(async (req) => {
           status: "active",
           spend_cap: spendCap,
           amount_spent: amountSpent,
-        });
+        }).select("id").single();
+        accountUuid = inserted?.id;
       }
+
+      // Upsert insights with balance
+      if (accountUuid) {
+        await supabase.from("ad_account_insights").upsert({
+          ad_account_id: accountUuid,
+          balance: accountBalance,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "ad_account_id" });
+      }
+
       syncedCount++;
     }
 
