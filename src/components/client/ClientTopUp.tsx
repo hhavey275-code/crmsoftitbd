@@ -449,19 +449,16 @@ export function ClientTopUp() {
                       {r.admin_note}
                     </p>
                   )}
-                  <div className="flex items-center justify-between mt-2">
-                    <span className="text-[11px] text-muted-foreground">
-                      {getReviewerName(r)}
-                    </span>
-                    {r.status === "approved" && (
+                  {r.status === "approved" && (
+                    <div className="flex justify-end mt-2">
                       <Button size="sm" variant="ghost" className="gap-1 text-primary hover:underline h-6 px-2 text-xs" asChild>
                         <Link to={`/invoice/${r.id}`} target="_blank">
                           <FileText className="h-3 w-3" />
                           Invoice
                         </Link>
                       </Button>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               ))}
               {(!myRequests || myRequests.length === 0) && (
@@ -479,7 +476,6 @@ export function ClientTopUp() {
                   <TableHead>Status</TableHead>
                   <TableHead>Invoice</TableHead>
                   <TableHead>Note</TableHead>
-                  <TableHead>Processed By</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -508,18 +504,10 @@ export function ClientTopUp() {
                         </span>
                       ) : "—"}
                     </TableCell>
-                    <TableCell className="text-sm">
-                      <span className="text-foreground">{getReviewerName(r)}</span>
-                      {r.status === "approved" && (
-                        <span className="block text-[10px] text-muted-foreground">
-                          {format(new Date(new Date(r.updated_at).toLocaleString("en-US", { timeZone: "Asia/Dhaka" })), "MMM d, yyyy hh:mm a")}
-                        </span>
-                      )}
-                    </TableCell>
                   </TableRow>
                 ))}
                 {(!myRequests || myRequests.length === 0) && (
-                  <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">No requests yet</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No requests yet</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
