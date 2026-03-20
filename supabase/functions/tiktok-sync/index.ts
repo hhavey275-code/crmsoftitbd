@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
     let syncedCount = 0;
 
     // Fetch balance/budget for all advertisers via BC endpoint (paginated)
-    let budgetMap: Record<string, { balance: number; grant: number }> = {};
+    let budgetMap: Record<string, { balance: number; budget: number; budgetCost: number }> = {};
     try {
       let page = 1;
       let hasMore = true;
