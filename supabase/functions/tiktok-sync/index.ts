@@ -94,13 +94,14 @@ Deno.serve(async (req) => {
           headers: { "Access-Token": accessToken },
         });
         const balanceText = await balanceRes.text();
+        console.log("Balance API response page", page, "status:", balanceRes.status, "preview:", balanceText.substring(0, 500));
         let balanceData;
         try { balanceData = JSON.parse(balanceText); } catch {
           console.warn("Balance parse error:", balanceText.substring(0, 200));
           break;
         }
         if (balanceData.code !== 0) {
-          console.warn("Balance API error:", balanceData.message);
+          console.warn("Balance API error code:", balanceData.code, "msg:", balanceData.message);
           break;
         }
         const list = balanceData.data?.list ?? [];
