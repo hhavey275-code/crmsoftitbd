@@ -358,10 +358,6 @@ export default function ClientDetailPage() {
   const renderMobileAdAccountCards = () => (
     <div className="space-y-3">
       {adAccounts?.map((acc: any) => {
-        const remaining = Math.max(0, Number(acc.spend_cap) - Number(acc.amount_spent));
-        const ratio = Number(acc.spend_cap) > 0 ? Number(acc.amount_spent) / Number(acc.spend_cap) : 0;
-        const percentage = Math.min(ratio * 100, 100);
-        const barColor = ratio >= 0.8 ? "bg-destructive" : ratio >= 0.5 ? "bg-yellow-500" : "bg-primary";
         const ins = insights?.[acc.id];
 
         return (
@@ -397,13 +393,12 @@ export default function ClientDetailPage() {
               </div>
 
               {/* Remaining + Progress */}
-              <div className="mt-3">
-                <p className="text-sm font-medium text-foreground">
-                  Remaining: <span className="font-bold">${remaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                </p>
-                <div className="h-2 w-full rounded-full bg-muted overflow-hidden mt-1.5">
-                  <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${percentage}%` }} />
-                </div>
+              <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+                <SpendProgressBar
+                  amountSpent={Number(acc.amount_spent)}
+                  spendCap={Number(acc.spend_cap)}
+                  balanceAfterTopup={Number((acc as any).balance_after_topup ?? 0)}
+                />
               </div>
 
               {/* Spent / Limit + Top Up */}
