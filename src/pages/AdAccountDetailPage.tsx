@@ -11,10 +11,11 @@ import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SpendProgressBar } from "@/components/SpendProgressBar";
 import { MetricCard } from "@/components/MetricCard";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { ArrowLeft, Pencil, Check, X, ExternalLink, User, RefreshCw, Megaphone, DollarSign, ShoppingCart, MessageSquare, ChevronsUpDown } from "lucide-react";
+import { ArrowLeft, Pencil, Check, X, ExternalLink, User, RefreshCw, Megaphone, DollarSign, ShoppingCart, MessageSquare, ChevronsUpDown, ArrowUpCircle } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { AdAccountPartners } from "@/components/admin/AdAccountPartners";
 import { AdAccountPaymentMethods } from "@/components/admin/AdAccountPaymentMethods";
@@ -32,6 +33,8 @@ export default function AdAccountDetailPage() {
   const [updatingMeta, setUpdatingMeta] = useState(false);
   const [clientSearch, setClientSearch] = useState("");
   const [lastMetaUpdate, setLastMetaUpdate] = useState<number>(0);
+  const [showTopUp, setShowTopUp] = useState(false);
+  const [topUpAmount, setTopUpAmount] = useState("");
 
   const { data: account, isLoading } = useQuery({
     queryKey: ["ad-account-detail", id],
@@ -153,7 +156,36 @@ export default function AdAccountDetailPage() {
     onError: (err: any) => toast.error(err.message),
   });
 
-  // Update from Meta / Update from BC
+  // Top-up mutation
+  const topUpMutation = useMutation({
+    mutationFn: async () => {
+      if (!topUpAmount) throw new Error("Enter amount");
+      const amt = parseFloat(topUpAmount);
+      if (isNaN(amt) || amt <= 0) throw new Error("Invalid amount");
+
+      const edgeFn = isTikTok ? "tiktok-topup" : "spend-cap-update";
+      const body = isTikTok
+        ? { ad_account_id: id, amount: amt, deduct_wallet: !!assignedUserId, target_user_id: assignedUserId }
+        : { ad_account_id: id, amount: amt, deduct_wallet: !!assignedUserId, target_user_id: assignedUserId };
+
+      const { data, error } = await supabase.functions.invoke(edgeFn, { body });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => {
+      toast.success(`Top up successful: $${topUpAmount}`);
+      setShowTopUp(false);
+      setTopUpAmount("");
+      queryClient.invalidateQueries({ queryKey: ["ad-account-detail", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["tiktok-ad-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-all-wallets"] });
+    },
+    onError: (err: any) => toast.error(friendlyEdgeError(err)),
+  });
+
+
   const handleUpdateFromSource = async () => {
     if (!isAdmin && !isTikTok) {
       const now = Date.now();
@@ -360,7 +392,15 @@ export default function AdAccountDetailPage() {
           {/* Spend Info */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Spend Overview</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">Spend Overview</CardTitle>
+                {isAdmin && (
+                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setShowTopUp(true)}>
+                    <ArrowUpCircle className="h-4 w-4 mr-1" />
+                    Top Up
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               <SpendProgressBar amountSpent={Number(account.amount_spent)} spendCap={Number(account.spend_cap)} balanceAfterTopup={Number((account as any).balance_after_topup ?? 0)} />
@@ -483,6 +523,43 @@ export default function AdAccountDetailPage() {
           {/* Partner BMs (Meta + Admin only) */}
           {isAdmin && id && !isTikTok && <AdAccountPartners adAccountId={id} />}
         </div>
+
+        {/* Top Up Dialog */}
+        <Dialog open={showTopUp} onOpenChange={setShowTopUp}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Top Up — {account?.account_name}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <div>
+                <Label>Amount (USD)</Label>
+                <Input
+                  type="number"
+                  placeholder="Enter amount"
+                  value={topUpAmount}
+                  onChange={(e) => setTopUpAmount(e.target.value)}
+                  min="1"
+                  autoFocus
+                />
+              </div>
+              {assignedUserId && (
+                <p className="text-xs text-muted-foreground">
+                  Wallet will be deducted for assigned client.
+                </p>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowTopUp(false)}>Cancel</Button>
+              <Button
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={() => topUpMutation.mutate()}
+                disabled={topUpMutation.isPending || !topUpAmount}
+              >
+                {topUpMutation.isPending ? "Processing..." : "Top Up"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
