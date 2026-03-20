@@ -121,42 +121,42 @@ Deno.serve(async (req) => {
 
     // Upsert accounts
     for (const adv of advertiserList) {
-        const advertiserId = String(adv.advertiser_id);
-        const advertiserName = adv.advertiser_name || `TikTok ${advertiserId}`;
-        const budget = budgetMap[advertiserId];
-        const spendCap = budget?.budget ?? 0;
-        const amountSpent = budget?.spent ?? 0;
+      const advertiserId = String(adv.advertiser_id);
+      const advertiserName = adv.advertiser_name || `TikTok ${advertiserId}`;
+      const bal = budgetMap[advertiserId];
+      // grant = total allocated, balance = remaining; spent = grant - balance
+      const spendCap = bal?.grant ?? 0;
+      const amountSpent = spendCap > 0 ? Math.max(0, spendCap - (bal?.balance ?? 0)) : 0;
 
-        const { data: existing } = await supabase
+      const { data: existing } = await supabase
+        .from("ad_accounts")
+        .select("id")
+        .eq("account_id", advertiserId)
+        .eq("platform", "tiktok")
+        .maybeSingle();
+
+      if (existing) {
+        await supabase
           .from("ad_accounts")
-          .select("id")
-          .eq("account_id", advertiserId)
-          .eq("platform", "tiktok")
-          .maybeSingle();
-
-        if (existing) {
-          await supabase
-            .from("ad_accounts")
-            .update({
-              account_name: advertiserName,
-              business_manager_id: bm.id,
-              spend_cap: spendCap,
-              amount_spent: amountSpent,
-            })
-            .eq("id", existing.id);
-        } else {
-          await supabase.from("ad_accounts").insert({
-            account_id: advertiserId,
+          .update({
             account_name: advertiserName,
-            platform: "tiktok",
             business_manager_id: bm.id,
-            status: "active",
             spend_cap: spendCap,
             amount_spent: amountSpent,
-          });
-        }
-        syncedCount++;
+          })
+          .eq("id", existing.id);
+      } else {
+        await supabase.from("ad_accounts").insert({
+          account_id: advertiserId,
+          account_name: advertiserName,
+          platform: "tiktok",
+          business_manager_id: bm.id,
+          status: "active",
+          spend_cap: spendCap,
+          amount_spent: amountSpent,
+        });
       }
+      syncedCount++;
     }
 
     // Update last_synced_at
