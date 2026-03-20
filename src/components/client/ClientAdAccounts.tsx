@@ -47,6 +47,7 @@ export function ClientAdAccounts() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showSelect, setShowSelect] = useState(false);
   const [search, setSearch] = useState(() => sessionStorage.getItem("adAccountsSearch") || "");
+  useEffect(() => { sessionStorage.setItem("adAccountsSearch", search); }, [search]);
   const [statusFilter, setStatusFilter] = useState("all");
   const [cardFilter, setCardFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);

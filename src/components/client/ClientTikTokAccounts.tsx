@@ -18,6 +18,7 @@ export function ClientTikTokAccounts() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState(() => sessionStorage.getItem("tiktokAccountsSearch") || "");
+  useEffect(() => { sessionStorage.setItem("tiktokAccountsSearch", search); }, [search]);
   const [topUpAccount, setTopUpAccount] = useState<any>(null);
   const [topUpAmount, setTopUpAmount] = useState("");
 
