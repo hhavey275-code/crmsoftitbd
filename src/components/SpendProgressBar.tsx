@@ -31,7 +31,7 @@ export function SpendProgressBar({ amountSpent, spendCap, balanceAfterTopup }: S
       ? "bg-destructive"
       : ratio >= 0.5
         ? "bg-yellow-500 dark:bg-yellow-400"
-        : "bg-blue-500 dark:bg-blue-400";
+        : "bg-teal-500 dark:bg-teal-400";
 
   return (
     <div className="w-full min-w-[80px]">
